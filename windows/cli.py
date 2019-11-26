@@ -2,6 +2,7 @@ import re
 import sys
 import time
 import signal
+import capstone
 import threading
 from ctypes import *
 from binascii import hexlify
@@ -154,10 +155,28 @@ def show_context():
 	print("r11=%016X r12=%016X r13=%016X" % (r11, r12, r13))
 	print("r14=%016X r15=%016X" % (r14, r15))
 
-	data_at_rip = mem_read(rip, 16)
-	print(repr(data_at_rip))
-	if data_at_rip:
-		print('%016X %s' % (rip, hexlify(data_at_rip).decode('utf-8')))
+	data = mem_read(rip, 16)
+	if data:
+		(asmstr, asmlen) = disasm1(data, rip)
+		print('%016X: %s\t%s' % (rip, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
+
+def disasm1(data, addr):
+	md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+	gen = md.disasm(data, addr)
+	insn = next(gen)
+	return ('%s %s' % (insn.mnemonic, insn.op_str), insn.size)
+
+def disasm(data, addr):
+	lines = []
+	md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+	offset = 0
+	for i in md.disasm(data, addr):
+		bytestr = hexlify(data[offset:offset+i.size]).decode('utf-8').ljust(16)
+		asmstr = i.mnemonic + ' ' + i.op_str
+		line = '%016X: %s %s' % (i.address, bytestr, asmstr)
+		lines.append(line)
+		offset += i.size
+	return '\n'.join(lines)
 
 def hex_dump(data, addr=0, grouping=1, endian='little'):
 	result = ''
@@ -348,7 +367,7 @@ if __name__ == '__main__':
 				(_, reg, val) = text.split(' ')
 				reg_write(reg, int(val, 16))
 
-			# read/write mem
+			# read/write mem, disasm mem
 			elif text.startswith('db '):
 				addr = int(text[3:],16)
 				data = mem_read(addr, 256)
@@ -358,6 +377,10 @@ if __name__ == '__main__':
 				addr = int(m.group(1), 16)
 				bytes_ = bytes(map(lambda x: int(x,16), m.group(2).split()))
 				mem_write(addr, bytes_)
+			elif text.startswith('u '):
+				addr = int(text[2:],16)
+				data = mem_read(addr, 64)
+				print(disasm(data, addr))
 
 			# break into, go, step, step into
 			elif text in ['break', 'breakinto']:
