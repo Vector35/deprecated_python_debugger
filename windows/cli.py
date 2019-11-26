@@ -9,6 +9,10 @@ from binascii import hexlify
 from struct import pack, unpack
 
 import colorama
+RED = '\x1B[31m'
+GREEN = '\x1B[32m'
+BROWN = '\x1B[33m'
+NORMAL = '\x1B[0m'
 
 adapter = None
 cbuf = None
@@ -148,17 +152,24 @@ def show_context():
 	if rax==None or r15==None:
 		return
 
-	print("rax=%016X rbx=%016X rcx=%016X" % (rax, rbx, rcx))
-	print("rdx=%016X rsi=%016X rdi=%016X" % (rdx, rsi, rdi))
-	print("rip=%016X rsp=%016X rbp=%016X" % (rip, rsp, rbp))
-	print(" r8=%016X  r9=%016X r10=%016X" % (r8, r9, r10))
-	print("r11=%016X r12=%016X r13=%016X" % (r11, r12, r13))
-	print("r14=%016X r15=%016X" % (r14, r15))
+	print("%srax%s=%016X %srbx%s=%016X %srcx%s=%016X" % \
+		(BROWN, NORMAL, rax, BROWN, NORMAL, rbx, BROWN, NORMAL, rcx))
+	print("%srdx%s=%016X %srsi%s=%016X %srdi%s=%016X" % 
+		(BROWN, NORMAL, rdx, BROWN, NORMAL, rsi, BROWN, NORMAL, rdi))
+	print("%srip%s=%016X %srsp%s=%016X %srbp%s=%016X" % \
+		(BROWN, NORMAL, rip, BROWN, NORMAL, rsp, BROWN, NORMAL, rbp))
+	print(" %sr8%s=%016X  %sr9%s=%016X %sr10%s=%016X" % \
+		(BROWN, NORMAL, r8, BROWN, NORMAL, r9, BROWN, NORMAL, r10))
+	print("%sr11%s=%016X %sr12%s=%016X %sr13%s=%016X" % \
+		(BROWN, NORMAL, r11, BROWN, NORMAL, r12, BROWN, NORMAL, r13))
+	print("%sr14%s=%016X %sr15%s=%016X" % \
+		(BROWN, NORMAL, r14, BROWN, NORMAL, r15))
 
 	data = mem_read(rip, 16)
 	if data:
 		(asmstr, asmlen) = disasm1(data, rip)
-		print('%016X: %s\t%s' % (rip, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
+		print('%s%016X%s: %s\t%s' % \
+			(GREEN, rip, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
 
 def disasm1(data, addr):
 	md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
@@ -167,13 +178,16 @@ def disasm1(data, addr):
 	return ('%s %s' % (insn.mnemonic, insn.op_str), insn.size)
 
 def disasm(data, addr):
+	if not data:
+		return
 	lines = []
 	md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 	offset = 0
 	for i in md.disasm(data, addr):
+		addrstr = '%s%016X%s' % (GREEN, i.address, NORMAL)
 		bytestr = hexlify(data[offset:offset+i.size]).decode('utf-8').ljust(16)
 		asmstr = i.mnemonic + ' ' + i.op_str
-		line = '%016X: %s %s' % (i.address, bytestr, asmstr)
+		line = '%s: %s %s' % (addrstr, bytestr, asmstr)
 		lines.append(line)
 		offset += i.size
 	return '\n'.join(lines)
@@ -185,7 +199,7 @@ def hex_dump(data, addr=0, grouping=1, endian='little'):
 		ascii = ''
 		buff16 = data[0:16]
 		data = data[16:]
-		result += "%08X: " % addr
+		result += "%s%016X%s: " % (GREEN, addr, NORMAL)
 
 		i = 0
 		while i < 16:
@@ -301,6 +315,8 @@ def debug_thread(action, target):
 	adapter = None
 
 if __name__ == '__main__':
+	colorama.init()
+
 	user_still_wants_to_debug = True
 	sema = threading.Semaphore()
 	sema.acquire()
@@ -369,8 +385,8 @@ if __name__ == '__main__':
 
 			# read/write mem, disasm mem
 			elif text.startswith('db '):
-				addr = int(text[3:],16)
-				data = mem_read(addr, 256)
+				addr = int(text[3:], 16)
+				data = mem_read(addr, 128)
 				print(hex_dump(data, addr))
 			elif text.startswith('eb '):
 				m = re.match(r'^eb (\w+) (.*)$', text)
@@ -379,7 +395,7 @@ if __name__ == '__main__':
 				mem_write(addr, bytes_)
 			elif text.startswith('u '):
 				addr = int(text[2:],16)
-				data = mem_read(addr, 64)
+				data = mem_read(addr, 32)
 				print(disasm(data, addr))
 
 			# break into, go, step, step into
