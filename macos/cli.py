@@ -80,10 +80,10 @@ def tx_rx(data):
 	if data[0] in 'fiIkRt':
 		pass
 	# require simple ack
-	elif data[0] in '!ADGHMPQTX' or data.startswith('vFlashErase') or data.startswith('vFlashWrite'):
+	elif data[0] in '!ADGHQTX' or data.startswith('vFlashErase') or data.startswith('vFlashWrite'):
 		pass
 	# return result data or error code
-	elif data[0] in '?cCgmpsSqvZz':
+	elif data[0] in '?cCgmMpPsSqvzZ':
 		return recv_packet_data()
 
 def send_ack():
@@ -179,6 +179,30 @@ def mem_read(addr, amt=None):
 		amt -= chunk
 
 	return packed
+
+def mem_write(addr, data):
+	payload = 'M%X,%X:%s' % (addr, len(data), ''.join(['%02X'%b for b in data]))
+	reply = tx_rx(payload)
+	if reply == 'OK':
+		return 0
+
+def reg_write(regname, value):
+	if not reg_id_to_name:
+		register_info_learn()
+
+	if not regname in reg_id_to_name.values():
+		print('ERROR: unknown register %s' % regname)
+		return None
+
+	regid = [key_val[0] for key_val in reg_id_to_name.items() if key_val[1]==regname][0]
+
+	valstr = '%016x'%value
+	valstr = [valstr[i:i+2] for i in range(0,len(valstr),2)]
+	valstr = ''.join(reversed(valstr))
+	payload = 'P %d=%s' % (regid, valstr)
+	reply = tx_rx(payload)
+	if reply == 'OK':
+		return 0
 
 breakpoint_id_to_addr = {}
 def breakpoint_set(addr):
