@@ -17,6 +17,8 @@ import colorama
 
 sock = None
 
+reg_id_to_name = {}
+
 sig_num_to_name = {
 	1: 'SIGHUP', 2: 'SIGINT', 3: 'SIGQUIT', 4: 'SIGILL', 5: 'SIGTRAP', 6:
 	'SIGABRT', 7: 'SIGEMT', 8: 'SIGFPE', 9: 'SIGKILL', 10: 'SIGBUS', 11: 'SIGSEGV',
@@ -26,7 +28,7 @@ sig_num_to_name = {
 	'SIGPROF', 28: 'SIGWINCH', 29: 'SIGINFO', 30: 'SIGUSR1', 31: 'SIGUSR2'}
 
 #--------------------------------------------------------------------------
-# GDB RSP FUNCTIONS
+# GDB RSP FUNCTIONS (LOW LEVEL)
 #--------------------------------------------------------------------------
 def send_raw(data):
 	global sock
@@ -81,6 +83,53 @@ def send_ack():
 	print(packet.decode('utf-8'), '->')
 
 #--------------------------------------------------------------------------
+# GDB RSP FUNCTIONS (HIGHER LEVEL)
+#--------------------------------------------------------------------------
+
+def register_info_learn():
+	for i in range(256):
+		reply = tx_rx('qRegisterInfo%02X' % i)
+		if not reply.startswith('name:'):
+			break
+		name = re.match(r'^name:(.*?);', reply).group(1)
+		#print('reg %d is %s' % (i, name))
+		reg_id_to_name[i] = name
+
+def packet_display(data):
+	# stdout
+	if reply[0] == 'O':
+		message = binascii.unhexlify(reply[1:])
+		print('stdout message: %s' % message)
+
+	# thread info
+	elif reply[0] == 'T':
+		if not reg_id_to_name:
+			register_info_learn()
+
+		signal = int(reply[1:3], 16)
+		print('thread stopped due to signal %d (%s)' % (signal, sig_num_to_name[signal]))
+		for key_vals in reply[3:].split(';'):
+			if not key_vals:
+				continue
+			(key, val) = key_vals.split(':')
+			if key == 'thread':
+				tid = int(val, 16)
+				print('thread: %s' % tid)
+			elif re.match(r'^[0-9a-fA-F]+$', key):
+				rid = int(key, 16)
+				reg_name = reg_id_to_name[rid] if rid in reg_id_to_name else 'reg%02d' % rid;
+				print('%s: %s' % (reg_name, val))
+			else:
+				print('%s: %s' % (key, val))
+
+	# exit status
+	elif reply[0] == 'W':
+		exit_status = int(reply[1:], 16)
+		print('inferior exited with status: %d' % exit_status)
+	else:
+		print(reply)	
+
+#--------------------------------------------------------------------------
 # COMMON DEBUGGER TASKS
 #--------------------------------------------------------------------------
 
@@ -108,27 +157,6 @@ def mem_read(addr, amt=None):
 
 def debug_status():
 	return
-
-def show_context():
-	reply = tx_rx('?')
-
-	if reply[0] == 'T':
-		signal = int(reply[1:3], 16)
-		print('thread stopped due to signal %d (%s)' % (signal, sig_num_to_name[signal]))
-		for key_vals in reply[3:].split(';'):
-			if not key_vals:
-				continue
-			(key, val) = key_vals.split(':')
-			if key == 'thread':
-				tid = int(val, 16)
-				print('thread: %s' % tid)
-			elif re.match(r'^[0-9a-fA-F]+$', key):
-				rid = int(key, 16)
-				print('reg%02d: %s' % (rid, val))
-			else:
-				print('%s: %s' % (key, val))
-	else:
-		print('unrecognized reply')
 
 #--------------------------------------------------------------------------
 # MAIN
@@ -183,7 +211,8 @@ if __name__ == '__main__':
 
 			# context, read regs, write regs
 			elif text in ['r']:
-				show_context()
+				reply = tx_rx('?')
+				packet_display(reply)
 			elif re.match(r'r .* .*$', text):
 				(_, reg, val) = text.split(' ')
 				reg_write(reg, int(val, 16))
@@ -209,18 +238,11 @@ if __name__ == '__main__':
 
 			elif text == 'g':
 				reply = tx_rx('c') # rsp continue packet
-				if reply[0] == 'W':
-					exit_status = int(reply[1:], 16)
-					print('inferior exited with status: %d' % exit_status)
-				elif reply[0] == 'O':
-					message = binascii.unhexlify(reply[1:])
-					print('stdout message: %s' % message)
-				else:
-					print(reply)
+				packet_display(reply)
 
 			elif text == 't':
 				reply = tx_rx('vCont;s') # rsp step packet
-				print(reply)
+				packet_display(reply)
 
 			elif text == 'p':
 				print('no step over')
@@ -232,6 +254,11 @@ if __name__ == '__main__':
 			elif text in ['qd', 'detach']:
 				process_detach()
 				user_still_wants_to_debug = False
+
+			# pass-thru packet
+			elif text.startswith('packet '):
+				reply = tx_rx(text[7:])
+				packet_display(reply)
 
 			# else
 			else:
