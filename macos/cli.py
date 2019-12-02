@@ -318,8 +318,8 @@ if __name__ == '__main__':
 	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	sock.connect(('localhost', 31337))
 
-	user_still_wants_to_debug = True
-	while user_still_wants_to_debug:
+	user_goal = 'debug'
+	while user_goal == 'debug':
 		try:
 			prompt = 'RUNNING>' if adapter_blocking else 'FAKEDBG>'
 			text = input(prompt)
@@ -397,10 +397,11 @@ if __name__ == '__main__':
 
 			# quit, detach, quit+detach
 			elif text in ['q', 'quit', 'exit']:
-				user_still_wants_to_debug = False
+				user_goal = 'quit'
+				break
 			elif text in ['qd', 'detach']:
-				process_detach()
-				user_still_wants_to_debug = False
+				user_goal = 'detach'
+				break
 
 			# pass-thru packet
 			elif text.startswith('packet '):
@@ -413,10 +414,14 @@ if __name__ == '__main__':
 
 		except KeyboardInterrupt as e:
 			print("ctrl+c detected! quiting!\n")
-			user_still_wants_to_debug = False
+			user_goal = 'quit'
 
-	print("telling server to disconnect")
-	send_raw('D')
+	if user_goal == 'detach':
+		print('telling server to detach from process')
+		send_packet_data('D')
+	elif user_goal == 'quit':
+		print("telling server to kill process")
+		send_packet_data('k')
 	print("socket shutdown() and close()")
 	sock.shutdown(socket.SHUT_RDWR)
 	sock.close()
