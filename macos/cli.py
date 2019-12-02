@@ -12,6 +12,7 @@ import sys
 from struct import pack, unpack
 import socket
 import string
+import readline
 import capstone
 from binascii import hexlify, unhexlify
 
@@ -79,10 +80,10 @@ def tx_rx(data):
 	if data[0] in 'fiIkRt':
 		pass
 	# require simple ack
-	elif data[0] in '!ADGHMPQTXzZ' or data.startswith('vFlashErase') or data.startswith('vFlashWrite'):
+	elif data[0] in '!ADGHMPQTX' or data.startswith('vFlashErase') or data.startswith('vFlashWrite'):
 		pass
 	# return result data or error code
-	elif data[0] in '?cCgmpsSqv':
+	elif data[0] in '?cCgmpsSqvZz':
 		return recv_packet_data()
 
 def send_ack():
@@ -114,6 +115,11 @@ def packet_T_to_dict(data):
 	for key_vals in data[3:].split(';'):
 		if not key_vals:
 			continue
+
+		if not ':' in key_vals:
+			print(key_vals)
+			assert(0)
+
 		(key, val) = key_vals.split(':')
 
 		if key == 'thread':
@@ -173,6 +179,35 @@ def mem_read(addr, amt=None):
 		amt -= chunk
 
 	return packed
+
+breakpoint_id_to_addr = {}
+def breakpoint_set(addr):
+	if addr in breakpoint_id_to_addr.values():
+		return None
+
+	data = 'Z0,%x,1' % addr
+	reply = tx_rx(data)
+	if reply != 'OK':
+		return None
+
+	ids = breakpoint_id_to_addr.keys()
+	for bpid in range(999999999):
+		if not bpid in ids:
+			breakpoint_id_to_addr[bpid] = addr
+			return bpid
+
+def breakpoint_clear(bpid):
+	if not bpid in breakpoint_id_to_addr:
+		return None
+
+	data = 'z0,%x,1' % breakpoint_id_to_addr[bpid]
+	reply = tx_rx(data)
+	if reply != 'OK':
+		print('reply was: -%s-' % reply)
+		return None
+
+	del breakpoint_id_to_addr[bpid]
+	return bpid
 
 def context_show(pkt_T=None):
 	global context_last
@@ -356,6 +391,13 @@ if __name__ == '__main__':
 				bpid = int(text[3:])
 				if breakpoint_clear(bpid) == None:
 					print('ERROR')
+				else:
+					print('breakpoint id %d cleared' % bpid)
+
+			elif text == 'bl':
+				print('breakpoint list:')
+				for (bpid, addr) in breakpoint_id_to_addr.items():
+					print('%d: 0x%X' % (bpid, addr))
 
 			# context, read regs, write regs
 			elif text in ['r']:
@@ -384,8 +426,8 @@ if __name__ == '__main__':
 				break_into()
 
 			elif text == 'g':
-				reply = tx_rx('c') # rsp continue packet
-				packet_display(reply)
+				pkt_T = tx_rx('c') # rsp continue packet
+				context_show(pkt_T)
 
 			elif text == 't':
 				pkt_T = tx_rx('vCont;s') # rsp step packet
