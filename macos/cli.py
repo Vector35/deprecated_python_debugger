@@ -9,13 +9,21 @@
 import os
 import re
 import sys
-import struct
+from struct import pack, unpack
 import socket
 import string
-import binascii
+import capstone
+from binascii import hexlify, unhexlify
+
 import colorama
+RED = '\x1B[31m'
+GREEN = '\x1B[32m'
+BROWN = '\x1B[33m'
+NORMAL = '\x1B[0m'
 
 sock = None
+
+context_last = {}
 
 reg_id_to_name = {}
 
@@ -95,39 +103,51 @@ def register_info_learn():
 		#print('reg %d is %s' % (i, name))
 		reg_id_to_name[i] = name
 
+def packet_T_to_dict(data):
+	if not reg_id_to_name:
+		register_info_learn()
+
+	# map the info to a context dictionary
+	context = {}
+	context['signal'] = int(data[1:3], 16)
+
+	for key_vals in data[3:].split(';'):
+		if not key_vals:
+			continue
+		(key, val) = key_vals.split(':')
+
+		if key == 'thread':
+			context['thread'] = int(val, 16)
+		elif re.match(r'^[0-9a-fA-F]+$', key):
+			rid = int(key, 16)
+			reg_name = reg_id_to_name[rid]
+			val = int(''.join(reversed([val[i:i+2] for i in range(0,len(val),2)])), 16)
+			context[reg_name] = val
+		else:
+			# 'metype', 'mecount', 'medata', 'memory', etc.
+			context[key] = val
+
+	return context
+
 def packet_display(data):
 	# stdout
-	if reply[0] == 'O':
-		message = binascii.unhexlify(reply[1:])
+	if data[0] == 'O':
+		message = unhexlify(data[1:])
 		print('stdout message: %s' % message)
 
 	# thread info
-	elif reply[0] == 'T':
-		if not reg_id_to_name:
-			register_info_learn()
-
-		signal = int(reply[1:3], 16)
-		print('thread stopped due to signal %d (%s)' % (signal, sig_num_to_name[signal]))
-		for key_vals in reply[3:].split(';'):
-			if not key_vals:
-				continue
-			(key, val) = key_vals.split(':')
-			if key == 'thread':
-				tid = int(val, 16)
-				print('thread: %s' % tid)
-			elif re.match(r'^[0-9a-fA-F]+$', key):
-				rid = int(key, 16)
-				reg_name = reg_id_to_name[rid] if rid in reg_id_to_name else 'reg%02d' % rid;
-				print('%s: %s' % (reg_name, val))
-			else:
-				print('%s: %s' % (key, val))
+	elif data[0] == 'T':
+		if data[-1] == ';':
+			data = data[0:-1]
+		for (key,val) in [x.split(':') for x in data[3:].split(';')]:
+			print('%s: %s' % (key, val))
 
 	# exit status
-	elif reply[0] == 'W':
-		exit_status = int(reply[1:], 16)
+	elif data[0] == 'W':
+		exit_status = int(data[1:], 16)
 		print('inferior exited with status: %d' % exit_status)
 	else:
-		print(reply)	
+		print(data)
 
 #--------------------------------------------------------------------------
 # COMMON DEBUGGER TASKS
@@ -138,25 +158,153 @@ def break_into():
 	pass
 
 def mem_read(addr, amt=None):
-	packed = ''
+	packed = b''
 
 	while(amt):
 		chunk = min(amt, 256)
 
 		data = 'm' + ( "%x" % addr ) + ',' + ( "%x" % chunk )
-		send_packet_data(data)
-		resp = recv_packet_data()
+		reply = tx_rx(data)
 
-		while(resp):
-			packed += pack('B', int(resp[0:2],16))
-			resp = resp[2:]
+		while(reply):
+			packed += pack('B', int(reply[0:2],16))
+			reply = reply[2:]
 
 		amt -= chunk
 
 	return packed
 
+def context_show(pkt_T=None):
+	global context_last
+
+	# get a new context
+	if not pkt_T:
+		pkt_T = tx_rx('?')
+	context_last = packet_T_to_dict(pkt_T)
+
+	# show it
+	sig = context_last['signal']
+	if 'thread' in context_last:
+		print('thread %d stopped due to signal %d (%s)' % \
+			(context_last['thread'], sig, sig_num_to_name[sig]))
+	else:
+		print('thread ? stopped due to signal %d (%s)' % \
+			(sig, sig_num_to_name[sig]))
+
+	rax = context_last['rax']
+	rbx = context_last['rbx']
+	rcx = context_last['rcx']
+	rdx = context_last['rdx']
+	rsi = context_last['rsi']
+	rdi = context_last['rdi']
+	rip = context_last['rip']
+	rsp = context_last['rsp']
+	rbp = context_last['rbp']
+	r8 = context_last['r8']
+	r9 = context_last['r9']
+	r10 = context_last['r10']
+	r11 = context_last['r11']
+	r12 = context_last['r12']
+	r13 = context_last['r13']
+	r14 = context_last['r14']
+	r15 = context_last['r15']
+
+	print("%srax%s=%016X %srbx%s=%016X %srcx%s=%016X" % \
+		(BROWN, NORMAL, rax, BROWN, NORMAL, rbx, BROWN, NORMAL, rcx))
+	print("%srdx%s=%016X %srsi%s=%016X %srdi%s=%016X" %
+		(BROWN, NORMAL, rdx, BROWN, NORMAL, rsi, BROWN, NORMAL, rdi))
+	print("%srip%s=%016X %srsp%s=%016X %srbp%s=%016X" % \
+		(BROWN, NORMAL, rip, BROWN, NORMAL, rsp, BROWN, NORMAL, rbp))
+	print(" %sr8%s=%016X  %sr9%s=%016X %sr10%s=%016X" % \
+		(BROWN, NORMAL, r8, BROWN, NORMAL, r9, BROWN, NORMAL, r10))
+	print("%sr11%s=%016X %sr12%s=%016X %sr13%s=%016X" % \
+		(BROWN, NORMAL, r11, BROWN, NORMAL, r12, BROWN, NORMAL, r13))
+	print("%sr14%s=%016X %sr15%s=%016X" % \
+		(BROWN, NORMAL, r14, BROWN, NORMAL, r15))
+
+	data = mem_read(rip, 16)
+	if data:
+		(asmstr, asmlen) = disasm1(data, rip)
+		print('%s%016X%s: %s\t%s' % \
+			(GREEN, rip, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
+
 def debug_status():
 	return
+
+#--------------------------------------------------------------------------
+# UTILITIES
+#--------------------------------------------------------------------------
+
+def disasm1(data, addr):
+	md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+	gen = md.disasm(data, addr)
+	insn = next(gen)
+	return ('%s %s' % (insn.mnemonic, insn.op_str), insn.size)
+
+def disasm(data, addr):
+	if not data:
+		return
+	lines = []
+	md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+	offset = 0
+	for i in md.disasm(data, addr):
+		addrstr = '%s%016X%s' % (GREEN, i.address, NORMAL)
+		bytestr = hexlify(data[offset:offset+i.size]).decode('utf-8').ljust(16)
+		asmstr = i.mnemonic + ' ' + i.op_str
+		line = '%s: %s %s' % (addrstr, bytestr, asmstr)
+		lines.append(line)
+		offset += i.size
+	return '\n'.join(lines)
+
+def hex_dump(data, addr=0, grouping=1, endian='little'):
+	result = ''
+
+	while(data):
+		ascii = ''
+		buff16 = data[0:16]
+		data = data[16:]
+		result += "%s%016X%s: " % (GREEN, addr, NORMAL)
+
+		i = 0
+		while i < 16:
+			if(i < len(buff16)):
+				f0 = { \
+					'big':	{1:'>B', 2:'>H', 4:'>I', 8:'>Q'}, \
+					'little': {1:'<B', 2:'<H', 4:'<I', 8:'<Q'} \
+				}
+
+				f1 = { \
+					1:'%02X ', 2:'%04X ', 4:'%08X ', 8:'%016X ' \
+				}
+
+				temp = unpack(f0[endian][grouping], buff16[i:i+grouping])[0]
+
+				result += f1[grouping] % temp
+
+				for j in range(grouping):
+					u8 = buff16[i+j]
+
+					if(u8 >= ord(' ') and u8 <= ord('~')):
+						ascii += chr(u8)
+					else:
+						ascii += '.'
+			else:
+				if grouping == 1:
+					result += ' '*3
+				elif grouping == 2:
+					result += ' '*5
+				elif grouping == 4:
+					result += ' '*9
+				elif grouping == 8:
+					result += ' '*17
+
+			i += grouping
+
+		result += ' %s\n' % ascii
+
+		addr += 16
+
+	return result
 
 #--------------------------------------------------------------------------
 # MAIN
@@ -211,8 +359,7 @@ if __name__ == '__main__':
 
 			# context, read regs, write regs
 			elif text in ['r']:
-				reply = tx_rx('?')
-				packet_display(reply)
+				context_show()
 			elif re.match(r'r .* .*$', text):
 				(_, reg, val) = text.split(' ')
 				reg_write(reg, int(val, 16))
@@ -241,8 +388,8 @@ if __name__ == '__main__':
 				packet_display(reply)
 
 			elif text == 't':
-				reply = tx_rx('vCont;s') # rsp step packet
-				packet_display(reply)
+				pkt_T = tx_rx('vCont;s') # rsp step packet
+				context_show(pkt_T)
 
 			elif text == 'p':
 				print('no step over')
