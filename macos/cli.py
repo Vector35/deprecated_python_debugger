@@ -10,6 +10,7 @@ import os
 import re
 import sys
 from struct import pack, unpack
+import signal
 import socket
 import string
 import readline
@@ -73,18 +74,39 @@ def recv_packet_data():
 
 	return pkt[1:-3].decode('utf-8')
 
-def tx_rx(data):
+def assert_ack():
+	global sock
+	ack = sock.recv(1)
+	if ack != b'+':
+		print('expected ack, got: ', ack)
+		assert False
+
+def tx_rx(data, expect=None):
 	send_packet_data(data)
 
-	# require no acknowledgement
-	if data[0] in 'fiIkRt':
-		pass
-	# require simple ack
-	elif data[0] in '!ADGHQTX' or data.startswith('vFlashErase') or data.startswith('vFlashWrite'):
-		pass
-	# return result data or error code
-	elif data[0] in '?cCgmMpPsSqvzZ':
-		return recv_packet_data()
+	if expect == None:
+		# require no acknowledgement
+		if data[0] in 'fiIkRt':
+			pass
+		# require simple ack
+		elif data[0] in '!ADGHQTX' or data.startswith('vFlashErase') or data.startswith('vFlashWrite'):
+			pass
+		# return result data or error code
+		elif data[0] in '?cCgmMpPsSqvzZ':
+			return recv_packet_data()
+	else:
+		if expect == 'nothing':
+			pass
+		elif expect == 'ack_then_nothing':
+			assert_ack()
+		elif expect == 'ack_then_reply':
+			assert_ack()
+			return recv_packet_data()
+		elif expect == 'ack_then_ok':
+			assert_ack()
+			assert recv_packet_data() == 'OK'
+		else:
+			print('dunno how to expect %s' % expect)
 
 def send_ack():
 	packet = '+'
@@ -136,6 +158,10 @@ def packet_T_to_dict(data):
 	return context
 
 def packet_display(data):
+	if not data:
+		print('(empty packet)')
+		return
+
 	# stdout
 	if data[0] == 'O':
 		message = unhexlify(data[1:])
@@ -160,7 +186,7 @@ def packet_display(data):
 #--------------------------------------------------------------------------
 
 def break_into():
-	send_draw(b'\x03')
+	send_raw('\x03')
 	pass
 
 def mem_read(addr, amt=None):
@@ -233,22 +259,71 @@ def breakpoint_clear(bpid):
 	del breakpoint_id_to_addr[bpid]
 	return bpid
 
+def go_loop(pdata):
+	while 1:
+		reply = tx_rx(pdata)
+		if reply[0] == 'T':
+			break
+		packet_display(reply)
+
+	context_show(reply)
+
+def thread_list(display=False):
+	reply = tx_rx('qfThreadInfo', 'ack_then_reply')
+	assert reply[0] == 'm'
+	lldb_tids = reply[1:].split(',')
+	lldb_tids = list(map(lambda x: int(x,16), lldb_tids))
+
+	if display:
+		lldb_tid_cur = None
+
+		if context_last and 'thread' in context_last:
+			lldb_tid_cur = context_last['thread']
+		for (i, lldb_tid) in enumerate(lldb_tids):
+			marker = '-->' if lldb_tid == lldb_tid_cur else '   '
+			print('%s %d: %x' % (marker, i, lldb_tid))
+
+	return lldb_tids
+
+def thread_set_current(thread_idx):
+	global context_last
+
+	thread_ids = thread_list()
+
+	# set thread for step and continue operations
+	payload = 'Hc%x' % thread_ids[thread_idx]
+	reply = tx_rx(payload, 'ack_then_ok')
+
+	# set thread for other operations
+	payload = 'Hg%x' % thread_ids[thread_idx]
+	reply = tx_rx(payload, 'ack_then_ok')
+
+	# capture new thread context
+	pkt_T = tx_rx('?', 'ack_then_reply')
+	context_last = packet_T_to_dict(pkt_T)
+
 def context_show(pkt_T=None):
 	global context_last
 
 	# get a new context
 	if not pkt_T:
-		pkt_T = tx_rx('?')
+		pkt_T = tx_rx('?', 'ack_then_reply')
 	context_last = packet_T_to_dict(pkt_T)
 
 	# show it
-	sig = context_last['signal']
+	thread_str = 'thread ?'
 	if 'thread' in context_last:
-		print('thread %d stopped due to signal %d (%s)' % \
-			(context_last['thread'], sig, sig_num_to_name[sig]))
+		thread_str = 'thread %x' % context_last['thread']
+
+	sig = context_last['signal']
+	if sig == 0:
+		signal_str = '(no signal)'
+	elif sig in sig_num_to_name:
+		signal_str = 'stopped due to signal %d (%s)' % (sig, sig_num_to_name[sig])
 	else:
-		print('thread ? stopped due to signal %d (%s)' % \
-			(sig, sig_num_to_name[sig]))
+		signal_str = 'stopped due to signal %d (UNKNOWN)' % sig
+
+	print('%s %s' % (thread_str, signal_str))
 
 	rax = context_last['rax']
 	rbx = context_last['rbx']
@@ -371,8 +446,13 @@ def hex_dump(data, addr=0, grouping=1, endian='little'):
 
 adapter_blocking = False
 
+def handler(signal, frame):
+    break_into()
+
 if __name__ == '__main__':
 	colorama.init()
+
+	signal.signal(signal.SIGINT, handler)
 
 	sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	sock.connect(('localhost', 31337))
@@ -390,17 +470,16 @@ if __name__ == '__main__':
 				continue
 
 			# testing stuff
-			if text == 'hello':
-				send_packet_data('?')
-			elif text in ['?', 'state']:
-				debug_status()
+			elif text.startswith('packet '):
+				reply = tx_rx(text[7:])
+				packet_display(reply)
 
 			# thread list, thread switch
 			elif text in ['~', 'threads']:
-				threads_list()
+				thread_list(True)
 			elif text[0:] and text[0]=='~' and text[-1]=='s':
 				tid = int(text[1:-1])
-				set_current_thread(tid)
+				thread_set_current(tid)
 
 			# breakpoint set/clear
 			elif text.startswith('bp '):
@@ -450,12 +529,10 @@ if __name__ == '__main__':
 				break_into()
 
 			elif text == 'g':
-				pkt_T = tx_rx('c') # rsp continue packet
-				context_show(pkt_T)
+				go_loop('c')
 
 			elif text == 't':
-				pkt_T = tx_rx('vCont;s') # rsp step packet
-				context_show(pkt_T)
+				go_loop('vCont;s')
 
 			elif text == 'p':
 				print('no step over')
@@ -469,18 +546,13 @@ if __name__ == '__main__':
 				user_goal = 'detach'
 				break
 
-			# pass-thru packet
-			elif text.startswith('packet '):
-				reply = tx_rx(text[7:])
-				packet_display(reply)
-
 			# else
 			else:
 				print('unrecognized: %s' % text)
 
 		except KeyboardInterrupt as e:
-			print("ctrl+c detected! quiting!\n")
-			user_goal = 'quit'
+			print("ctrl+c detected! breaking in!\n")
+			break_into()
 
 	if user_goal == 'detach':
 		print('telling server to detach from process')
