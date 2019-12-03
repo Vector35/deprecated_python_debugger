@@ -27,7 +27,7 @@ context_last = {}
 # COMMON DEBUGGER TASKS
 #--------------------------------------------------------------------------
 
-def context_show(pkt_T=None):
+def context_display(pkt_T=None):
 	global adapter
 	global context_last
 
@@ -87,6 +87,17 @@ def context_show(pkt_T=None):
 		(asmstr, asmlen) = disasm1(data, rip)
 		print('%s%016X%s: %s\t%s' % \
 			(GREEN, rip, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
+
+def thread_display():
+	tid_selected = adapter.thread_selected()
+
+	for tid in adapter.thread_list():
+		adapter.thread_select(tid)
+		rip = adapter.register_read('rip')
+		seltxt = ['','(selected)'][tid == tid_selected]
+		print('Thread tid=0x%X rip=0x%X %s' % (tid, rip, seltxt))
+
+	adapter.thread_select(tid_selected)
 
 def debug_status():
 	return
@@ -166,11 +177,6 @@ def hex_dump(data, addr=0, grouping=1, endian='little'):
 
 	return result
 
-# handle asynchronous output packets from lldb server
-def output_handler(packet):
-	message = unhexlify(data[1:])
-	print('stdout message: %s' % message)
-
 #--------------------------------------------------------------------------
 # MAIN
 #--------------------------------------------------------------------------
@@ -196,16 +202,16 @@ if __name__ == '__main__':
 			# testing stuff
 			#elif text.startswith('packet '):
 			#	reply = tx_rx(text[7:])
-			#	packet_display(reply)
+			elif text == 'test':
+				adapter.break_reason()
 
 			# thread list, thread switch
 			elif text in ['~', 'threads']:
-				tids = adapter.thread_list()
-				for (idx, tid) in enumerate(tids):
-					print('%02d: tid=0x%X' % (idx, tid))
+				thread_display()
 
 			elif text[0:] and text[0]=='~' and text[-1]=='s':
-				tid = int(text[1:-1])
+				tid = int(text[1:-1], 16)
+				print('switching to thread 0x%x' % tid)
 				adapter.thread_select(tid)
 
 			# breakpoint set/clear
@@ -231,7 +237,7 @@ if __name__ == '__main__':
 
 			# context, read regs, write regs
 			elif text in ['r']:
-				context_show()
+				context_display()
 			elif re.match(r'r .* .*$', text):
 				(_, reg, val) = text.split(' ')
 				adapter.reg_write(reg, int(val, 16))
@@ -255,9 +261,6 @@ if __name__ == '__main__':
 			elif text in ['break', 'breakinto']:
 				break_into()
 
-			elif text == 'test':
-				(reason, data) = adapter.go()
-
 			elif text in 'gpt':
 				while 1:
 					if text == 'g':
@@ -273,7 +276,7 @@ if __name__ == '__main__':
 						print('process exited, return code=%d', data)
 					else:
 						print('stopped, reason: ', reason.name)
-						context_show()
+						context_display()
 						break
 
 			# quit, detach, quit+detach

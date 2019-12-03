@@ -80,8 +80,6 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.sock.connect(('localhost', 31337))
 
-		self.context_last = {}
-
 		# register state
 		self.reg_id_to_name = {}
 		self.reg_name_to_id = {}
@@ -127,39 +125,20 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		tids = list(map(lambda x: int(x,16), tids))
 		return tids
 
-#	def thread_list(self):
-#		# get list of thread id's
-#
-#		# get active thread
-#		reply = rsp.tx_rx(self.sock, '?', 'ack_then_reply')
-#		context = rsp.packet_T_to_dict(reply)
-#		tid_active = context.get('thread')
-#
-#		result = []
-#		for (tidx, tid) in enumerate(tids):
-#			info = {}
-#			info['tid'] = tid
-#			info['active'] = tid == tid_active
-#			info['selected'] = tidx == self.thread_idx_selected
-#			result.append(info)
-#
-#		return result
+	def thread_selected(self):
+		reply = rsp.tx_rx(self.sock, '?', 'ack_then_reply')
+		context = rsp.packet_T_to_dict(reply)
+		assert 'thread' in context
+		return context.get('thread')
 
-	def thread_select(self, tidx):
-		# get list of thread id's
-		tids = self.thread_list()
-
+	def thread_select(self, tid):
 		# set thread for step and continue operations
-		payload = 'Hc%x' % tids[tidx]
+		payload = 'Hc%x' % tid
 		reply = rsp.tx_rx(self.sock, payload, 'ack_then_ok')
 
 		# set thread for other operations
-		payload = 'Hg%x' % tids[tidx]
+		payload = 'Hg%x' % tid
 		reply = rsp.tx_rx(self.sock, payload, 'ack_then_ok')
-
-		# capture new thread context
-		pkt_T = rsp.tx_rx(self.sock, '?', 'ack_then_reply')
-		self.context_last = rsp.packet_T_to_dict(pkt_T)
 
 	# breakpoints
 	def breakpoint_set(self, address):
@@ -246,6 +225,10 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 	def break_into(self):
 		rsp.send_raw(self.sock, '\x03')
 
+	def break_reason(self):
+		pkt_T = rsp.tx_rx(self.sock, '?', 'ack_then_reply')
+		print(pkt_T)
+
 	# execution control
 	def go(self):
 		return self.go_generic('c')
@@ -276,8 +259,8 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 			self.reg_id_to_name[i] = name
 			self.reg_name_to_id[name] = i
 
-	def go_generic(self, gotype, output_handler=None):
-		reply = rsp.tx_rx(self.sock, gotype, 'mixed_output_ack_then_reply', output_handler)
+	def go_generic(self, gotype, handler_async_pkt=None):
+		reply = rsp.tx_rx(self.sock, gotype, 'mixed_output_ack_then_reply', handler_async_pkt)
 		(reason, reason_data) = (None, None)
 
 		# thread info

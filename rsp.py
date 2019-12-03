@@ -37,7 +37,7 @@ def assert_ack(sock):
 		print('expected ack, got: ', ack)
 		assert False
 
-def tx_rx(sock, data, expect=None, callback_output=None):
+def tx_rx(sock, data, expect=None, handler_async_pkt=None):
 	send_packet_data(sock, data)
 
 	if expect == 'nothing':
@@ -60,8 +60,8 @@ def tx_rx(sock, data, expect=None, callback_output=None):
 			assert peek1 == b'$'
 			reply = recv_packet_data(sock)
 			if reply[0] == 'O':
-				if callback_output:
-					callback_output(reply)
+				if handler_async_pkt:
+					handler_async_pkt(reply)
 			else:
 				# return first non-output packet
 				break
@@ -122,28 +122,4 @@ def packet_T_to_dict(data, lookup_reg={}):
 			context[key] = val
 
 	return context
-
-def packet_display(data):
-	if not data:
-		print('(empty packet)')
-		return
-
-	# stdout
-	if data[0] == 'O':
-	message = unhexlify(data[1:])
-	print('stdout message: %s' % message)
-
-	# thread info
-	elif data[0] == 'T':
-		if data[-1] == ';':
-			data = data[0:-1]
-		for (key,val) in [x.split(':') for x in data[3:].split(';')]:
-			print('%s: %s' % (key, val))
-
-	# exit status
-	elif data[0] == 'W':
-		exit_status = int(data[1:], 16)
-		print('inferior exited with status: %d' % exit_status)
-	else:
-		print(data)
 
