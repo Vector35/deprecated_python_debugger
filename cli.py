@@ -31,43 +31,26 @@ def context_display(pkt_T=None):
 	global adapter
 	global context_last
 
-	# get a new context
-	#if not pkt_T:
-	#	pkt_T = tx_rx('?', 'ack_then_reply')
-	#context_last = packet_T_to_dict(pkt_T)
+	tid = adapter.thread_selected()
+	print('thread 0x%X:' % tid)
 
-	# show it
-	#thread_str = 'thread ?'
-	#if 'thread' in context_last:
-	#	thread_str = 'thread %x' % context_last['thread']
-
-	#sig = context_last['signal']
-	#if sig == 0:
-	#	signal_str = '(no signal)'
-	#elif sig in sig_num_to_name:
-	#	signal_str = 'stopped due to signal %d (%s)' % (sig, sig_num_to_name[sig])
-	#else:
-	#	signal_str = 'stopped due to signal %d (UNKNOWN)' % sig
-
-	#print('%s %s' % (thread_str, signal_str))
-
-	rax = adapter.register_read('rax')
-	rbx = adapter.register_read('rbx')
-	rcx = adapter.register_read('rcx')
-	rdx = adapter.register_read('rdx')
-	rsi = adapter.register_read('rsi')
-	rdi = adapter.register_read('rdi')
-	rip = adapter.register_read('rip')
-	rsp = adapter.register_read('rsp')
-	rbp = adapter.register_read('rbp')
-	r8 = adapter.register_read('r8')
-	r9 = adapter.register_read('r9')
-	r10 = adapter.register_read('r10')
-	r11 = adapter.register_read('r11')
-	r12 = adapter.register_read('r12')
-	r13 = adapter.register_read('r13')
-	r14 = adapter.register_read('r14')
-	r15 = adapter.register_read('r15')
+	rax = adapter.reg_read('rax')
+	rbx = adapter.reg_read('rbx')
+	rcx = adapter.reg_read('rcx')
+	rdx = adapter.reg_read('rdx')
+	rsi = adapter.reg_read('rsi')
+	rdi = adapter.reg_read('rdi')
+	rip = adapter.reg_read('rip')
+	rsp = adapter.reg_read('rsp')
+	rbp = adapter.reg_read('rbp')
+	r8 = adapter.reg_read('r8')
+	r9 = adapter.reg_read('r9')
+	r10 = adapter.reg_read('r10')
+	r11 = adapter.reg_read('r11')
+	r12 = adapter.reg_read('r12')
+	r13 = adapter.reg_read('r13')
+	r14 = adapter.reg_read('r14')
+	r15 = adapter.reg_read('r15')
 
 	print("%srax%s=%016X %srbx%s=%016X %srcx%s=%016X" % \
 		(BROWN, NORMAL, rax, BROWN, NORMAL, rbx, BROWN, NORMAL, rcx))
@@ -93,7 +76,7 @@ def thread_display():
 
 	for tid in adapter.thread_list():
 		adapter.thread_select(tid)
-		rip = adapter.register_read('rip')
+		rip = adapter.reg_read('rip')
 		seltxt = ['','(selected)'][tid == tid_selected]
 		print('Thread tid=0x%X rip=0x%X %s' % (tid, rip, seltxt))
 
@@ -238,9 +221,13 @@ if __name__ == '__main__':
 			# context, read regs, write regs
 			elif text in ['r']:
 				context_display()
-			elif re.match(r'r .* .*$', text):
+			elif re.match(r'r \w+ .*$', text):
 				(_, reg, val) = text.split(' ')
 				adapter.reg_write(reg, int(val, 16))
+			elif re.match(r'r \w+', text):
+				(_, reg) = text.split(' ')
+				val = adapter.reg_read(reg)
+				print('%s=%016X' % (reg, val))
 
 			# read/write mem, disasm mem
 			elif text.startswith('db '):

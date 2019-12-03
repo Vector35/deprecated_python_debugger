@@ -76,11 +76,11 @@ class DebugAdapter:
 		''' return map of bpid -> address '''
 
 	# register
-	def register_read(self, reg):
+	def reg_read(self, reg):
 		pass
-	def register_write(self, reg):
+	def reg_write(self, reg):
 		pass
-	def register_list(self):
+	def reg_list(self):
 		pass
 
 	# mem

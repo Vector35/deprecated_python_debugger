@@ -172,13 +172,13 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		return self.breakpoint_id_to_addr
 
 	# register
-	def register_read(self, name):
+	def reg_read(self, name):
 		self.register_sense()
 		id_ = self.reg_name_to_id[name]
 		reply = rsp.tx_rx(self.sock, 'p%02x' % id_, 'ack_then_reply')
 		return int(''.join(reversed([reply[i:i+2] for i in range(0,len(reply),2)])), 16)
 
-	def register_write(self, name, value):
+	def reg_write(self, name, value):
 		self.register_sense()
 
 		if not name in self.reg_name_to_id:
@@ -216,7 +216,7 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		return packed
 
 	def mem_write(self, address, data):
-		payload = 'M%X,%X:%s' % (addr, len(data), ''.join(['%02X'%b for b in data]))
+		payload = 'M%X,%X:%s' % (address, len(data), ''.join(['%02X'%b for b in data]))
 		reply = rsp.tx_rx(self.sock, payload, 'ack_then_reply')
 		if reply == 'OK':
 			return 0
