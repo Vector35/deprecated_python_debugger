@@ -10,6 +10,7 @@ import signal
 import sys
 
 import lldb
+import DebugAdapter
 
 RED = '\x1B[31m'
 GREEN = '\x1B[32m'
@@ -20,13 +21,7 @@ NORMAL = '\x1B[0m'
 adapter = None
 context_last = {}
 
-sig_num_to_name = {
-	1: 'SIGHUP', 2: 'SIGINT', 3: 'SIGQUIT', 4: 'SIGILL', 5: 'SIGTRAP', 6:
-	'SIGABRT', 7: 'SIGEMT', 8: 'SIGFPE', 9: 'SIGKILL', 10: 'SIGBUS', 11: 'SIGSEGV',
-	12: 'SIGSYS', 13: 'SIGPIPE', 14: 'SIGALRM', 15: 'SIGTERM', 16: 'SIGURG', 17:
-	'SIGSTOP', 18: 'SIGTSTP', 19:  'SIGCONT', 20: 'SIGCHLD', 21: 'SIGTTIN', 22:
-	'SIGTTOU', 23: 'SIGIO', 24:    'SIGXCPU', 25: 'SIGXFSZ', 26: 'SIGVTALRM', 27:
-	'SIGPROF', 28: 'SIGWINCH', 29: 'SIGINFO', 30: 'SIGUSR1', 31: 'SIGUSR2'}
+
 
 #--------------------------------------------------------------------------
 # COMMON DEBUGGER TASKS
@@ -171,6 +166,11 @@ def hex_dump(data, addr=0, grouping=1, endian='little'):
 
 	return result
 
+# handle asynchronous output packets from lldb server
+def output_handler(packet):
+	message = unhexlify(data[1:])
+	print('stdout message: %s' % message)
+
 #--------------------------------------------------------------------------
 # MAIN
 #--------------------------------------------------------------------------
@@ -179,7 +179,7 @@ def hex_dump(data, addr=0, grouping=1, endian='little'):
 adapter = lldb.DebugAdapterLLDB()
 
 def handler(signal, frame):
-    break_into()
+    adapter.break_into()
 
 if __name__ == '__main__':
 	colorama.init()
@@ -200,13 +200,13 @@ if __name__ == '__main__':
 
 			# thread list, thread switch
 			elif text in ['~', 'threads']:
-				ids = adapter.thread_list()
-				for id_ in ids:
-					print('%d' % id_)
+				tids = adapter.thread_list()
+				for (idx, tid) in enumerate(tids):
+					print('%02d: tid=0x%X' % (idx, tid))
 
 			elif text[0:] and text[0]=='~' and text[-1]=='s':
 				tid = int(text[1:-1])
-				adapter.thread_switch(tid)
+				adapter.thread_select(tid)
 
 			# breakpoint set/clear
 			elif text.startswith('bp '):
@@ -255,15 +255,26 @@ if __name__ == '__main__':
 			elif text in ['break', 'breakinto']:
 				break_into()
 
-			elif text == 'g':
-				adapter.go('c')
-				context_show()
-			elif text == 't':
-				adapter.step_into()
-				context_show()
-			elif text == 'p':
-				adapter.step_over()
-				context_show()
+			elif text == 'test':
+				(reason, data) = adapter.go()
+
+			elif text in 'gpt':
+				while 1:
+					if text == 'g':
+						(reason, data) = adapter.go()
+					elif text == 't':
+						(reason, data) = adapter.step_into()
+					else:
+						assert 0
+
+					if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
+						print('stdout: ', data)
+					elif reason == DebugAdapter.STOP_REASON.PROCESS_EXITED:
+						print('process exited, return code=%d', data)
+					else:
+						print('stopped, reason: ', reason.name)
+						context_show()
+						break
 
 			# quit, detach, quit+detach
 			elif text in ['q', 'quit', 'exit']:
