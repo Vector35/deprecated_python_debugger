@@ -37,7 +37,7 @@ def assert_ack(sock):
 		print('expected ack, got: ', ack)
 		assert False
 
-def tx_rx(sock, data, expect=None, handler_async_pkt=None):
+def tx_rx(sock, data, expect='ack_then_reply', handler_async_pkt=None):
 	send_packet_data(sock, data)
 
 	if expect == 'nothing':

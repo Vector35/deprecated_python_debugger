@@ -186,7 +186,7 @@ if __name__ == '__main__':
 			#elif text.startswith('packet '):
 			#	reply = tx_rx(text[7:])
 			elif text == 'test':
-				adapter.break_reason()
+				adapter.test()
 
 			# thread list, thread switch
 			elif text in ['~', 'threads']:
@@ -241,8 +241,13 @@ if __name__ == '__main__':
 				adapter.mem_write(addr, bytes_)
 			elif text.startswith('u '):
 				addr = int(text[2:],16)
-				data = mem_read(addr, 32)
+				data = adapter.mem_read(addr, 32)
 				print(disasm(data, addr))
+			elif text == 'lm':
+				module2addr = adapter.mem_modules()
+				for module in sorted(module2addr, key=lambda m: module2addr[m]):
+					addr = module2addr[module]
+					print('%016X: %s' % (addr, module))
 
 			# break into, go, step, step into
 			elif text in ['break', 'breakinto']:

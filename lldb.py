@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import re
 import rsp
 import socket
 from struct import pack, unpack
@@ -221,6 +222,14 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		if reply == 'OK':
 			return 0
 
+	def mem_modules(self):
+		module2addr = {}
+		reply = rsp.tx_rx(self.sock, 'jGetLoadedDynamicLibrariesInfos:{"fetch_all_solibs":true}')
+		for (addr, path) in re.findall(r'"load_address":(\d+).*?"pathname":"([^"]+)"', reply):
+			addr = int(addr, 10)
+			module2addr[path] = addr
+		return module2addr
+
 	# break
 	def break_into(self):
 		rsp.send_raw(self.sock, '\x03')
@@ -238,6 +247,15 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 
 	def step_over(self):
 		pass
+
+	# testing
+	def test(self):
+		reply = rsp.tx_rx(self.sock, 'jGetLoadedDynamicLibrariesInfos:{"fetch_all_solibs":true}')
+		for (addr, path) in re.findall(r'"load_address":(\d+).*?"pathname":"([^"]+)"', reply):
+			addr = int(addr, 10)
+			print('%s: 0x%X' % (path, addr))
+
+		#self.break_reason()
 
 	#--------------------------------------------------------------------------
 	# helpers, NOT part of the API

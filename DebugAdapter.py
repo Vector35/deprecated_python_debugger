@@ -88,6 +88,8 @@ class DebugAdapter:
 		pass
 	def mem_write(self, address, data):
 		pass
+	def mem_modules(self):
+		pass
 
 	# break
 	def break_into(self):
