@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 import re
-import rsp
 import socket
 from struct import pack, unpack
 from binascii import hexlify, unhexlify
 
-import DebugAdapter
+from . import rsp
+from . import DebugAdapter
 
 macos_signal_to_name = {
 	1: 'SIGHUP',
