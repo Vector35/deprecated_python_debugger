@@ -168,6 +168,7 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 			return None
 
 		del self.breakpoint_id_to_addr[bpid]
+		return bpid
 
 	def breakpoint_list(self):
 		return self.breakpoint_id_to_addr
