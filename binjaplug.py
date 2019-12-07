@@ -24,7 +24,7 @@ breakpoints = []
 # COMMON DEBUGGER TASKS
 #--------------------------------------------------------------------------
 
-def context_display(ddWidget):
+def context_display(bv):
 	global adapter
 	global debug_dockwidgets
 
@@ -72,7 +72,6 @@ def context_display(ddWidget):
 	context_widget.editR15.setText('%X' % r15)
 
 	# select instruction currently at
-	bv = ddWidget.bv
 	if bv.read(rip, 1):
 		print('navigating to: 0x%X' % rip)
 		bv.navigate(bv.file.view, rip)
@@ -89,36 +88,39 @@ def context_display(ddWidget):
 # debugger functions
 #------------------------------------------------------------------------------
 
-def debug_run(ddWidget):
+def debug_run(bv):
 	global adapter
 	adapter = lldb.DebugAdapterLLDB()
 
-def debug_quit(ddWidget):
+	if bv and bv.entry_point:
+		debug_breakpoint_set(bv, bv.entry_point)
+
+def debug_quit(bv):
 	global adapter
 	assert adapter
 	adapter.quit()
 	adapter = None
 
-def debug_detach(ddWidget):
+def debug_detach(bv):
 	global adapter
 	assert adapter
 	adapter.detach()
 	adapter = None
 
-def debug_break(ddWidget):
+def debug_break(bv):
 	global adapter
 	assert adapter
 	adapter.break_into()
 
-def debug_go(ddWidget):
+def debug_go(bv):
 	global adapter
 	assert adapter
 	print('going in...')
 	adapter.go()
 	print('im out!')
-	context_display(ddWidget)
+	context_display(bv)
 
-def debug_step(ddWidget):
+def debug_step(bv):
 	global adapter
 	assert adapter
 	(reason, data) = adapter.step_into()
@@ -129,7 +131,53 @@ def debug_step(ddWidget):
 		print('process exited, return code=%d', data)
 	else:
 		print('stopped, reason: ', reason.name)
-		context_display(ddWidget)
+		context_display(bv)
+
+def debug_breakpoint_set(bv, address):
+	global breakpoints
+	global adapter
+	assert adapter
+
+	bpid = adapter.breakpoint_set(address)
+	if bpid != None:
+		# add it to breakpoint entries
+		entry = {'id':bpid, 'addr':address}
+
+		# create tag store that shit too
+		tt = bv.tag_types["Crashes"]
+		for func in bv.get_functions_containing(address):
+			tag = func.create_user_address_tag(address, tt, "breakpoint")
+
+		breakpoints.append(entry)
+		print('breakpoint %d set, address=0x%X' % (entry['id'], entry['addr']))
+	else:
+		print('ERROR: breakpoint set failed')
+
+def debug_breakpoint_clear(bv, address):
+	global breakpoints
+	global adapter
+	assert adapter
+
+	# find/remove address tag
+	entry = [entry for entry in breakpoints if entry['addr'] == address][0]
+	if entry:
+		# delete from adapter
+		bpid = entry['id']
+		if adapter.breakpoint_clear(bpid) != None:
+			print('breakpoint %d cleared, address=0x%X' % (entry['id'], entry['addr']))
+		else:
+			print('ERROR: clearing breakpoint')
+
+		# delete breakpoint tags from all functions containing this address
+		for func in bv.get_functions_containing(address):
+			delqueue = [tag for tag in func.get_address_tags_at(address) if tag.data == 'breakpoint']
+			for tag in delqueue:
+				func.remove_user_address_tag(address, tag)
+
+		# delete from our list
+		breakpoints = [entry for entry in breakpoints if entry['addr'] != address]
+	else:
+		print('ERROR: breakpoint not found in list')
 
 #------------------------------------------------------------------------------
 # debugger registers widget
@@ -284,8 +332,10 @@ class DebugContextDockWidget(QWidget, DockContextHandler):
 #------------------------------------------------------------------------------
 
 class DebugMainDockWidget(QWidget, DockContextHandler):
-	# in practice, data is a BinaryView
 	def __init__(self, parent, name, data):
+		assert type(data) == binaryninja.binaryview.BinaryView
+		self.bv = data
+
 		QWidget.__init__(self, parent)
 		DockContextHandler.__init__(self, self, name)
 		self.actionHandler = UIActionHandler()
@@ -307,11 +357,11 @@ class DebugMainDockWidget(QWidget, DockContextHandler):
 		# add session control buttons
 		lo = QHBoxLayout()
 		btnRun = QPushButton("Run")
-		btnRun.clicked.connect(lambda : debug_run(self))
+		btnRun.clicked.connect(lambda : debug_run(self.bv))
 		btnQuit = QPushButton("Quit")
-		btnQuit.clicked.connect(lambda : debug_quit(self))
+		btnQuit.clicked.connect(lambda : debug_quit(self.bv))
 		btnDetach = QPushButton("Detach")
-		btnDetach.clicked.connect(lambda : debug_detach(self))
+		btnDetach.clicked.connect(lambda : debug_detach(self.bv))
 		lo.addWidget(btnRun)
 		lo.addWidget(btnQuit)
 		lo.addWidget(btnDetach)
@@ -324,11 +374,11 @@ class DebugMainDockWidget(QWidget, DockContextHandler):
 
 		# add execution control buttons
 		btnPause = QPushButton("Break")
-		btnPause.clicked.connect(lambda : debug_break(self))
+		btnPause.clicked.connect(lambda : debug_break(self.bv))
 		btnResume = QPushButton("Go")
-		btnResume.clicked.connect(lambda : debug_go(self))
+		btnResume.clicked.connect(lambda : debug_go(self.bv))
 		btnStep = QPushButton("Step")
-		btnStep.clicked.connect(lambda : debug_step(self))
+		btnStep.clicked.connect(lambda : debug_step(self.bv))
 		lo = QHBoxLayout()
 		lo.addWidget(btnPause)
 		lo.addWidget(btnResume)
@@ -338,7 +388,6 @@ class DebugMainDockWidget(QWidget, DockContextHandler):
 		# layout done!
 		layout.addStretch()
 		self.setLayout(layout)
-
 
 	#--------------------------------------------------------------------------
 	# callbacks to us api/ui/dockhandler.h
@@ -394,53 +443,11 @@ def showDebuggerControls(binaryView):
 # right click plugin
 #------------------------------------------------------------------------------
 
-def setBreakpoint(bv, address):
-	print('setBreakpoint() called with address 0x%X ' % address)
-	global breakpoints
-	global adapter
-	assert adapter
+def cb_bp_set(bv, address):
+	debug_breakpoint_set(bv, address)
 
-	bpid = adapter.breakpoint_set(address)
-	if bpid != None:
-		# add it to breakpoint entries
-		entry = {'id':bpid, 'addr':address}
-
-		# create tag store that shit too
-		tt = bv.tag_types["Crashes"]
-		for func in bv.get_functions_containing(address):
-			tag = func.create_user_address_tag(address, tt, "breakpoint")
-
-		breakpoints.append(entry)
-		print('breakpoint %d set, address=0x%X' % (entry['id'], entry['addr']))
-	else:
-		print('ERROR: breakpoint set failed')
-
-def clrBreakpoint(bv, address):
-	print('clrBreakpoint() called with address 0x%X ' % address)
-	global breakpoints
-	global adapter
-	assert adapter
-
-	# find/remove address tag
-	entry = [entry for entry in breakpoints if entry['addr'] == address][0]
-	if entry:
-		# delete from adapter
-		bpid = entry['id']
-		if adapter.breakpoint_clear(bpid) != None:
-			print('breakpoint %d cleared, address=0x%X' % (entry['id'], entry['addr']))
-		else:
-			print('ERROR: clearing breakpoint')
-
-		# delete breakpoint tags from all functions containing this address
-		for func in bv.get_functions_containing(address):
-			delqueue = [tag for tag in func.get_address_tags_at(address) if tag.data == 'breakpoint']
-			for tag in delqueue:
-				func.remove_user_address_tag(address, tag)
-
-		# delete from our list
-		breakpoints = [entry for entry in breakpoints if entry['addr'] != address]
-	else:
-		print('ERROR: breakpoint not found in list')
+def cb_bp_clr(bv, address):
+	debug_breakpoint_clear(bv, address)
 
 #------------------------------------------------------------------------------
 # "main"
@@ -458,6 +465,6 @@ def initialize():
 
 	PluginCommand.register("Hide Debugger Widget", "", hideDebuggerControls)
 	PluginCommand.register("Show Debugger Widget", "", showDebuggerControls)
-	PluginCommand.register_for_address("Set Breakpoint", "sets breakpoint at right-clicked address", setBreakpoint)
-	PluginCommand.register_for_address("Clear Breakpoint", "clears breakpoint at right-clicked address", clrBreakpoint)
+	PluginCommand.register_for_address("Set Breakpoint", "sets breakpoint at right-clicked address", cb_bp_set)
+	PluginCommand.register_for_address("Clear Breakpoint", "clears breakpoint at right-clicked address", cb_bp_clr)
 
