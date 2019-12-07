@@ -1,5 +1,6 @@
 import re
 
+import binaryninja
 from binaryninja.plugin import PluginCommand
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler
 from PySide2 import QtCore
@@ -14,12 +15,19 @@ from . import lldb
 #------------------------------------------------------------------------------
 adapter = None
 
+debug_dockwidgets = {}
+
 #--------------------------------------------------------------------------
 # COMMON DEBUGGER TASKS
 #--------------------------------------------------------------------------
 
 def context_display(ddWidget):
 	global adapter
+	global debug_dockwidgets
+
+	context_widget = debug_dockwidgets.get('context')
+	if not context_widget:
+		return
 
 	#tid = adapter.thread_selected()
 	#print('thread 0x%X:' % tid)
@@ -42,36 +50,23 @@ def context_display(ddWidget):
 	r14 = adapter.reg_read('r14')
 	r15 = adapter.reg_read('r15')
 
-	ddWidget.editRax.setText('%X' % rax)
-	ddWidget.editRbx.setText('%X' % rbx)
-	ddWidget.editRcx.setText('%X' % rcx)
-	ddWidget.editRdx.setText('%X' % rdx)
-	ddWidget.editRsi.setText('%X' % rsi)
-	ddWidget.editRdi.setText('%X' % rdi)
-	ddWidget.editRip.setText('%X' % rip)
-	ddWidget.editRsp.setText('%X' % rsp)
-	ddWidget.editRbp.setText('%X' % rbp)
-	ddWidget.editR08.setText('%X' % r8)
-	ddWidget.editR09.setText('%X' % r9)
-	ddWidget.editR10.setText('%X' % r10)
-	ddWidget.editR11.setText('%X' % r11)
-	ddWidget.editR12.setText('%X' % r12)
-	ddWidget.editR13.setText('%X' % r13)
-	ddWidget.editR14.setText('%X' % r14)
-	ddWidget.editR15.setText('%X' % r15)
-
-#	print("%srax%s=%016X %srbx%s=%016X %srcx%s=%016X" % \
-#		(BROWN, NORMAL, rax, BROWN, NORMAL, rbx, BROWN, NORMAL, rcx))
-#	print("%srdx%s=%016X %srsi%s=%016X %srdi%s=%016X" %
-#		(BROWN, NORMAL, rdx, BROWN, NORMAL, rsi, BROWN, NORMAL, rdi))
-#	print("%srip%s=%016X %srsp%s=%016X %srbp%s=%016X" % \
-#		(BROWN, NORMAL, rip, BROWN, NORMAL, rsp, BROWN, NORMAL, rbp))
-#	print(" %sr8%s=%016X  %sr9%s=%016X %sr10%s=%016X" % \
-#		(BROWN, NORMAL, r8, BROWN, NORMAL, r9, BROWN, NORMAL, r10))
-#	print("%sr11%s=%016X %sr12%s=%016X %sr13%s=%016X" % \
-#		(BROWN, NORMAL, r11, BROWN, NORMAL, r12, BROWN, NORMAL, r13))
-#	print("%sr14%s=%016X %sr15%s=%016X" % \
-#		(BROWN, NORMAL, r14, BROWN, NORMAL, r15))
+	context_widget.editRax.setText('%X' % rax)
+	context_widget.editRbx.setText('%X' % rbx)
+	context_widget.editRcx.setText('%X' % rcx)
+	context_widget.editRdx.setText('%X' % rdx)
+	context_widget.editRsi.setText('%X' % rsi)
+	context_widget.editRdi.setText('%X' % rdi)
+	context_widget.editRip.setText('%X' % rip)
+	context_widget.editRsp.setText('%X' % rsp)
+	context_widget.editRbp.setText('%X' % rbp)
+	context_widget.editR08.setText('%X' % r8)
+	context_widget.editR09.setText('%X' % r9)
+	context_widget.editR10.setText('%X' % r10)
+	context_widget.editR11.setText('%X' % r11)
+	context_widget.editR12.setText('%X' % r12)
+	context_widget.editR13.setText('%X' % r13)
+	context_widget.editR14.setText('%X' % r14)
+	context_widget.editR15.setText('%X' % r15)
 
 	#data = adapter.mem_read(rip, 16)
 	#if data:
@@ -122,14 +117,14 @@ def debug_step(ddWidget):
 		context_display(ddWidget)
 
 #------------------------------------------------------------------------------
-# debugger buttons widget
+# debugger registers widget
 #------------------------------------------------------------------------------
 
-instance_id = 0
-class DebuggerDockWidget(QWidget, DockContextHandler):
-	# in practice, data is a BinaryView
+class DebugContextDockWidget(QWidget, DockContextHandler):
 	def __init__(self, parent, name, data):
-		global instance_id
+		assert type(data) == binaryninja.binaryview.BinaryView
+		self.bv = data
+
 		QWidget.__init__(self, parent)
 		DockContextHandler.__init__(self, self, name)
 		self.actionHandler = UIActionHandler()
@@ -137,47 +132,6 @@ class DebuggerDockWidget(QWidget, DockContextHandler):
 
 		layout = QVBoxLayout()
 		layout.addStretch()
-
-		# add "Target:"
-		self.labelTarget = QLabel("Target: ", self)
-		layout.addWidget(self.labelTarget)
-		self.labelTarget.setAlignment(QtCore.Qt.AlignCenter)
-
-		# add "Session Control:"
-		l = QLabel("Session Control:", self)
-		l.setAlignment(QtCore.Qt.AlignCenter)
-		layout.addWidget(l)
-
-		# add session control buttons
-		lo = QHBoxLayout()
-		btnRun = QPushButton("Run")
-		btnRun.clicked.connect(lambda : debug_run(self))
-		btnQuit = QPushButton("Quit")
-		btnQuit.clicked.connect(lambda : debug_quit(self))
-		btnDetach = QPushButton("Detach")
-		btnDetach.clicked.connect(lambda : debug_detach(self))
-		lo.addWidget(btnRun)
-		lo.addWidget(btnQuit)
-		lo.addWidget(btnDetach)
-		layout.addLayout(lo)
-
-		# add "Execution Control:"
-		l = QLabel("Execution Control: ", self)
-		l.setAlignment(QtCore.Qt.AlignCenter)
-		layout.addWidget(l)
-
-		# add execution control buttons
-		btnPause = QPushButton("Break")
-		btnPause.clicked.connect(lambda : debug_break(self))
-		btnResume = QPushButton("Go")
-		btnResume.clicked.connect(lambda : debug_go(self))
-		btnStep = QPushButton("Step")
-		btnStep.clicked.connect(lambda : debug_step(self))
-		lo = QHBoxLayout()
-		lo.addWidget(btnPause)
-		lo.addWidget(btnResume)
-		lo.addWidget(btnStep)
-		layout.addLayout(lo)
 
 		# add "Registers:"
 		l = QLabel("Registers: ", self)
@@ -279,27 +233,20 @@ class DebuggerDockWidget(QWidget, DockContextHandler):
 		layout.addStretch()
 		self.setLayout(layout)
 
-		instance_id += 1
-		self.data = data
-
 	#--------------------------------------------------------------------------
 	# callbacks to us api/ui/dockhandler.h
 	#--------------------------------------------------------------------------
 	def notifyOffsetChanged(self, offset):
-		#self.offset.setText(hex(offset))
 		pass
 
 	def notifyViewChanged(self, view_frame):
-		# many options on view_frame, see api/ui/viewframe.h
-
 		if view_frame is None:
-			self.data = None
+			self.bv = None
 		else:
 			view = view_frame.getCurrentViewInterface()
-			self.data = view.getData()
-			# self.data is a BinaryView
-			if self.data.file and self.data.file.filename:
-				self.labelTarget.setText('Target: ' + self.data.file.filename)
+			data = view.getData()
+			assert type(data) == binaryninja.binaryview.BinaryView
+			self.bv = data
 
 	def contextMenuEvent(self, event):
 		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)
@@ -312,11 +259,107 @@ class DebuggerDockWidget(QWidget, DockContextHandler):
 
 	@staticmethod
 	def create_widget(name, parent, data = None):
-		return DebuggerDockWidget(parent, name, data)
+		global debug_dockwidgets
+		ref = DebugContextDockWidget(parent, name, data)
+		debug_dockwidgets['context'] = ref
+		return ref
+
+#------------------------------------------------------------------------------
+# debugger buttons widget
+#------------------------------------------------------------------------------
+
+class DebugMainDockWidget(QWidget, DockContextHandler):
+	# in practice, data is a BinaryView
+	def __init__(self, parent, name, data):
+		QWidget.__init__(self, parent)
+		DockContextHandler.__init__(self, self, name)
+		self.actionHandler = UIActionHandler()
+		self.actionHandler.setupActionHandler(self)
+
+		layout = QVBoxLayout()
+		layout.addStretch()
+
+		# add "Target:"
+		self.labelTarget = QLabel("Target: ", self)
+		layout.addWidget(self.labelTarget)
+		self.labelTarget.setAlignment(QtCore.Qt.AlignCenter)
+
+		# add "Session Control:"
+		l = QLabel("Session Control:", self)
+		l.setAlignment(QtCore.Qt.AlignCenter)
+		layout.addWidget(l)
+
+		# add session control buttons
+		lo = QHBoxLayout()
+		btnRun = QPushButton("Run")
+		btnRun.clicked.connect(lambda : debug_run(self))
+		btnQuit = QPushButton("Quit")
+		btnQuit.clicked.connect(lambda : debug_quit(self))
+		btnDetach = QPushButton("Detach")
+		btnDetach.clicked.connect(lambda : debug_detach(self))
+		lo.addWidget(btnRun)
+		lo.addWidget(btnQuit)
+		lo.addWidget(btnDetach)
+		layout.addLayout(lo)
+
+		# add "Execution Control:"
+		l = QLabel("Execution Control: ", self)
+		l.setAlignment(QtCore.Qt.AlignCenter)
+		layout.addWidget(l)
+
+		# add execution control buttons
+		btnPause = QPushButton("Break")
+		btnPause.clicked.connect(lambda : debug_break(self))
+		btnResume = QPushButton("Go")
+		btnResume.clicked.connect(lambda : debug_go(self))
+		btnStep = QPushButton("Step")
+		btnStep.clicked.connect(lambda : debug_step(self))
+		lo = QHBoxLayout()
+		lo.addWidget(btnPause)
+		lo.addWidget(btnResume)
+		lo.addWidget(btnStep)
+		layout.addLayout(lo)
+
+		# layout done!
+		layout.addStretch()
+		self.setLayout(layout)
+
 
 	#--------------------------------------------------------------------------
-	# extra shiz
+	# callbacks to us api/ui/dockhandler.h
 	#--------------------------------------------------------------------------
+	def notifyOffsetChanged(self, offset):
+		#self.offset.setText(hex(offset))
+		pass
+
+	def notifyViewChanged(self, view_frame):
+		# many options on view_frame, see api/ui/viewframe.h
+
+		if view_frame is None:
+			self.bv = None
+		else:
+			view = view_frame.getCurrentViewInterface()
+			data = view.getData()
+			assert type(data) == binaryninja.binaryview.BinaryView
+			self.bv = data
+			if self.bv.file and self.bv.file.filename:
+				self.labelTarget.setText('Target: ' + self.bv.file.filename)
+
+	def contextMenuEvent(self, event):
+		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)
+
+	def shouldBeVisible(self, view_frame):
+		if view_frame is None:
+			return False
+		else:
+			return True
+
+	@staticmethod
+	def create_widget(name, parent, data):
+		global debug_dockwidgets
+		ref = DebugMainDockWidget(parent, name, data)
+		debug_dockwidgets['main'] = ref
+		return ref
 
 #------------------------------------------------------------------------------
 # "main"
@@ -334,7 +377,10 @@ def initialize():
 
 	# binaryninja/api/ui/dockhandler.h
 	dock_handler = mainWindow.findChild(DockHandler, '__DockHandler')
-	dock_handler.addDockWidget("Debugger Controls", DebuggerDockWidget.create_widget, Qt.BottomDockWidgetArea, Qt.Horizontal, True)
+
+	# create main debugger controls
+	dock_handler.addDockWidget("Debugger Controls", DebugMainDockWidget.create_widget, Qt.BottomDockWidgetArea, Qt.Horizontal, True)
+	dock_handler.addDockWidget("Debugger Context", DebugContextDockWidget.create_widget, Qt.BottomDockWidgetArea, Qt.Horizontal, True)
 
 	PluginCommand.register("Hide Debugger Widget", "", hideDebuggerControls)
 	PluginCommand.register("Show Debugger Widget", "", showDebuggerControls)
