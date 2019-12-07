@@ -68,6 +68,17 @@ def context_display(ddWidget):
 	context_widget.editR14.setText('%X' % r14)
 	context_widget.editR15.setText('%X' % r15)
 
+	if rip == 0x100000f50:
+		adapter.breakpoint_clear(0)
+
+	# select instruction currently at
+	bv = ddWidget.bv
+	if bv.read(rip, 1):
+		print('navigating to: 0x%X' % rip)
+		bv.navigate(bv.file.view, rip)
+	else:
+		print('address 0x%X outside of binary view, not setting cursor' % rip)
+
 	#data = adapter.mem_read(rip, 16)
 	#if data:
 	#	(asmstr, asmlen) = disasm1(data, rip)
@@ -81,6 +92,7 @@ def context_display(ddWidget):
 def debug_run(ddWidget):
 	global adapter
 	adapter = lldb.DebugAdapterLLDB()
+	adapter.breakpoint_set(0x100000f50)	
 
 def debug_quit(ddWidget):
 	global adapter
@@ -102,6 +114,10 @@ def debug_break(ddWidget):
 def debug_go(ddWidget):
 	global adapter
 	assert adapter
+	print('going in...')
+	adapter.go()
+	print('im out!')
+	context_display(ddWidget)
 
 def debug_step(ddWidget):
 	global adapter

@@ -9,8 +9,9 @@ from struct import pack, unpack
 import signal
 import sys
 
-import lldb
-import DebugAdapter
+sys.path.append('..')
+import debugger.lldb as lldb
+import debugger.DebugAdapter as DebugAdapter
 
 RED = '\x1B[31m'
 GREEN = '\x1B[32m'
@@ -257,6 +258,8 @@ if __name__ == '__main__':
 						(reason, data) = adapter.go()
 					elif text == 't':
 						(reason, data) = adapter.step_into()
+					elif text == 'p':
+						print('step over not implemented')
 					else:
 						assert 0
 

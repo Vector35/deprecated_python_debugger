@@ -142,7 +142,7 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		reply = rsp.tx_rx(self.sock, payload, 'ack_then_ok')
 
 	# breakpoints
-	def breakpoint_set(self, address):
+	def breakpoint_set(self, addr):
 		if addr in self.breakpoint_id_to_addr.values():
 			return None
 
