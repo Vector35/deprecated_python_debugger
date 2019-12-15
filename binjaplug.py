@@ -120,7 +120,7 @@ def debug_go(bv):
 	print('im out!')
 	context_display(bv)
 
-def debug_step(bv):
+def debug_step_into(bv):
 	global adapter
 	assert adapter
 	(reason, data) = adapter.step_into()
@@ -133,6 +133,31 @@ def debug_step(bv):
 		print('stopped, reason: ', reason.name)
 		context_display(bv)
 
+def debug_step_over(bv):
+	global adapter
+	assert adapter
+
+	if bv.arch.name == 'x86_64':
+		rip = adapter.reg_read('rip')
+		instxt = bv.get_disassembly(rip)
+		inslen = bv.get_instruction_length(rip)
+		ripnext = rip + inslen
+
+		# non-calls are the same as step into
+		if not instxt.startswith('call '):
+			return debug_step_into(bv)
+
+		# if there's already a breakpoint at the next instruction, just go
+		if [bp for bp in breakpoints if bp['addr'] == ripnext]:
+			return debug_go(bv)
+
+		# set a temporary bp, go, then clear
+		debug_breakpoint_set(bv, ripnext)
+		debug_go(bv)
+		debug_breakpoint_clear(bv, ripnext)
+	else:
+		raise NotImplementedError('step over unimplemented for architecture %s' % bv.arch.name)
+
 def debug_breakpoint_set(bv, address):
 	global breakpoints
 	global adapter
@@ -143,13 +168,14 @@ def debug_breakpoint_set(bv, address):
 		# add it to breakpoint entries
 		entry = {'id':bpid, 'addr':address}
 
-		# create tag store that shit too
+		# create tag
 		tt = bv.tag_types["Crashes"]
 		for func in bv.get_functions_containing(address):
 			tag = func.create_user_address_tag(address, tt, "breakpoint")
 
 		breakpoints.append(entry)
 		print('breakpoint %d set, address=0x%X' % (entry['id'], entry['addr']))
+		return True
 	else:
 		print('ERROR: breakpoint set failed')
 
@@ -263,7 +289,7 @@ class DebugContextDockWidget(QWidget, DockContextHandler):
 		layout.addLayout(lo)
 
 		lo = QHBoxLayout()
-		lo.addWidget(QLabel('rr11:', self))
+		lo.addWidget(QLabel('r11:', self))
 		self.editR11 = QLineEdit('0000000000000000', self)
 		self.editR11.setReadOnly(True)
 		lo.addWidget(self.editR11)
@@ -377,12 +403,15 @@ class DebugMainDockWidget(QWidget, DockContextHandler):
 		btnPause.clicked.connect(lambda : debug_break(self.bv))
 		btnResume = QPushButton("Go")
 		btnResume.clicked.connect(lambda : debug_go(self.bv))
-		btnStep = QPushButton("Step")
-		btnStep.clicked.connect(lambda : debug_step(self.bv))
+		btnStepInto = QPushButton("Step Into")
+		btnStepInto.clicked.connect(lambda : debug_step_into(self.bv))
+		btnStepOver = QPushButton("Step Over")
+		btnStepOver.clicked.connect(lambda : debug_step_over(self.bv))
 		lo = QHBoxLayout()
 		lo.addWidget(btnPause)
 		lo.addWidget(btnResume)
-		lo.addWidget(btnStep)
+		lo.addWidget(btnStepInto)
+		lo.addWidget(btnStepOver)
 		layout.addLayout(lo)
 
 		# layout done!
