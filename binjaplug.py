@@ -17,8 +17,8 @@ adapter = None
 
 debug_dockwidgets = {}
 
-# list of {'id':bpid, 'addr':address} entries
-breakpoints = []
+# address -> adapter id
+breakpoints = {}
 
 #--------------------------------------------------------------------------
 # COMMON DEBUGGER TASKS
@@ -120,10 +120,30 @@ def debug_go(bv):
 	print('im out!')
 	context_display(bv)
 
-def debug_step_into(bv):
+def debug_step(bv):
 	global adapter
 	assert adapter
-	(reason, data) = adapter.step_into()
+
+	(reason, data) = (None, None)
+
+	if bv.arch.name == 'x86_64':
+		rip = adapter.reg_read('rip')
+
+		# if currently a breakpoint at rip, temporarily clear it
+		# TODO: detect windbg adapter because dbgeng's step behavior might ignore breakpoint
+		# at current rip
+
+		seq = []
+		if rip in breakpoints:
+			seq.append((adapter.breakpoint_clear, (rip,)))
+			seq.append((adapter.step_into, ()))
+			seq.append((adapter.breakpoint_set, (rip,)))
+		else:
+			seq.append((adapter.step_into, ()))
+
+		(reason, data) = exec_adapter_sequence(seq)
+	else:
+		raise NotImplementedError('step unimplemented for architecture %s' % bv.arch.name)
 
 	if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
 		print('stdout: ', data)
@@ -137,24 +157,50 @@ def debug_step_over(bv):
 	global adapter
 	assert adapter
 
+	# TODO: detect windbg adapter because dbgeng has a builtin step_into() that we don't
+	# have to synthesize
 	if bv.arch.name == 'x86_64':
 		rip = adapter.reg_read('rip')
 		instxt = bv.get_disassembly(rip)
 		inslen = bv.get_instruction_length(rip)
 		ripnext = rip + inslen
 
-		# non-calls are the same as step into
-		if not instxt.startswith('call '):
-			return debug_step_into(bv)
+		call = instxt.startswith('call ')
+		bphere = rip in breakpoints
+		bpnext = ripnext in breakpoints
 
-		# if there's already a breakpoint at the next instruction, just go
-		if [bp for bp in breakpoints if bp['addr'] == ripnext]:
-			return debug_go(bv)
+		seq = []
 
-		# set a temporary bp, go, then clear
-		debug_breakpoint_set(bv, ripnext)
-		debug_go(bv)
-		debug_breakpoint_clear(bv, ripnext)
+		if not call:
+			seq.append((adapter.step_into, ()))
+		elif bphere and bpnext:
+			seq.append((adapter.breakpoint_clear, (rip,)))
+			seq.append((adapter.go, ()))
+			seq.append((adapter.breakpoint_set, (rip,)))
+		elif bphere and not bpnext:
+			seq.append((adapter.breakpoint_clear, (rip,)))
+			seq.append((adapter.breakpoint_set, (ripnext,)))
+			seq.append((adapter.go, ()))
+			seq.append((adapter.breakpoint_clear, (ripnext,)))
+			seq.append((adapter.breakpoint_set, (rip,)))
+		elif not bphere and bpnext:
+			seq.append((adapter.go, ()))
+		elif not bphere and not bpnext:
+			seq.append((adapter.breakpoint_set, (ripnext,)))
+			seq.append((adapter.go, ()))
+			seq.append((adapter.breakpoint_clear, (ripnext,)))
+		else:
+			raise Exception('confused by call, bphere, bpnext state')
+
+		(reason, data) = exec_adapter_sequence(seq)
+		if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
+			print('stdout: ', data)
+		elif reason == DebugAdapter.STOP_REASON.PROCESS_EXITED:
+			print('process exited, return code=%d', data)
+		else:
+			print('stopped, reason: ', reason.name)
+			context_display(bv)
+
 	else:
 		raise NotImplementedError('step over unimplemented for architecture %s' % bv.arch.name)
 
@@ -163,21 +209,19 @@ def debug_breakpoint_set(bv, address):
 	global adapter
 	assert adapter
 
-	bpid = adapter.breakpoint_set(address)
-	if bpid != None:
-		# add it to breakpoint entries
-		entry = {'id':bpid, 'addr':address}
-
-		# create tag
-		tt = bv.tag_types["Crashes"]
-		for func in bv.get_functions_containing(address):
-			tag = func.create_user_address_tag(address, tt, "breakpoint")
-
-		breakpoints.append(entry)
-		print('breakpoint %d set, address=0x%X' % (entry['id'], entry['addr']))
-		return True
-	else:
+	if adapter.breakpoint_set(address) != 0:
 		print('ERROR: breakpoint set failed')
+		return None
+
+	# create tag
+	tt = bv.tag_types["Crashes"]
+	for func in bv.get_functions_containing(address):
+		tag = func.create_user_address_tag(address, tt, "breakpoint")
+
+	# save it
+	breakpoints[address] = True
+	print('breakpoint address=0x%X set' % (address))
+	return 0
 
 def debug_breakpoint_clear(bv, address):
 	global breakpoints
@@ -185,12 +229,10 @@ def debug_breakpoint_clear(bv, address):
 	assert adapter
 
 	# find/remove address tag
-	entry = [entry for entry in breakpoints if entry['addr'] == address][0]
-	if entry:
+	if address in breakpoints:
 		# delete from adapter
-		bpid = entry['id']
-		if adapter.breakpoint_clear(bpid) != None:
-			print('breakpoint %d cleared, address=0x%X' % (entry['id'], entry['addr']))
+		if adapter.breakpoint_clear(address) != None:
+			print('breakpoint address=0x%X cleared' % (address))
 		else:
 			print('ERROR: clearing breakpoint')
 
@@ -201,9 +243,22 @@ def debug_breakpoint_clear(bv, address):
 				func.remove_user_address_tag(address, tag)
 
 		# delete from our list
-		breakpoints = [entry for entry in breakpoints if entry['addr'] != address]
+		del breakpoints[address]
 	else:
 		print('ERROR: breakpoint not found in list')
+
+# execute a sequence of adapter commands, capturing the return of the last
+# blocking call
+def exec_adapter_sequence(seq):
+	(reason, data) = (None, None)
+
+	for (func, args) in seq:
+		if func in [adapter.step_into, adapter.step_over, adapter.go]:
+			(reason, data) = func(*args)
+		else:
+			func(*args)
+
+	return (reason, data)
 
 #------------------------------------------------------------------------------
 # debugger registers widget
@@ -403,8 +458,8 @@ class DebugMainDockWidget(QWidget, DockContextHandler):
 		btnPause.clicked.connect(lambda : debug_break(self.bv))
 		btnResume = QPushButton("Go")
 		btnResume.clicked.connect(lambda : debug_go(self.bv))
-		btnStepInto = QPushButton("Step Into")
-		btnStepInto.clicked.connect(lambda : debug_step_into(self.bv))
+		btnStepInto = QPushButton("Step")
+		btnStepInto.clicked.connect(lambda : debug_step(self.bv))
 		btnStepOver = QPushButton("Step Over")
 		btnStepOver.clicked.connect(lambda : debug_step_over(self.bv))
 		lo = QHBoxLayout()
