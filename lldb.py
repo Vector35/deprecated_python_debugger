@@ -86,8 +86,8 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		self.reg_name_to_id = {}
 		self.register_sense()
 
-		# breakpoint state
-		self.breakpoint_id_to_addr = {}
+		# address -> True
+		self.breakpoints = {}
 
 		# thread state
 		self.thread_idx_selected = None
@@ -143,7 +143,7 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 
 	# breakpoints
 	def breakpoint_set(self, addr):
-		if addr in self.breakpoint_id_to_addr.values():
+		if addr in self.breakpoints:
 			return None
 
 		data = 'Z0,%x,1' % addr
@@ -151,27 +151,24 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		if reply != 'OK':
 			return None
 
-		ids = self.breakpoint_id_to_addr.keys()
-		for bpid in range(999999999):
-			if not bpid in ids:
-				self.breakpoint_id_to_addr[bpid] = addr
-				return bpid
+		self.breakpoints[addr] = True
+		return 0
 
-	def breakpoint_clear(self, bpid):
-		if not bpid in self.breakpoint_id_to_addr:
+	def breakpoint_clear(self, addr):
+		if not addr in self.breakpoints:
 			return None
 
-		data = 'z0,%x,1' % self.breakpoint_id_to_addr[bpid]
+		data = 'z0,%x,1' % addr
 		reply = rsp.tx_rx(self.sock, data, 'ack_then_reply')
 		if reply != 'OK':
 			print('reply was: -%s-' % reply)
 			return None
 
-		del self.breakpoint_id_to_addr[bpid]
-		return bpid
+		del self.breakpoints[addr]
+		return 0
 
 	def breakpoint_list(self):
-		return self.breakpoint_id_to_addr
+		return self.breakpoints
 
 	# register
 	def reg_read(self, name):
@@ -247,7 +244,8 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		return self.go_generic('vCont;s')
 
 	def step_over(self):
-		pass
+		# gdb, lldb just doesn't have this, you must synthesize it yourself
+		raise NotImplementedError('step over')
 
 	# testing
 	def test(self):

@@ -214,8 +214,8 @@ if __name__ == '__main__':
 
 			elif text == 'bl':
 				print('breakpoint list:')
-				for (bpid, addr) in adapter.breakpoint_list().items():
-					print('%d: 0x%X' % (bpid, addr))
+				for (i,addr) in enumerate(adapter.breakpoint_list()):
+					print('%d: 0x%X' % (i, addr))
 
 			# context, read regs, write regs
 			elif text in ['r']:
