@@ -10,6 +10,7 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QW
 
 from . import DebugAdapter
 from . import lldb
+from .dockwidgets import BreakpointsWidget, widget
 
 #------------------------------------------------------------------------------
 # globals
@@ -29,9 +30,8 @@ breakpoints = {}
 
 def context_display(bv):
 	global adapter
-	global debug_dockwidgets
 
-	context_widget = debug_dockwidgets.get('context')
+	context_widget = widget.debug_dockwidgets.get('Debugger Context')
 	if not context_widget:
 		return
 
@@ -302,6 +302,11 @@ def debug_breakpoint_set(bv, address):
 	# save it
 	breakpoints[address] = True
 	print('breakpoint address=0x%X set' % (address))
+
+	bp_widget = widget.debug_dockwidgets.get("Breakpoints")
+	if bp_widget is not None:
+		bp_widget.notifyBreakpointChanged()
+
 	return 0
 
 def debug_breakpoint_clear(bv, address):
@@ -681,17 +686,10 @@ def cb_bp_clr(bv, address):
 # "main"
 #------------------------------------------------------------------------------
 
-def initialize():
-	mainWindow = QApplication.allWidgets()[0].window()
-
-	# binaryninja/api/ui/dockhandler.h
-	dock_handler = mainWindow.findChild(DockHandler, '__DockHandler')
-
-	# create main debugger controls
-	dock_handler.addDockWidget("Debugger Controls", DebugMainDockWidget.create_widget, Qt.BottomDockWidgetArea, Qt.Horizontal, True)
-	dock_handler.addDockWidget("Debugger Context", DebugContextDockWidget.create_widget, Qt.BottomDockWidgetArea, Qt.Horizontal, True)
-	#dock_handler.addDockWidget("Debugger Breakpoints", DebugBreakpointsDockWidget.create_widget, Qt.BottomDockWidgetArea, Qt.Horizontal, True)
-
+def initialize(context):
+	widget.register_dockwidget(DebugMainDockWidget, "Debugger Controls", Qt.BottomDockWidgetArea, Qt.Horizontal, True)
+	widget.register_dockwidget(DebugContextDockWidget, "Debugger Context", Qt.BottomDockWidgetArea, Qt.Horizontal, True)
+	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Breakpoints", Qt.RightDockWidgetArea, Qt.Vertical, True, context)
 
 	PluginCommand.register("Hide Debugger Widget", "", hideDebuggerControls)
 	PluginCommand.register("Show Debugger Widget", "", showDebuggerControls)

@@ -5,7 +5,7 @@
 # create the widgets, debugger, etc.
 try:
 	from . import binjaplug
-	binjaplug.initialize()
+	binjaplug.initialize(binjaplug)
 except ModuleNotFoundError:
 	print('binjaplug not found, assuming this is cli mode')
 
