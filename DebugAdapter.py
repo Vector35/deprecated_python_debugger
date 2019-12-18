@@ -5,6 +5,7 @@ class STOP_REASON(Enum):
 	UNKNOWN = 0
 	STDOUT_MESSAGE = auto()
 	PROCESS_EXITED = auto()
+	BACKEND_DISCONNECTED = auto()
 	SIGNAL_HUP = auto()
 	SIGNAL_INT = auto()
 	SIGNAL_QUIT = auto()
@@ -64,7 +65,7 @@ class DebugAdapter:
 	def thread_select(self, tidx):
 		''' make a given thread id active '''
 		pass
-	
+
 	# breakpoints
 	def breakpoint_set(self, address):
 		''' set software breakpoint at address, return breakpoint id '''

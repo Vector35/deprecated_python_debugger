@@ -1,6 +1,12 @@
 import re
 import socket
 
+# custom exceptions
+class RspDisconnected(Exception):
+	pass
+class RspAckMissing(Exception):
+	pass
+
 def send_raw(sock, data):
 	sock.send(data.encode('utf-8'))
 
@@ -17,6 +23,8 @@ def recv_packet_data(sock):
 	tmp = b'+'
 	while tmp == b'+':
 		tmp = sock.recv(1)
+		if tmp == b'':
+			raise RspDisconnected('disconnection while receiving packet')
 
 	# start packet
 	pkt = tmp
@@ -24,7 +32,10 @@ def recv_packet_data(sock):
 
 	# consume until '#' and checksum bytes
 	while not (len(pkt)>=3 and pkt[-3] == ord('#') and pkt[-2] in hexes and pkt[-1] in hexes):
-		pkt = pkt + sock.recv(1)
+		tmp = sock.recv(1)
+		if tmp == b'':
+			raise RspDisconnected('disconnection while receiving packet')
+		pkt = pkt + tmp
 
 	# acknowledge
 	send_raw(sock, '+')
@@ -32,10 +43,24 @@ def recv_packet_data(sock):
 	return pkt[1:-3].decode('utf-8')
 
 def assert_ack(sock):
-	ack = sock.recv(1)
-	if ack != b'+':
-		print('expected ack, got: ', ack)
-		assert False
+	resp = sock.recv(1)
+	if resp == b'':
+		raise RspDisconnected('disconnection while waiting for ack')
+	if resp != b'+':
+		raise RspAckMissing('got instead: %s' % str(resp))
+
+#def is_connected(sock):
+#	print('testing RSP connection')
+#	result = None
+#	try:
+#		sock.setblocking(0)
+#		resp = sock.recv(1, socket.MSG_PEEK)
+#		sock.setblocking(1)
+#		result = (resp != '')
+#	except Exception:
+#		result = False
+#
+#	print('RSP connection status: %s' % str(result))
 
 def tx_rx(sock, data, expect='ack_then_reply', handler_async_pkt=None):
 	send_packet_data(sock, data)

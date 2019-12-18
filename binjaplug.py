@@ -1,4 +1,5 @@
 import re
+import time
 
 import binaryninja
 from binaryninja.plugin import PluginCommand
@@ -15,13 +16,15 @@ from . import lldb
 #------------------------------------------------------------------------------
 adapter = None
 
+state = 'INACTIVE'
+
 debug_dockwidgets = {}
 
 # address -> adapter id
 breakpoints = {}
 
 #--------------------------------------------------------------------------
-# COMMON DEBUGGER TASKS
+# SUPPORT FUNCTIONS (HIGHER LEVEL)
 #--------------------------------------------------------------------------
 
 def context_display(bv):
@@ -74,9 +77,13 @@ def context_display(bv):
 	# select instruction currently at
 	if bv.read(rip, 1):
 		print('navigating to: 0x%X' % rip)
+		statusText = 'STOPPED at 0x%016X' % rip
 		bv.navigate(bv.file.view, rip)
 	else:
+		statusText = 'STOPPED at 0x%016X (outside view)' % rip
 		print('address 0x%X outside of binary view, not setting cursor' % rip)
+
+	debug_dockwidgets['main'].editStatus.setText(statusText)
 
 	#data = adapter.mem_read(rip, 16)
 	#if data:
@@ -84,8 +91,80 @@ def context_display(bv):
 	#	print('%s%016X%s: %s\t%s' % \
 	#		(GREEN, rip, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
 
+# breakpoint TAG removal - strictly presentation
+# (doesn't remove actual breakpoints, just removes the binja tags that mark them)
+#
+def del_breakpoint_tags(bv, addresses=None):
+	global breakpoints
+
+	if addresses == None:
+		addresses = breakpoints
+
+	for address in addresses:
+		# delete breakpoint tags from all functions containing this address
+		for func in bv.get_functions_containing(address):
+			delqueue = [tag for tag in func.get_address_tags_at(address) if tag.data == 'breakpoint']
+			for tag in delqueue:
+				func.remove_user_address_tag(address, tag)
+
+def buttons_xable(states):
+	assert len(states) == 8
+
+	dw = debug_dockwidgets['main']
+
+	buttons = [dw.btnRun, dw.btnRestart, dw.btnQuit, dw.btnDetach, dw.btnPause,
+		dw.btnResume, dw.btnStepInto, dw.btnStepOver]
+
+	for (button, state) in zip(buttons, states):
+		button.setEnabled(bool(state))
+
+def debug_status(message):
+	global debug_dockwidgets
+	main = debug_dockwidgets['main']
+	main.editStatus.setText(message)
+
+def state_inactive(bv, msg=None):
+	global adapter, state, debug_dockwidgets
+
+	# clear breakpoints
+	del_breakpoint_tags(bv)
+	breakpoints = {}
+
+	state = 'INACTIVE'
+	debug_status(msg or state)
+	buttons_xable([1, 0, 0, 0, 0, 0, 0, 0])
+
+def state_stopped(bv, msg=None):
+	state = 'STOPPED'
+	dw = debug_dockwidgets['main']
+	debug_status(msg or state)
+	buttons_xable([0, 1, 1, 1, 1, 1, 1, 1])
+
+def state_running(bv, msg=None):
+	state = 'RUNNING'
+	debug_status(msg or state)
+	buttons_xable([0, 0, 0, 0, 1, 0, 0, 0])
+
+def state_error(bv, msg=None):
+	state = 'ERROR'
+	debug_status(msg or state)
+	buttons_xable([1, 1, 1, 1, 1, 1, 1, 1])
+
+def handle_stop_return(bv, reason, data):
+	if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
+		state_stopped(bv, 'stdout: '+data)
+		context_display(bv)
+	elif reason == DebugAdapter.STOP_REASON.PROCESS_EXITED:
+		debug_quit(bv)
+		state_inactive(bv, 'process exited, return code=%d' % data)
+	elif reason == DebugAdapter.STOP_REASON.BACKEND_DISCONNECTED:
+		debug_quit(bv)
+		state_inactive(bv, 'backend disconnected (process exited?)')
+	else:
+		context_display(bv)
+
 #------------------------------------------------------------------------------
-# debugger functions
+# DEBUGGER FUNCTIONS (MEDIUM LEVEL)
 #------------------------------------------------------------------------------
 
 def debug_run(bv):
@@ -94,34 +173,46 @@ def debug_run(bv):
 
 	if bv and bv.entry_point:
 		debug_breakpoint_set(bv, bv.entry_point)
+		bv.navigate(bv.file.view, bv.entry_point)
+
+	state_stopped(bv)
+	context_display(bv)
 
 def debug_quit(bv):
 	global adapter
-	assert adapter
-	adapter.quit()
-	adapter = None
+	if adapter:
+		adapter.quit()
+		adapter = None
+	state_inactive(bv)
+
+def debug_restart(bv):
+	debug_quit(bv)
+	time.sleep(1)
+	debug_run(bv) # sets state
 
 def debug_detach(bv):
 	global adapter
 	assert adapter
 	adapter.detach()
 	adapter = None
+	state_inactive(bv)
 
 def debug_break(bv):
 	global adapter
 	assert adapter
 	adapter.break_into()
+	# TODO: wait for actual stop
+	state_stopped(bv)
+	context_display(bv)
 
 def debug_go(bv):
 	global adapter
 	assert adapter
-	print('going in...')
-	adapter.go()
-	print('im out!')
-	context_display(bv)
+	(reason, data) = adapter.go()
+	handle_stop_return(bv, reason, data)
 
 def debug_step(bv):
-	global adapter
+	global adapter, state
 	assert adapter
 
 	(reason, data) = (None, None)
@@ -145,13 +236,7 @@ def debug_step(bv):
 	else:
 		raise NotImplementedError('step unimplemented for architecture %s' % bv.arch.name)
 
-	if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
-		print('stdout: ', data)
-	elif reason == DebugAdapter.STOP_REASON.PROCESS_EXITED:
-		print('process exited, return code=%d', data)
-	else:
-		print('stopped, reason: ', reason.name)
-		context_display(bv)
+	handle_stop_return(bv, reason, data)
 
 def debug_step_over(bv):
 	global adapter
@@ -193,16 +278,12 @@ def debug_step_over(bv):
 			raise Exception('confused by call, bphere, bpnext state')
 
 		(reason, data) = exec_adapter_sequence(seq)
-		if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
-			print('stdout: ', data)
-		elif reason == DebugAdapter.STOP_REASON.PROCESS_EXITED:
-			print('process exited, return code=%d', data)
-		else:
-			print('stopped, reason: ', reason.name)
-			context_display(bv)
+		handle_stop_return(bv, reason, data)
 
 	else:
 		raise NotImplementedError('step over unimplemented for architecture %s' % bv.arch.name)
+
+	state = 'stopped'
 
 def debug_breakpoint_set(bv, address):
 	global breakpoints
@@ -237,10 +318,7 @@ def debug_breakpoint_clear(bv, address):
 			print('ERROR: clearing breakpoint')
 
 		# delete breakpoint tags from all functions containing this address
-		for func in bv.get_functions_containing(address):
-			delqueue = [tag for tag in func.get_address_tags_at(address) if tag.data == 'breakpoint']
-			for tag in delqueue:
-				func.remove_user_address_tag(address, tag)
+		del_breakpoint_tags(bv, [address])
 
 		# delete from our list
 		del breakpoints[address]
@@ -261,7 +339,62 @@ def exec_adapter_sequence(seq):
 	return (reason, data)
 
 #------------------------------------------------------------------------------
-# debugger registers widget
+# DEBUGGER BREAKPOINTS WIDGET
+#------------------------------------------------------------------------------
+
+class DebugBreakpointsDockWidget(QWidget, DockContextHandler):
+	def __init__(self, parent, name, data):
+		assert type(data) == binaryninja.binaryview.BinaryView
+		self.bv = data
+
+		QWidget.__init__(self, parent)
+		DockContextHandler.__init__(self, self, name)
+		self.actionHandler = UIActionHandler()
+		self.actionHandler.setupActionHandler(self)
+
+		layout = QVBoxLayout()
+		layout.addStretch()
+
+		self.listBreakpoints = QListWidget(self)
+		layout.addWidget(l)
+
+		# layout done!
+		layout.addStretch()
+		self.setLayout(layout)
+
+	#--------------------------------------------------------------------------
+	# callbacks to us api/ui/dockhandler.h
+	#--------------------------------------------------------------------------
+	def notifyOffsetChanged(self, offset):
+		pass
+
+	def notifyViewChanged(self, view_frame):
+		if view_frame is None:
+			self.bv = None
+		else:
+			view = view_frame.getCurrentViewInterface()
+			data = view.getData()
+			assert type(data) == binaryninja.binaryview.BinaryView
+			self.bv = data
+
+	def contextMenuEvent(self, event):
+		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)
+
+	def shouldBeVisible(self, view_frame):
+		if view_frame is None:
+			return False
+		else:
+			return True
+
+	@staticmethod
+	def create_widget(name, parent, data = None):
+		global debug_dockwidgets
+		ref = DebugBreakpointDockWidget(parent, name, data)
+		debug_dockwidgets['breakpoints'] = ref
+		return ref
+
+#------------------------------------------------------------------------------
+# DEBUGGER CONTEXT WIDGET
 #------------------------------------------------------------------------------
 
 class DebugContextDockWidget(QWidget, DockContextHandler):
@@ -409,7 +542,7 @@ class DebugContextDockWidget(QWidget, DockContextHandler):
 		return ref
 
 #------------------------------------------------------------------------------
-# debugger buttons widget
+# DEBUGGER BUTTONS WIDGET
 #------------------------------------------------------------------------------
 
 class DebugMainDockWidget(QWidget, DockContextHandler):
@@ -437,15 +570,18 @@ class DebugMainDockWidget(QWidget, DockContextHandler):
 
 		# add session control buttons
 		lo = QHBoxLayout()
-		btnRun = QPushButton("Run")
-		btnRun.clicked.connect(lambda : debug_run(self.bv))
-		btnQuit = QPushButton("Quit")
-		btnQuit.clicked.connect(lambda : debug_quit(self.bv))
-		btnDetach = QPushButton("Detach")
-		btnDetach.clicked.connect(lambda : debug_detach(self.bv))
-		lo.addWidget(btnRun)
-		lo.addWidget(btnQuit)
-		lo.addWidget(btnDetach)
+		self.btnRun = QPushButton("Run")
+		self.btnRun.clicked.connect(lambda : debug_run(self.bv))
+		self.btnRestart = QPushButton("Restart")
+		self.btnRestart.clicked.connect(lambda : debug_restart(self.bv))
+		self.btnQuit = QPushButton("Quit")
+		self.btnQuit.clicked.connect(lambda : debug_quit(self.bv))
+		self.btnDetach = QPushButton("Detach")
+		self.btnDetach.clicked.connect(lambda : debug_detach(self.bv))
+		lo.addWidget(self.btnRun)
+		lo.addWidget(self.btnRestart)
+		lo.addWidget(self.btnQuit)
+		lo.addWidget(self.btnDetach)
 		layout.addLayout(lo)
 
 		# add "Execution Control:"
@@ -454,19 +590,29 @@ class DebugMainDockWidget(QWidget, DockContextHandler):
 		layout.addWidget(l)
 
 		# add execution control buttons
-		btnPause = QPushButton("Break")
-		btnPause.clicked.connect(lambda : debug_break(self.bv))
-		btnResume = QPushButton("Go")
-		btnResume.clicked.connect(lambda : debug_go(self.bv))
-		btnStepInto = QPushButton("Step")
-		btnStepInto.clicked.connect(lambda : debug_step(self.bv))
-		btnStepOver = QPushButton("Step Over")
-		btnStepOver.clicked.connect(lambda : debug_step_over(self.bv))
+		self.btnPause = QPushButton("Break")
+		self.btnPause.clicked.connect(lambda : debug_break(self.bv))
+		self.btnResume = QPushButton("Go")
+		self.btnResume.clicked.connect(lambda : debug_go(self.bv))
+		self.btnStepInto = QPushButton("Step")
+		self.btnStepInto.clicked.connect(lambda : debug_step(self.bv))
+		self.btnStepOver = QPushButton("Step Over")
+		self.btnStepOver.clicked.connect(lambda : debug_step_over(self.bv))
 		lo = QHBoxLayout()
-		lo.addWidget(btnPause)
-		lo.addWidget(btnResume)
-		lo.addWidget(btnStepInto)
-		lo.addWidget(btnStepOver)
+		lo.addWidget(self.btnPause)
+		lo.addWidget(self.btnResume)
+		lo.addWidget(self.btnStepInto)
+		lo.addWidget(self.btnStepOver)
+		layout.addLayout(lo)
+
+		l = QLabel("Debugger State: ", self)
+		l.setAlignment(QtCore.Qt.AlignCenter)
+		self.editStatus = QLineEdit('INACTIVE', self)
+		self.editStatus.setReadOnly(True)
+		self.editStatus.setAlignment(QtCore.Qt.AlignCenter)
+		lo = QHBoxLayout()
+		lo.addWidget(l)
+		lo.addWidget(self.editStatus)
 		layout.addLayout(lo)
 
 		# layout done!
@@ -509,8 +655,6 @@ class DebugMainDockWidget(QWidget, DockContextHandler):
 		debug_dockwidgets['main'] = ref
 		return ref
 
-
-
 #------------------------------------------------------------------------------
 # tools menu stuff
 #------------------------------------------------------------------------------
@@ -546,6 +690,8 @@ def initialize():
 	# create main debugger controls
 	dock_handler.addDockWidget("Debugger Controls", DebugMainDockWidget.create_widget, Qt.BottomDockWidgetArea, Qt.Horizontal, True)
 	dock_handler.addDockWidget("Debugger Context", DebugContextDockWidget.create_widget, Qt.BottomDockWidgetArea, Qt.Horizontal, True)
+	#dock_handler.addDockWidget("Debugger Breakpoints", DebugBreakpointsDockWidget.create_widget, Qt.BottomDockWidgetArea, Qt.Horizontal, True)
+
 
 	PluginCommand.register("Hide Debugger Widget", "", hideDebuggerControls)
 	PluginCommand.register("Show Debugger Widget", "", showDebuggerControls)

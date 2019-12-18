@@ -106,17 +106,22 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		pass
 
 	def detach(self):
-		rsp.send_packet_data(self.sock, 'D')
-		self.sock.shutdown(socket.SHUT_RDWR)
-		self.sock.close()
-		self.sock = None
-		pass
+		try:
+			rsp.send_packet_data(self.sock, 'D')
+			self.sock.shutdown(socket.SHUT_RDWR)
+			self.sock.close()
+			self.sock = None
+		except rsp.RspDisconnected:
+			pass
 
 	def quit(self):
-		rsp.send_packet_data(self.sock, 'k')
-		self.sock.shutdown(socket.SHUT_RDWR)
-		self.sock.close()
-		self.sock = None
+		try:
+			rsp.send_packet_data(self.sock, 'k')
+			self.sock.shutdown(socket.SHUT_RDWR)
+			self.sock.close()
+			self.sock = None
+		except RspDisconnected:
+			pass
 
 	# threads
 	def thread_list(self):
@@ -231,6 +236,8 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 	# break
 	def break_into(self):
 		rsp.send_raw(self.sock, '\x03')
+		# TODO: detect error
+		return True
 
 	def break_reason(self):
 		pkt_T = rsp.tx_rx(self.sock, '?', 'ack_then_reply')
@@ -277,25 +284,29 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 			self.reg_name_to_id[name] = i
 
 	def go_generic(self, gotype, handler_async_pkt=None):
-		reply = rsp.tx_rx(self.sock, gotype, 'mixed_output_ack_then_reply', handler_async_pkt)
-		(reason, reason_data) = (None, None)
+		try:
+			reply = rsp.tx_rx(self.sock, gotype, 'mixed_output_ack_then_reply', handler_async_pkt)
+			(reason, reason_data) = (None, None)
 
-		# thread info
-		if reply[0] == 'T':
-			tdict = rsp.packet_T_to_dict(reply)
-			self.active_thread_tid = tdict['thread']
-			signum = tdict.get('signal', 0)
-			(reason, reason_data) = \
-				(macos_signal_to_debugadapter_reason.get(signum, DebugAdapter.STOP_REASON.UNKNOWN), signum)
+			# thread info
+			if reply[0] == 'T':
+				tdict = rsp.packet_T_to_dict(reply)
+				self.active_thread_tid = tdict['thread']
+				signum = tdict.get('signal', 0)
+				(reason, reason_data) = \
+					(macos_signal_to_debugadapter_reason.get(signum, DebugAdapter.STOP_REASON.UNKNOWN), signum)
 
-		# exit status
-		elif reply[0] == 'W':
-			exit_status = int(reply[1:], 16)
-			#print('inferior exited with status: %d' % exit_status)
-			(reason, reason_data) = (DebugAdapter.STOP_REASON.PROCESS_EXITED, exit_status)
+			# exit status
+			elif reply[0] == 'W':
+				exit_status = int(reply[1:], 16)
+				#print('inferior exited with status: %d' % exit_status)
+				(reason, reason_data) = (DebugAdapter.STOP_REASON.PROCESS_EXITED, exit_status)
 
-		else:
-			print(reply)
-			(reason, reason_data) = (DebugAdapter.STOP_REASON.UNKNOWN, None)
+			else:
+				print(reply)
+				(reason, reason_data) = (DebugAdapter.STOP_REASON.UNKNOWN, None)
 
-		return (reason, reason_data)
+			return (reason, reason_data)
+
+		except rsp.RspDisconnected:
+			return (DebugAdapter.BACKEND_DISCONNECTED, None)
