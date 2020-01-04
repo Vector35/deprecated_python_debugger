@@ -83,7 +83,7 @@ def context_display(bv):
 		statusText = 'STOPPED at 0x%016X (outside view)' % rip
 		print('address 0x%X outside of binary view, not setting cursor' % rip)
 
-	debug_dockwidgets['main'].editStatus.setText(statusText)
+	widget.debug_dockwidgets.get('Debugger Controls').editStatus.setText(statusText)
 
 	#data = adapter.mem_read(rip, 16)
 	#if data:
@@ -110,7 +110,7 @@ def del_breakpoint_tags(bv, addresses=None):
 def buttons_xable(states):
 	assert len(states) == 8
 
-	dw = debug_dockwidgets['main']
+	dw = widget.debug_dockwidgets.get('Debugger Controls')
 
 	buttons = [dw.btnRun, dw.btnRestart, dw.btnQuit, dw.btnDetach, dw.btnPause,
 		dw.btnResume, dw.btnStepInto, dw.btnStepOver]
@@ -120,7 +120,7 @@ def buttons_xable(states):
 
 def debug_status(message):
 	global debug_dockwidgets
-	main = debug_dockwidgets['main']
+	main = widget.debug_dockwidgets.get('Debugger Controls')
 	main.editStatus.setText(message)
 
 def state_inactive(bv, msg=None):
@@ -136,7 +136,7 @@ def state_inactive(bv, msg=None):
 
 def state_stopped(bv, msg=None):
 	state = 'STOPPED'
-	dw = debug_dockwidgets['main']
+	dw = widget.debug_dockwidgets.get('Debugger Controls')
 	debug_status(msg or state)
 	buttons_xable([0, 1, 1, 1, 1, 1, 1, 1])
 
