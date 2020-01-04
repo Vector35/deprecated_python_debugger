@@ -34,48 +34,7 @@ def context_display(bv):
 	registers_widget = widget.debug_dockwidgets.get('Registers')
 	registers_widget.notifyRegisterChanged()
 
-	context_widget = widget.debug_dockwidgets.get('Debugger Context')
-	if not context_widget:
-		return
-
-	#tid = adapter.thread_selected()
-	#print('thread 0x%X:' % tid)
-
-	rax = adapter.reg_read('rax')
-	rbx = adapter.reg_read('rbx')
-	rcx = adapter.reg_read('rcx')
-	rdx = adapter.reg_read('rdx')
-	rsi = adapter.reg_read('rsi')
-	rdi = adapter.reg_read('rdi')
 	rip = adapter.reg_read('rip')
-	rsp = adapter.reg_read('rsp')
-	rbp = adapter.reg_read('rbp')
-	r8 = adapter.reg_read('r8')
-	r9 = adapter.reg_read('r9')
-	r10 = adapter.reg_read('r10')
-	r11 = adapter.reg_read('r11')
-	r12 = adapter.reg_read('r12')
-	r13 = adapter.reg_read('r13')
-	r14 = adapter.reg_read('r14')
-	r15 = adapter.reg_read('r15')
-
-	context_widget.editRax.setText('%X' % rax)
-	context_widget.editRbx.setText('%X' % rbx)
-	context_widget.editRcx.setText('%X' % rcx)
-	context_widget.editRdx.setText('%X' % rdx)
-	context_widget.editRsi.setText('%X' % rsi)
-	context_widget.editRdi.setText('%X' % rdi)
-	context_widget.editRip.setText('%X' % rip)
-	context_widget.editRsp.setText('%X' % rsp)
-	context_widget.editRbp.setText('%X' % rbp)
-	context_widget.editR08.setText('%X' % r8)
-	context_widget.editR09.setText('%X' % r9)
-	context_widget.editR10.setText('%X' % r10)
-	context_widget.editR11.setText('%X' % r11)
-	context_widget.editR12.setText('%X' % r12)
-	context_widget.editR13.setText('%X' % r13)
-	context_widget.editR14.setText('%X' % r14)
-	context_widget.editR15.setText('%X' % r15)
 
 	# select instruction currently at
 	if bv.read(rip, 1):
@@ -402,154 +361,6 @@ class DebugBreakpointsDockWidget(QWidget, DockContextHandler):
 		return ref
 
 #------------------------------------------------------------------------------
-# DEBUGGER CONTEXT WIDGET
-#------------------------------------------------------------------------------
-
-class DebugContextDockWidget(QWidget, DockContextHandler):
-	def __init__(self, parent, name, data):
-		assert type(data) == binaryninja.binaryview.BinaryView
-		self.bv = data
-
-		QWidget.__init__(self, parent)
-		DockContextHandler.__init__(self, self, name)
-		self.actionHandler = UIActionHandler()
-		self.actionHandler.setupActionHandler(self)
-
-		layout = QVBoxLayout()
-		layout.addStretch()
-
-		# add "Registers:"
-		l = QLabel("Registers: ", self)
-		l.setAlignment(QtCore.Qt.AlignCenter)
-		layout.addWidget(l)
-
-		# add rax, rbx, rcx
-		lo = QHBoxLayout()
-		lo.addWidget(QLabel('rax:', self))
-		self.editRax = QLineEdit('0000000000000000', self)
-		self.editRax.setReadOnly(True)
-		lo.addWidget(self.editRax)
-		lo.addWidget(QLabel('rbx:', self))
-		self.editRbx = QLineEdit('0000000000000000', self)
-		self.editRbx.setReadOnly(True)
-		lo.addWidget(self.editRbx)
-		lo.addWidget(QLabel('rcx:', self))
-		self.editRcx = QLineEdit('0000000000000000', self)
-		self.editRcx.setReadOnly(True)
-		lo.addWidget(self.editRcx)
-		layout.addLayout(lo)
-
-		lo = QHBoxLayout()
-		lo.addWidget(QLabel('rdx:', self))
-		self.editRdx = QLineEdit('0000000000000000', self)
-		self.editRdx.setReadOnly(True)
-		lo.addWidget(self.editRdx)
-		lo.addWidget(QLabel('rsi:', self))
-		self.editRsi = QLineEdit('0000000000000000', self)
-		self.editRsi.setReadOnly(True)
-		lo.addWidget(self.editRsi)
-		lo.addWidget(QLabel('rdi:', self))
-		self.editRdi = QLineEdit('0000000000000000', self)
-		self.editRdi.setReadOnly(True)
-		lo.addWidget(self.editRdi)
-		layout.addLayout(lo)
-
-		lo = QHBoxLayout()
-		lo.addWidget(QLabel('rip:', self))
-		self.editRip = QLineEdit('0000000000000000', self)
-		self.editRip.setReadOnly(True)
-		lo.addWidget(self.editRip)
-		lo.addWidget(QLabel('rsp:', self))
-		self.editRsp = QLineEdit('0000000000000000', self)
-		self.editRsp.setReadOnly(True)
-		lo.addWidget(self.editRsp)
-		lo.addWidget(QLabel('rbp:', self))
-		self.editRbp = QLineEdit('0000000000000000', self)
-		self.editRbp.setReadOnly(True)
-		lo.addWidget(self.editRbp)
-		layout.addLayout(lo)
-
-		lo = QHBoxLayout()
-		lo.addWidget(QLabel('r08:', self))
-		self.editR08 = QLineEdit('0000000000000000', self)
-		self.editR08.setReadOnly(True)
-		lo.addWidget(self.editR08)
-		lo.addWidget(QLabel('r09:', self))
-		self.editR09 = QLineEdit('0000000000000000', self)
-		self.editR09.setReadOnly(True)
-		lo.addWidget(self.editR09)
-		lo.addWidget(QLabel('r10:', self))
-		self.editR10 = QLineEdit('0000000000000000', self)
-		self.editR10.setReadOnly(True)
-		lo.addWidget(self.editR10)
-		layout.addLayout(lo)
-
-		lo = QHBoxLayout()
-		lo.addWidget(QLabel('r11:', self))
-		self.editR11 = QLineEdit('0000000000000000', self)
-		self.editR11.setReadOnly(True)
-		lo.addWidget(self.editR11)
-		lo.addWidget(QLabel('r12:', self))
-		self.editR12 = QLineEdit('0000000000000000', self)
-		self.editR12.setReadOnly(True)
-		lo.addWidget(self.editR12)
-		lo.addWidget(QLabel('r13:', self))
-		self.editR13 = QLineEdit('0000000000000000', self)
-		self.editR13.setReadOnly(True)
-		lo.addWidget(self.editR13)
-		layout.addLayout(lo)
-
-		lo = QHBoxLayout()
-		lo.addWidget(QLabel('r14:', self))
-		self.editR14 = QLineEdit('0000000000000000', self)
-		self.editR14.setReadOnly(True)
-		lo.addWidget(self.editR14)
-		lo.addWidget(QLabel('r15:', self))
-		self.editR15 = QLineEdit('0000000000000000', self)
-		self.editR15.setReadOnly(True)
-		lo.addWidget(self.editR15)
-		lo.addWidget(QLabel('', self))
-		self.editRcx = QLineEdit('0000000000000000', self)
-		self.editRcx.setReadOnly(True)
-		lo.addWidget(self.editRcx)
-		layout.addLayout(lo)
-
-		# layout done!
-		layout.addStretch()
-		self.setLayout(layout)
-
-	#--------------------------------------------------------------------------
-	# callbacks to us api/ui/dockhandler.h
-	#--------------------------------------------------------------------------
-	def notifyOffsetChanged(self, offset):
-		pass
-
-	def notifyViewChanged(self, view_frame):
-		if view_frame is None:
-			self.bv = None
-		else:
-			view = view_frame.getCurrentViewInterface()
-			data = view.getData()
-			assert type(data) == binaryninja.binaryview.BinaryView
-			self.bv = data
-
-	def contextMenuEvent(self, event):
-		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)
-
-	def shouldBeVisible(self, view_frame):
-		if view_frame is None:
-			return False
-		else:
-			return True
-
-	@staticmethod
-	def create_widget(name, parent, data = None):
-		global debug_dockwidgets
-		ref = DebugContextDockWidget(parent, name, data)
-		debug_dockwidgets['context'] = ref
-		return ref
-
-#------------------------------------------------------------------------------
 # DEBUGGER BUTTONS WIDGET
 #------------------------------------------------------------------------------
 
@@ -691,7 +502,6 @@ def cb_bp_clr(bv, address):
 
 def initialize(context):
 	widget.register_dockwidget(DebugMainDockWidget, "Debugger Controls", Qt.BottomDockWidgetArea, Qt.Horizontal, True)
-	widget.register_dockwidget(DebugContextDockWidget, "Debugger Context", Qt.BottomDockWidgetArea, Qt.Horizontal, True)
 	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Breakpoints", Qt.RightDockWidgetArea, Qt.Vertical, True, context)
 	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Registers", Qt.RightDockWidgetArea, Qt.Vertical, True, context)
 
