@@ -163,6 +163,9 @@ class DebugBreakpointsWidget(QWidget, DockContextHandler):
 		self.table.resizeColumnsToContents()
 		self.table.resizeRowsToContents()
 
+		for i in range(len(self.model.columns)):
+			self.table.setColumnWidth(i, self.item_delegate.sizeHint(self.table.viewOptions(), self.model.index(-1, i, QModelIndex())).width())
+
 		layout = QVBoxLayout()
 		layout.setContentsMargins(0, 0, 0, 0)
 		layout.setSpacing(0)
