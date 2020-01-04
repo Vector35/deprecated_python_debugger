@@ -19,8 +19,6 @@ adapter = None
 
 state = 'INACTIVE'
 
-debug_dockwidgets = {}
-
 # address -> adapter id
 breakpoints = {}
 
@@ -31,7 +29,7 @@ breakpoints = {}
 def context_display(bv):
 	global adapter
 
-	registers_widget = widget.debug_dockwidgets.get('Registers')
+	registers_widget = widget.get_dockwidget(bv, 'Registers')
 	registers_widget.notifyRegisterChanged()
 
 	rip = adapter.reg_read('rip')
@@ -45,7 +43,7 @@ def context_display(bv):
 		statusText = 'STOPPED at 0x%016X (outside view)' % rip
 		print('address 0x%X outside of binary view, not setting cursor' % rip)
 
-	widget.debug_dockwidgets.get('Debugger Controls').editStatus.setText(statusText)
+	widget.get_dockwidget(bv, 'Debugger Controls').editStatus.setText(statusText)
 
 	#data = adapter.mem_read(rip, 16)
 	#if data:
@@ -69,10 +67,10 @@ def del_breakpoint_tags(bv, addresses=None):
 			for tag in delqueue:
 				func.remove_user_address_tag(address, tag)
 
-def buttons_xable(states):
+def buttons_xable(bv, states):
 	assert len(states) == 8
 
-	dw = widget.debug_dockwidgets.get('Debugger Controls')
+	dw = widget.get_dockwidget(bv, 'Debugger Controls')
 
 	buttons = [dw.btnRun, dw.btnRestart, dw.btnQuit, dw.btnDetach, dw.btnPause,
 		dw.btnResume, dw.btnStepInto, dw.btnStepOver]
@@ -80,37 +78,36 @@ def buttons_xable(states):
 	for (button, state) in zip(buttons, states):
 		button.setEnabled(bool(state))
 
-def debug_status(message):
-	global debug_dockwidgets
-	main = widget.debug_dockwidgets.get('Debugger Controls')
+def debug_status(bv, message):
+	main = widget.get_dockwidget(bv, 'Debugger Controls')
 	main.editStatus.setText(message)
 
 def state_inactive(bv, msg=None):
-	global adapter, state, debug_dockwidgets
+	global adapter, state
 
 	# clear breakpoints
 	del_breakpoint_tags(bv)
 	breakpoints = {}
 
 	state = 'INACTIVE'
-	debug_status(msg or state)
-	buttons_xable([1, 0, 0, 0, 0, 0, 0, 0])
+	debug_status(bv, msg or state)
+	buttons_xable(bv, [1, 0, 0, 0, 0, 0, 0, 0])
 
 def state_stopped(bv, msg=None):
 	state = 'STOPPED'
-	dw = widget.debug_dockwidgets.get('Debugger Controls')
-	debug_status(msg or state)
-	buttons_xable([0, 1, 1, 1, 1, 1, 1, 1])
+	dw = widget.get_dockwidget(bv, 'Debugger Controls')
+	debug_status(bv, msg or state)
+	buttons_xable(bv, [0, 1, 1, 1, 1, 1, 1, 1])
 
 def state_running(bv, msg=None):
 	state = 'RUNNING'
-	debug_status(msg or state)
-	buttons_xable([0, 0, 0, 0, 1, 0, 0, 0])
+	debug_status(bv, msg or state)
+	buttons_xable(bv, [0, 0, 0, 0, 1, 0, 0, 0])
 
 def state_error(bv, msg=None):
 	state = 'ERROR'
-	debug_status(msg or state)
-	buttons_xable([1, 1, 1, 1, 1, 1, 1, 1])
+	debug_status(bv, msg or state)
+	buttons_xable(bv, [1, 1, 1, 1, 1, 1, 1, 1])
 
 def handle_stop_return(bv, reason, data):
 	if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
@@ -265,7 +262,7 @@ def debug_breakpoint_set(bv, address):
 	breakpoints[address] = True
 	print('breakpoint address=0x%X set' % (address))
 
-	bp_widget = widget.debug_dockwidgets.get("Breakpoints")
+	bp_widget = widget.get_dockwidget(bv, "Breakpoints")
 	if bp_widget is not None:
 		bp_widget.notifyBreakpointChanged()
 
@@ -353,12 +350,6 @@ class DebugBreakpointsDockWidget(QWidget, DockContextHandler):
 		else:
 			return True
 
-	@staticmethod
-	def create_widget(name, parent, data = None):
-		global debug_dockwidgets
-		ref = DebugBreakpointDockWidget(parent, name, data)
-		debug_dockwidgets['breakpoints'] = ref
-		return ref
 
 #------------------------------------------------------------------------------
 # DEBUGGER BUTTONS WIDGET
@@ -466,13 +457,6 @@ class DebugMainDockWidget(QWidget, DockContextHandler):
 			return False
 		else:
 			return True
-
-	@staticmethod
-	def create_widget(name, parent, data):
-		global debug_dockwidgets
-		ref = DebugMainDockWidget(parent, name, data)
-		debug_dockwidgets['main'] = ref
-		return ref
 
 #------------------------------------------------------------------------------
 # tools menu stuff

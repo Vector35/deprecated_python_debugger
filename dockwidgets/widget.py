@@ -1,7 +1,7 @@
 from PySide2.QtWidgets import QApplication, QWidget
 from binaryninjaui import DockHandler
 
-debug_dockwidgets = {}
+debug_dockwidgets = []
 
 def create_widget(widget_class, name, parent, data, *args):
 	# It is imperative this function return *some* value because Shiboken will try to deref what we return
@@ -11,7 +11,18 @@ def create_widget(widget_class, name, parent, data, *args):
 		widget = widget_class(parent, name, data, *args)
 		assert widget is not None
 		global debug_dockwidgets
-		debug_dockwidgets[name] = widget
+
+		found = False
+		for (bv, widgets) in debug_dockwidgets:
+			if bv == data:
+				widgets[name] = widget
+				found = True
+		
+		if not found:
+			debug_dockwidgets.append((data, {
+				name: widget
+			}))
+
 		return widget
 	except Exception as e:
 		print(e)
@@ -25,3 +36,11 @@ def register_dockwidget(widget_class, name, area, orientation, default_visibilit
 
 	# create main debugger controls
 	dock_handler.addDockWidget(name, lambda n,p,d: create_widget(widget_class, n, p, d, *args), area, orientation, default_visibility)
+
+def get_dockwidget(data, name):
+	for (bv, widgets) in debug_dockwidgets:
+		if bv == data:
+			return widgets.get(name)
+	
+	return None
+
