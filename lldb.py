@@ -84,6 +84,7 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		# register state
 		self.reg_id_to_name = {}
 		self.reg_name_to_id = {}
+		self.reg_name_to_id = {}
 		self.register_sense()
 
 		# address -> True
@@ -197,9 +198,13 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		payload = 'P %d=%s' % (id_, valstr)
 		reply = rsp.tx_rx(self.sock, payload, 'ack_then_ok')
 
-	def register_list(self):
+	def reg_list(self):
 		self.register_sense()
 		return self.reg_name_to_id.keys()
+
+	def reg_bits(self, reg):
+		self.register_sense()
+		return int(self.reg_name_to_info[reg]["bitsize"])
 
 	# mem
 	def mem_read(self, address, length):
@@ -273,15 +278,17 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 
 		self.reg_id_to_name = {}
 		self.reg_name_to_id = {}
+		self.reg_name_to_info = {}
 
 		reg_array = rsp.register_scan(self.sock)
 
-		for (i, name) in enumerate(reg_array):
-			if name == None:
+		for (i, info) in enumerate(reg_array):
+			if info == None:
 				continue
 
-			self.reg_id_to_name[i] = name
-			self.reg_name_to_id[name] = i
+			self.reg_id_to_name[i] = info["name"]
+			self.reg_name_to_id[info["name"]] = i
+			self.reg_name_to_info[info["name"]] = info
 
 	def go_generic(self, gotype, handler_async_pkt=None):
 		try:

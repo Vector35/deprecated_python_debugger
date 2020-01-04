@@ -83,6 +83,8 @@ class DebugAdapter:
 		pass
 	def reg_list(self):
 		pass
+	def reg_bits(self, reg):
+		pass
 
 	# mem
 	def mem_read(self, address, length):

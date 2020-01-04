@@ -114,9 +114,22 @@ def register_scan(sock):
 		reply = tx_rx(sock, 'qRegisterInfo%02X' % i, 'ack_then_reply')
 		if not reply.startswith('name:'):
 			break
-		name = re.match(r'^name:(.*?);', reply).group(1)
+
+		info = {}
+		for key_vals in reply.split(';'):
+			if not key_vals:
+				continue
+				
+			if not ':' in key_vals:
+				print(key_vals)
+				assert(0)
+
+			(key, val) = key_vals.split(':')
+
+			info[key] = val
+		
 		#print('reg %d is %s' % (i, name))
-		result[i] = name
+		result[i] = info
 
 	return result
 
