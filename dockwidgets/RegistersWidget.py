@@ -8,16 +8,16 @@ import binaryninjaui
 from binaryninjaui import DockContextHandler, UIActionHandler
 
 from . import widget
+from .. import binjaplug
 
 class DebugRegistersListModel(QAbstractItemModel):
-	def __init__(self, parent, context):
+	def __init__(self, parent):
 		QAbstractItemModel.__init__(self, parent)
 		self.columns = ["Name", "Value"]
 		self.rows = []
-		self.context = context
-		self.update_rows()
+		self.update_rows(None)
 
-	def update_rows(self):
+	def update_rows(self, new_rows):
 		self.beginResetModel()
 
 		old_regs = {}
@@ -26,19 +26,15 @@ class DebugRegistersListModel(QAbstractItemModel):
 
 		self.rows = []
 		self.row_info = []
-		if self.context.adapter is None:
+		if new_rows is None:
 			self.endResetModel()
 			return
 
 		# Fill self.rows
-		for register in self.context.adapter.reg_list():
-			value = self.context.adapter.reg_read(register)
-			self.rows.append((register, value))
-			self.row_info.append({
-				'name': register,
-				'bits': self.context.adapter.reg_bits(register),
-				'state': 'unchanged' if old_regs.get(register, -1) == value else 'updated'
-			})
+		for info in new_rows:
+			self.rows.append((info['name'], info['value']))
+			info['state'] = 'unchanged' if old_regs.get(info['name'], -1) == info['value'] else 'updated'
+			self.row_info.append(info)
 
 		self.endResetModel()
 
@@ -63,7 +59,7 @@ class DebugRegistersListModel(QAbstractItemModel):
 	
 	def flags(self, index):
 		f = super().flags(index)
-		if index.column() == 1 and self.context.adapter is not None:
+		if index.column() == 1:
 			f |= Qt.ItemIsEditable
 		return f
 
@@ -107,10 +103,10 @@ class DebugRegistersListModel(QAbstractItemModel):
 		register = info['name']
 
 		# Tell the debugger to update
-		self.context.adapter.reg_write(register, new_val)
+		binjaplug.adapter.reg_write(register, new_val)
 
 		# Update internal copy to show modification
-		updated_val = self.context.adapter.reg_read(register)
+		updated_val = binjaplug.adapter.reg_read(register)
 
 		# Make sure the debugger actually let us set the register
 		self.rows[index.row()] = (register, updated_val)
@@ -166,10 +162,9 @@ class DebugRegistersItemDelegate(QItemDelegate):
 
 
 class DebugRegistersWidget(QWidget, DockContextHandler):
-	def __init__(self, parent, name, data, context):
+	def __init__(self, parent, name, data):
 		assert type(data) == binaryninja.binaryview.BinaryView
 		self.bv = data
-		self.context = context
 		
 		QWidget.__init__(self, parent)
 		DockContextHandler.__init__(self, self, name)
@@ -177,7 +172,7 @@ class DebugRegistersWidget(QWidget, DockContextHandler):
 		self.actionHandler.setupActionHandler(self)
 
 		self.table = QTableView(self)
-		self.model = DebugRegistersListModel(self.table, self.context)
+		self.model = DebugRegistersListModel(self.table)
 		self.table.setModel(self.model)
 
 		self.item_delegate = DebugRegistersItemDelegate(self)
@@ -208,11 +203,8 @@ class DebugRegistersWidget(QWidget, DockContextHandler):
 	def notifyOffsetChanged(self, offset):
 		pass
 
-	def notifyRegisterChanged(self):
-		self.model.update_rows()
-
-	def notifyViewChanged(self, view_frame):
-		self.model.update_rows()
+	def notifyRegistersChanged(self, new_regs):
+		self.model.update_rows(new_regs)
 
 	def contextMenuEvent(self, event):
 		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)

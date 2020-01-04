@@ -30,7 +30,18 @@ def context_display(bv):
 	global adapter
 
 	registers_widget = widget.get_dockwidget(bv, 'Registers')
-	registers_widget.notifyRegisterChanged()
+
+	regs = []
+	for register in adapter.reg_list():
+		value = adapter.reg_read(register)
+		bits = adapter.reg_bits(register)
+		regs.append({
+			'name': register,
+			'bits': bits,
+			'value': value
+		})
+
+	registers_widget.notifyRegistersChanged(regs)
 
 	rip = adapter.reg_read('rip')
 
@@ -484,10 +495,10 @@ def cb_bp_clr(bv, address):
 # "main"
 #------------------------------------------------------------------------------
 
-def initialize(context):
+def initialize():
 	widget.register_dockwidget(DebugMainDockWidget, "Debugger Controls", Qt.BottomDockWidgetArea, Qt.Horizontal, True)
-	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Breakpoints", Qt.RightDockWidgetArea, Qt.Vertical, True, context)
-	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Registers", Qt.RightDockWidgetArea, Qt.Vertical, True, context)
+	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Breakpoints", Qt.RightDockWidgetArea, Qt.Vertical, True)
+	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Registers", Qt.RightDockWidgetArea, Qt.Vertical, True)
 
 	PluginCommand.register("Hide Debugger Widget", "", hideDebuggerControls)
 	PluginCommand.register("Show Debugger Widget", "", showDebuggerControls)

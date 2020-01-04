@@ -8,27 +8,27 @@ import binaryninjaui
 from binaryninjaui import DockContextHandler, UIActionHandler
 
 from . import widget
+from .. import binjaplug
 
 breakpoints = {}
 
 class DebugBreakpointsListModel(QAbstractItemModel):
-	def __init__(self, parent, context):
+	def __init__(self, parent):
 		QAbstractItemModel.__init__(self, parent)
 		self.columns = ["Address", "Enabled"]
-		self.context = context
 		self.update_rows()
 
 	def update_rows(self):
 		self.beginResetModel()
 
 		self.rows = []
-		if self.context.adapter is None:
+		if binjaplug.adapter is None:
 			self.endResetModel()
 			return
 
-		for bp in self.context.adapter.breakpoint_list():
-			if bp in self.context.breakpoints.keys():
-				self.rows.append([bp, self.context.breakpoints[bp]])
+		for bp in binjaplug.adapter.breakpoint_list():
+			if bp in binjaplug.breakpoints.keys():
+				self.rows.append([bp, binjaplug.breakpoints[bp]])
 		
 		self.endResetModel()
 
@@ -133,10 +133,9 @@ class DebugBreakpointsItemDelegate(QItemDelegate):
 
 
 class DebugBreakpointsWidget(QWidget, DockContextHandler):
-	def __init__(self, parent, name, data, context):
+	def __init__(self, parent, name, data):
 		assert type(data) == binaryninja.binaryview.BinaryView
 		self.bv = data
-		self.context = context
 		
 		QWidget.__init__(self, parent)
 		DockContextHandler.__init__(self, self, name)
@@ -144,7 +143,7 @@ class DebugBreakpointsWidget(QWidget, DockContextHandler):
 		self.actionHandler.setupActionHandler(self)
 
 		self.table = QTableView(self)
-		self.model = DebugBreakpointsListModel(self.table, self.context)
+		self.model = DebugBreakpointsListModel(self.table)
 		self.table.setModel(self.model)
 
 		self.item_delegate = DebugBreakpointsItemDelegate(self)
