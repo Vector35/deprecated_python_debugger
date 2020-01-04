@@ -10,7 +10,7 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QW
 
 from . import DebugAdapter
 from . import lldb
-from .dockwidgets import BreakpointsWidget, widget
+from .dockwidgets import BreakpointsWidget, RegistersWidget, widget
 
 #------------------------------------------------------------------------------
 # globals
@@ -30,6 +30,9 @@ breakpoints = {}
 
 def context_display(bv):
 	global adapter
+
+	registers_widget = widget.debug_dockwidgets.get('Registers')
+	registers_widget.notifyRegisterChanged()
 
 	context_widget = widget.debug_dockwidgets.get('Debugger Context')
 	if not context_widget:
@@ -690,6 +693,7 @@ def initialize(context):
 	widget.register_dockwidget(DebugMainDockWidget, "Debugger Controls", Qt.BottomDockWidgetArea, Qt.Horizontal, True)
 	widget.register_dockwidget(DebugContextDockWidget, "Debugger Context", Qt.BottomDockWidgetArea, Qt.Horizontal, True)
 	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Breakpoints", Qt.RightDockWidgetArea, Qt.Vertical, True, context)
+	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Registers", Qt.RightDockWidgetArea, Qt.Vertical, True, context)
 
 	PluginCommand.register("Hide Debugger Widget", "", hideDebuggerControls)
 	PluginCommand.register("Show Debugger Widget", "", showDebuggerControls)
