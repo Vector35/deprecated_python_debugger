@@ -35,8 +35,9 @@ class DebugRegistersListModel(QAbstractItemModel):
 			value = self.context.adapter.reg_read(register)
 			self.rows.append((register, value))
 			self.row_info.append({
+				'name': register,
 				'bits': self.context.adapter.reg_bits(register),
-				'updated': old_regs.get(register, -1) != value
+				'state': 'unchanged' if old_regs.get(register, -1) == value else 'updated'
 			})
 
 		self.endResetModel()
@@ -60,6 +61,12 @@ class DebugRegistersListModel(QAbstractItemModel):
 	def columnCount(self, parent):
 		return len(self.columns)
 	
+	def flags(self, index):
+		f = super().flags(index)
+		if index.column() == 1 and self.context.adapter is not None:
+			f |= Qt.ItemIsEditable
+		return f
+
 	def headerData(self, section, orientation, role):
 		if role != Qt.DisplayRole:
 			return None
@@ -85,9 +92,33 @@ class DebugRegistersListModel(QAbstractItemModel):
 				text = str(conts)
 			return text
 		elif role == Qt.UserRole:
-			return info["updated"]
+			return info['state']
 
 		return None
+	
+	def setData(self, index, value, role):
+		# Verify that we can edit this value
+		if (self.flags(index) & Qt.EditRole) != Qt.EditRole:
+			return False
+		
+		info = self.row_info[index.row()]
+		old_val = self.rows[index.row()][1]
+		new_val = int(value, 16)
+		register = info['name']
+
+		# Tell the debugger to update
+		self.context.adapter.reg_write(register, new_val)
+
+		# Update internal copy to show modification
+		updated_val = self.context.adapter.reg_read(register)
+
+		# Make sure the debugger actually let us set the register
+		self.rows[index.row()] = (register, updated_val)
+		self.row_info[index.row()]['state'] = 'modified' if updated_val == new_val else info['state']
+
+		self.dataChanged.emit(index, index, [role])
+		self.layoutChanged.emit()
+		return True
 
 class DebugRegistersItemDelegate(QItemDelegate):
 	def __init__(self, parent):
@@ -116,15 +147,22 @@ class DebugRegistersItemDelegate(QItemDelegate):
 		painter.drawRect(option.rect)
 
 		text = idx.data()
-		updated = bool(idx.data(Qt.UserRole))
+		state = idx.data(Qt.UserRole)
 
-		# Draw text
+		# Draw text depending on state
 		painter.setFont(self.font)
-		if updated:
+		if state == 'updated':
 			painter.setPen(option.palette.color(QPalette.Highlight).rgba())
+		elif state == 'modified':
+			painter.setPen(binaryninjaui.getThemeColor(binaryninjaui.OrangeStandardHighlightColor).rgba())
 		else:
 			painter.setPen(option.palette.color(QPalette.WindowText).rgba())
 		painter.drawText(2 + option.rect.left(), self.char_offset + self.baseline + option.rect.top(), str(text))
+		
+	def setEditorData(self, editor, idx):
+		if idx.column() == 1:
+			data = idx.data()
+			editor.setText(data)
 
 
 class DebugRegistersWidget(QWidget, DockContextHandler):
