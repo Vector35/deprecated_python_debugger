@@ -10,7 +10,7 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QW
 
 from . import DebugAdapter
 from . import lldb
-from .dockwidgets import BreakpointsWidget, RegistersWidget, widget
+from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, widget
 
 #------------------------------------------------------------------------------
 # globals
@@ -29,8 +29,10 @@ breakpoints = {}
 def context_display(bv):
 	global adapter
 
+	#----------------------------------------------------------------------
+	# Update Registers
+	#----------------------------------------------------------------------
 	registers_widget = widget.get_dockwidget(bv, 'Registers')
-
 	regs = []
 	for register in adapter.reg_list():
 		value = adapter.reg_read(register)
@@ -40,8 +42,50 @@ def context_display(bv):
 			'bits': bits,
 			'value': value
 		})
-
 	registers_widget.notifyRegistersChanged(regs)
+
+	#----------------------------------------------------------------------
+	# Update Stack
+	#----------------------------------------------------------------------
+	stack_widget = widget.get_dockwidget(bv, 'Stack')
+
+	if bv.arch.name == 'x86_64':
+		stack_pointer = adapter.reg_read('rsp')
+		# Read up and down from rsp
+		stack_range = [-8, 60] # Inclusive
+		stack = []
+		for i in range(stack_range[0], stack_range[1] + 1):
+			offset = i * bv.arch.address_size
+			address = stack_pointer + offset
+			value = adapter.mem_read(address, bv.arch.address_size)
+			value_int = value
+			if bv.arch.endianness == binaryninja.Endianness.LittleEndian:
+				value_int = value_int[::-1]
+			value_int = int(value_int.hex(), 16)
+
+			refs = []
+			for register in regs:
+				if register['value'] == address:
+					refs.append({
+						'source': 'register',
+						'dest': 'address',
+						'register': register
+					})
+				# Ignore zeroes because most registers start at zero and give false data
+				if value_int != 0 and register['value'] == value_int:
+					refs.append({
+						'source': 'register',
+						'dest': 'value',
+						'register': register
+					})
+
+			stack.append({
+				'offset': offset,
+				'value': value,
+				'address': address,
+				'refs': refs
+			})
+		stack_widget.notifyStackChanged(stack)
 
 	rip = adapter.reg_read('rip')
 
@@ -314,55 +358,6 @@ def exec_adapter_sequence(seq):
 	return (reason, data)
 
 #------------------------------------------------------------------------------
-# DEBUGGER BREAKPOINTS WIDGET
-#------------------------------------------------------------------------------
-
-class DebugBreakpointsDockWidget(QWidget, DockContextHandler):
-	def __init__(self, parent, name, data):
-		assert type(data) == binaryninja.binaryview.BinaryView
-		self.bv = data
-
-		QWidget.__init__(self, parent)
-		DockContextHandler.__init__(self, self, name)
-		self.actionHandler = UIActionHandler()
-		self.actionHandler.setupActionHandler(self)
-
-		layout = QVBoxLayout()
-		layout.addStretch()
-
-		self.listBreakpoints = QListWidget(self)
-		layout.addWidget(l)
-
-		# layout done!
-		layout.addStretch()
-		self.setLayout(layout)
-
-	#--------------------------------------------------------------------------
-	# callbacks to us api/ui/dockhandler.h
-	#--------------------------------------------------------------------------
-	def notifyOffsetChanged(self, offset):
-		pass
-
-	def notifyViewChanged(self, view_frame):
-		if view_frame is None:
-			self.bv = None
-		else:
-			view = view_frame.getCurrentViewInterface()
-			data = view.getData()
-			assert type(data) == binaryninja.binaryview.BinaryView
-			self.bv = data
-
-	def contextMenuEvent(self, event):
-		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)
-
-	def shouldBeVisible(self, view_frame):
-		if view_frame is None:
-			return False
-		else:
-			return True
-
-
-#------------------------------------------------------------------------------
 # DEBUGGER BUTTONS WIDGET
 #------------------------------------------------------------------------------
 
@@ -499,6 +494,7 @@ def initialize():
 	widget.register_dockwidget(DebugMainDockWidget, "Debugger Controls", Qt.BottomDockWidgetArea, Qt.Horizontal, True)
 	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Breakpoints", Qt.RightDockWidgetArea, Qt.Vertical, True)
 	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Registers", Qt.RightDockWidgetArea, Qt.Vertical, True)
+	widget.register_dockwidget(StackWidget.DebugStackWidget, "Stack", Qt.RightDockWidgetArea, Qt.Vertical, True)
 
 	PluginCommand.register("Hide Debugger Widget", "", hideDebuggerControls)
 	PluginCommand.register("Show Debugger Widget", "", showDebuggerControls)
