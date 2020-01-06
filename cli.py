@@ -266,7 +266,8 @@ if __name__ == '__main__':
 					if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
 						print('stdout: ', data)
 					elif reason == DebugAdapter.STOP_REASON.PROCESS_EXITED:
-						print('process exited, return code=%d', data)
+						print('process exited, return code=%d' % data)
+						break
 					else:
 						print('stopped, reason: ', reason.name)
 						context_display()

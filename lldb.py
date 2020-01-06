@@ -248,7 +248,8 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		pkt_T = rsp.tx_rx(self.sock, '?', 'ack_then_reply')
 		print(pkt_T)
 
-	# execution control
+	# execution control, all return:
+	# returns (STOP_REASON.XXX, <extra_info>)
 	def go(self):
 		return self.go_generic('c')
 
@@ -290,6 +291,7 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 			self.reg_name_to_id[info["name"]] = i
 			self.reg_name_to_info[info["name"]] = info
 
+	# returns (STOP_REASON.XXX, <extra_info>)
 	def go_generic(self, gotype, handler_async_pkt=None):
 		try:
 			reply = rsp.tx_rx(self.sock, gotype, 'mixed_output_ack_then_reply', handler_async_pkt)
@@ -306,7 +308,7 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 			# exit status
 			elif reply[0] == 'W':
 				exit_status = int(reply[1:], 16)
-				#print('inferior exited with status: %d' % exit_status)
+				print('inferior exited with status: %d' % exit_status)
 				(reason, reason_data) = (DebugAdapter.STOP_REASON.PROCESS_EXITED, exit_status)
 
 			else:

@@ -76,12 +76,16 @@ def tx_rx(sock, data, expect='ack_then_reply', handler_async_pkt=None):
 		ack_received = False
 		while 1:
 			peek1 = sock.recv(1, socket.MSG_PEEK)
+
 			if peek1 == b'+':
 				assert not ack_received
 				sock.recv(1)
 				ack_received = True
 				continue
 
+			if peek1 != b'$':
+				print('expected $, got: %s' % sock.recv(999))
+				assert False
 			assert peek1 == b'$'
 			reply = recv_packet_data(sock)
 			if reply[0] == 'O':
