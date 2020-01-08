@@ -10,7 +10,7 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QW
 
 from . import DebugAdapter
 from . import lldb
-from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, widget
+from .dockwidgets import BreakpointsWidget, RegistersWidget, ThreadsWidget, MemoryWidget StackWidget, widget
 
 #------------------------------------------------------------------------------
 # globals
@@ -106,6 +106,10 @@ def context_display(bv):
 	#	print('%s%016X%s: %s\t%s' % \
 	#		(GREEN, rip, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
 
+# Mark memory as dirty, will refresh memory view
+def memory_dirty(bv):
+	widget.get_dockwidget(bv, 'Memory').notifyMemoryChanged()
+
 # breakpoint TAG removal - strictly presentation
 # (doesn't remove actual breakpoints, just removes the binja tags that mark them)
 #
@@ -191,6 +195,7 @@ def debug_run(bv):
 
 	state_stopped(bv)
 	context_display(bv)
+	memory_dirty(bv)
 
 def debug_quit(bv):
 	global adapter
@@ -198,6 +203,7 @@ def debug_quit(bv):
 		adapter.quit()
 		adapter = None
 	state_inactive(bv)
+	memory_dirty(bv)
 
 def debug_restart(bv):
 	debug_quit(bv)
@@ -224,6 +230,7 @@ def debug_go(bv):
 	assert adapter
 	(reason, data) = adapter.go()
 	handle_stop_return(bv, reason, data)
+	memory_dirty(bv)
 
 def debug_step(bv):
 	global adapter, state
@@ -251,6 +258,7 @@ def debug_step(bv):
 		raise NotImplementedError('step unimplemented for architecture %s' % bv.arch.name)
 
 	handle_stop_return(bv, reason, data)
+	memory_dirty(bv)
 
 def debug_step_over(bv):
 	global adapter
@@ -298,6 +306,7 @@ def debug_step_over(bv):
 		raise NotImplementedError('step over unimplemented for architecture %s' % bv.arch.name)
 
 	state = 'stopped'
+	memory_dirty(bv)
 
 def debug_breakpoint_set(bv, address):
 	global breakpoints
@@ -496,6 +505,7 @@ def initialize():
 	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Registers", Qt.RightDockWidgetArea, Qt.Vertical, True)
 	widget.register_dockwidget(ThreadsWidget.DebugThreadsWidget, "Threads", Qt.RightDockWidgetArea, Qt.Vertical, True)
 	widget.register_dockwidget(StackWidget.DebugStackWidget, "Stack", Qt.RightDockWidgetArea, Qt.Vertical, True)
+	widget.register_dockwidget(MemoryWidget.DebugMemoryWidget, "Memory", Qt.BottomDockWidgetArea, Qt.Vertical, True)
 
 	PluginCommand.register("Hide Debugger Widget", "", hideDebuggerControls)
 	PluginCommand.register("Show Debugger Widget", "", showDebuggerControls)
