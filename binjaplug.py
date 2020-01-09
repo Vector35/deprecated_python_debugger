@@ -10,7 +10,7 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QW
 
 from . import DebugAdapter
 from . import lldb
-from .dockwidgets import BreakpointsWidget, RegistersWidget, ThreadsWidget, MemoryWidget StackWidget, widget
+from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, widget
 
 #------------------------------------------------------------------------------
 # globals
