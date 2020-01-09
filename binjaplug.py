@@ -8,8 +8,7 @@ from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
 
-from . import DebugAdapter
-from . import lldb
+from . import DebugAdapter, lldb
 from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, MemoryWidget, widget
 
 #------------------------------------------------------------------------------

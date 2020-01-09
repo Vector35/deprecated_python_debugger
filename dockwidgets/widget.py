@@ -1,6 +1,7 @@
 from PySide2.QtWidgets import QApplication, QWidget
 from binaryninjaui import DockHandler
 import sys
+import traceback
 
 debug_dockwidgets = []
 
@@ -26,7 +27,7 @@ def create_widget(widget_class, name, parent, data, *args):
 
 		return widget
 	except Exception as e:
-		print(e, file=sys.stderr)
+		traceback.print_exc(file=sys.stderr)
 		return QWidget(parent)
 
 def register_dockwidget(widget_class, name, area, orientation, default_visibility, *args):
