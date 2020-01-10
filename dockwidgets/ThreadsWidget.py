@@ -22,6 +22,10 @@ class DebugThreadsListModel(QAbstractItemModel):
 	def update_rows(self, new_rows):
 		self.beginResetModel()
 
+		old_threads = {}
+		for (tid, ip) in self.rows:
+			old_threads[tid] = ip
+
 		# clear old data
 		self.rows = []
 		self.row_info = []
@@ -31,9 +35,13 @@ class DebugThreadsListModel(QAbstractItemModel):
 
 		# set new data
 		for info in new_rows:
+			(tid, rip) = (info['tid'], info['rip'])
 			# actual values for the table rows
-			self.rows.append((info['tid'], info['rip']))
-			# parallel list of the incoming dicts (to use ['selected'] and ['bits'] during display)
+			self.rows.append((tid, rip))
+			# parallel list of the incoming dict, augmented
+			#  (keys 'selected', 'bits', 'state' used in display)
+			info['state'] = ['updated', 'unchanged'][old_threads.get(tid,-1) == rip]
+			print('info[state]=%s' % info['state'])
 			self.row_info.append(info)
 
 		self.endResetModel()
@@ -89,7 +97,8 @@ class DebugThreadsListModel(QAbstractItemModel):
 				text = '%X' % contents
 			return text
 		elif role == Qt.UserRole:
-			return info['selected']
+			return info['state'] # 'updated', 'modified', 'unchanged'
+		# TODO: look into Qt::CheckStateRole for whether thread selected or not
 
 		return None
 
@@ -128,6 +137,7 @@ class DebugThreadsItemDelegate(QItemDelegate):
 
 		# Draw text depending on state
 		painter.setFont(self.font)
+		print('read state: %s' % state)
 		if state == 'updated':
 			painter.setPen(option.palette.color(QPalette.Highlight).rgba())
 		elif state == 'modified':

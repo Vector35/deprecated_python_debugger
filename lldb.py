@@ -121,7 +121,7 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 			self.sock.shutdown(socket.SHUT_RDWR)
 			self.sock.close()
 			self.sock = None
-		except RspDisconnected:
+		except rsp.RspDisconnected:
 			pass
 
 	# threads
