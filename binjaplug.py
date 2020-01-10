@@ -45,6 +45,31 @@ def context_display(bv):
 	registers_widget.notifyRegistersChanged(regs)
 
 	#----------------------------------------------------------------------
+	# Update Threads
+	#----------------------------------------------------------------------
+	threads_widget = widget.get_dockwidget(bv, 'Threads')
+
+	if bv.arch.name == 'x86_64':
+		reg_ip_name = 'rip'
+		reg_ip_width = 64
+	else:
+		raise NotImplementedError('only x86_64 so far')
+
+	threads = []
+	tid_selected = adapter.thread_selected()
+	for tid in adapter.thread_list():
+		adapter.thread_select(tid)
+		reg_ip_val = adapter.reg_read(reg_ip_name)
+		threads.append({
+			'tid': tid,
+			reg_ip_name: reg_ip_val,
+			'bits': reg_ip_width,
+			'selected': (tid == tid_selected)
+		})
+	adapter.thread_select(tid_selected)
+	threads_widget.notifyThreadsChanged(threads)
+
+	#----------------------------------------------------------------------
 	# Update Stack
 	#----------------------------------------------------------------------
 	stack_widget = widget.get_dockwidget(bv, 'Stack')

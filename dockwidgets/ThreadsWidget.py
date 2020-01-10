@@ -17,23 +17,23 @@ class DebugThreadsListModel(QAbstractItemModel):
 		self.rows = []
 		self.update_rows(None)
 
+	# called from widget's notifyThreadsChanged() function
+	# new_rows is list of {'tid':<uint>, 'rip':<uint>, 'selected':<bool>}
 	def update_rows(self, new_rows):
 		self.beginResetModel()
 
-		old_regs = {}
-		for (reg, value) in self.rows:
-			old_regs[reg] = value
-
+		# clear old data
 		self.rows = []
 		self.row_info = []
 		if new_rows is None:
 			self.endResetModel()
 			return
 
-		# Fill self.rows
+		# set new data
 		for info in new_rows:
-			self.rows.append((info['name'], info['value']))
-			info['state'] = 'unchanged' if old_regs.get(info['name'], -1) == info['value'] else 'updated'
+			# actual values for the table rows
+			self.rows.append((info['tid'], info['rip']))
+			# parallel list of the incoming dicts (to use ['selected'] and ['bits'] during display)
 			self.row_info.append(info)
 
 		self.endResetModel()
@@ -76,45 +76,26 @@ class DebugThreadsListModel(QAbstractItemModel):
 		if index.row() < 0 or index.row() >= len(self.rows):
 			return None
 		
-		conts = self.rows[index.row()][index.column()]
+		contents = self.rows[index.row()][index.column()]
 		info = self.row_info[index.row()]
 
 		if role == Qt.DisplayRole:
 			# Format data into displayable text
 			if index.column() == 1:
 				# Pad out to ceil(bitlength/4) nibbles
-				text = ('%X' % conts).rjust((info['bits'] + 3) // 4, "0")
+				text = ('%X' % contents).rjust((info['bits'] + 3) // 4, "0")
 			else:
-				text = str(conts)
+				# TID should just be integer
+				text = '%X' % contents
 			return text
 		elif role == Qt.UserRole:
-			return info['state']
+			return info['selected']
 
 		return None
-	
+
+	# called back after user edits
 	def setData(self, index, value, role):
-		# Verify that we can edit this value
-		if (self.flags(index) & Qt.EditRole) != Qt.EditRole:
-			return False
-		
-		info = self.row_info[index.row()]
-		old_val = self.rows[index.row()][1]
-		new_val = int(value, 16)
-		register = info['name']
-
-		# Tell the debugger to update
-		binjaplug.adapter.reg_write(register, new_val)
-
-		# Update internal copy to show modification
-		updated_val = binjaplug.adapter.reg_read(register)
-
-		# Make sure the debugger actually let us set the register
-		self.rows[index.row()] = (register, updated_val)
-		self.row_info[index.row()]['state'] = 'modified' if updated_val == new_val else info['state']
-
-		self.dataChanged.emit(index, index, [role])
-		self.layoutChanged.emit()
-		return True
+		pass
 
 class DebugThreadsItemDelegate(QItemDelegate):
 	def __init__(self, parent):
@@ -156,10 +137,11 @@ class DebugThreadsItemDelegate(QItemDelegate):
 		painter.drawText(2 + option.rect.left(), self.char_offset + self.baseline + option.rect.top(), str(text))
 		
 	def setEditorData(self, editor, idx):
-		if idx.column() == 1:
-			data = idx.data()
-			editor.setText(data)
-
+		return None
+		# TODO: add checkbox to select thread
+		#if idx.column() == 1:
+		#	data = idx.data()
+		#	editor.setText(data)
 
 class DebugThreadsWidget(QWidget, DockContextHandler):
 	def __init__(self, parent, name, data):
@@ -203,8 +185,9 @@ class DebugThreadsWidget(QWidget, DockContextHandler):
 	def notifyOffsetChanged(self, offset):
 		pass
 
-	def notifyRegistersChanged(self, new_regs):
-		self.model.update_rows(new_regs)
+	# plugin calls this from it's context_display() function
+	def notifyThreadsChanged(self, new_threads):
+		self.model.update_rows(new_threads)
 
 	def contextMenuEvent(self, event):
 		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)
