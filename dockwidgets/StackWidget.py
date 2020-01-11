@@ -118,10 +118,11 @@ class DebugStackModel(QAbstractItemModel):
 		address = info['address']
 
 		# Tell the debugger to update
-		binjaplug.adapter.mem_write(address, new_val)
+		adapter = binjaplug.get_state(self.bv).adapter
+		adapter.mem_write(address, new_val)
 
 		# Update internal copy to show modification
-		updated_val = binjaplug.adapter.mem_read(address, len(old_val))
+		updated_val = adapter.mem_read(address, len(old_val))
 
 		# Make sure the debugger actually let us set the value
 		self.rows[index.row()]['value'] = updated_val

@@ -58,21 +58,23 @@ class DebugMemoryView(BinaryView):
 		return (2 ** (self.perform_get_address_size() * 8)) - 1
 
 	def perform_read(self, addr, length):
-		if binjaplug.adapter is None:
+		adapter = binjaplug.get_state(self.parent_view).adapter
+		if adapter is None:
 			return None
 		# Cache reads (will be cleared whenever view is marked dirty)
 		if addr in self.value_cache.keys():
 			return self.value_cache[addr]
-		value = binjaplug.adapter.mem_read(addr, length)
+		value = adapter.mem_read(addr, length)
 		self.value_cache[addr] = value
 		return value
 	
 	def perform_write(self, addr, data):
-		if binjaplug.adapter is None:
+		adapter = binjaplug.get_state(self.parent_view).adapter
+		if adapter is None:
 			return 0
 		# Assume any memory change invalidates all of memory (suboptimal, may not be necessary)
 		self.mark_dirty()
-		if binjaplug.adapter.mem_write(addr, data) == 0:
+		if adapter.mem_write(addr, data) == 0:
 			return len(data)
 		else:
 			return 0

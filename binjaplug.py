@@ -15,19 +15,43 @@ from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, Thread
 #------------------------------------------------------------------------------
 # globals
 #------------------------------------------------------------------------------
-adapter = None
 
-state = 'INACTIVE'
+class DebuggerState:
+	def __init__(self, bv):
+		self.bv = bv
+		self.adapter = None
+		self.state = 'INACTIVE'
+		# address -> adapter id
+		self.breakpoints = {}
 
-# address -> adapter id
-breakpoints = {}
+	states = []
+
+def get_state(bv):
+	# Try to find an existing state object
+	for state in DebuggerState.states:
+		if state.bv == bv:
+			return state
+
+	# Else make a new one
+	state = DebuggerState(bv)
+	DebuggerState.states.append(state)
+	return state
+
+def delete_state(bv):
+	print("Detroying debugger state for {}".format(bv))
+
+	# Try to find an existing state object
+	for (i, state) in enumerate(DebuggerState.states):
+		if state.bv == bv:
+			DebuggerState.states.pop(i)
+			return
 
 #--------------------------------------------------------------------------
 # SUPPORT FUNCTIONS (HIGHER LEVEL)
 #--------------------------------------------------------------------------
 
 def context_display(bv):
-	global adapter
+	adapter = get_state(bv).adapter
 
 	#----------------------------------------------------------------------
 	# Update Registers
@@ -139,10 +163,10 @@ def memory_dirty(bv):
 # (doesn't remove actual breakpoints, just removes the binja tags that mark them)
 #
 def del_breakpoint_tags(bv, addresses=None):
-	global breakpoints
+	debug_state = get_state(bv)
 
 	if addresses == None:
-		addresses = breakpoints
+		addresses = debug_state.breakpoints
 
 	for address in addresses:
 		# delete breakpoint tags from all functions containing this address
@@ -167,30 +191,33 @@ def debug_status(bv, message):
 	main.editStatus.setText(message)
 
 def state_inactive(bv, msg=None):
-	global adapter, state
-
+	debug_state = get_state(bv)
+	
 	# clear breakpoints
 	del_breakpoint_tags(bv)
-	breakpoints = {}
+	debug_state.breakpoints = {}
 
-	state = 'INACTIVE'
-	debug_status(bv, msg or state)
+	debug_state.state = 'INACTIVE'
+	debug_status(bv, msg or debug_state.state)
 	buttons_xable(bv, [1, 0, 0, 0, 0, 0, 0, 0])
 
 def state_stopped(bv, msg=None):
-	state = 'STOPPED'
+	debug_state = get_state(bv)
+	debug_state.state = 'STOPPED'
 	dw = widget.get_dockwidget(bv, 'Debugger Controls')
-	debug_status(bv, msg or state)
+	debug_status(bv, msg or debug_state.state)
 	buttons_xable(bv, [0, 1, 1, 1, 1, 1, 1, 1])
 
 def state_running(bv, msg=None):
-	state = 'RUNNING'
-	debug_status(bv, msg or state)
+	debug_state = get_state(bv)
+	debug_state.state = 'RUNNING'
+	debug_status(bv, msg or debug_state.state)
 	buttons_xable(bv, [0, 0, 0, 0, 1, 0, 0, 0])
 
 def state_error(bv, msg=None):
-	state = 'ERROR'
-	debug_status(bv, msg or state)
+	debug_state = get_state(bv)
+	debug_state.state = 'ERROR'
+	debug_status(bv, msg or debug_state.state)
 	buttons_xable(bv, [1, 1, 1, 1, 1, 1, 1, 1])
 
 def handle_stop_return(bv, reason, data):
@@ -211,8 +238,8 @@ def handle_stop_return(bv, reason, data):
 #------------------------------------------------------------------------------
 
 def debug_run(bv):
-	global adapter
 	adapter = lldb.DebugAdapterLLDB()
+	get_state(bv).adapter = adapter
 
 	if bv and bv.entry_point:
 		debug_breakpoint_set(bv, bv.entry_point)
@@ -223,10 +250,10 @@ def debug_run(bv):
 	memory_dirty(bv)
 
 def debug_quit(bv):
-	global adapter
+	adapter = get_state(bv).adapter
 	if adapter:
 		adapter.quit()
-		adapter = None
+		get_state(bv).adapter = None
 	state_inactive(bv)
 	memory_dirty(bv)
 
@@ -236,14 +263,14 @@ def debug_restart(bv):
 	debug_run(bv) # sets state
 
 def debug_detach(bv):
-	global adapter
+	adapter = get_state(bv).adapter
 	assert adapter
 	adapter.detach()
-	adapter = None
+	get_state(bv).adapter = None
 	state_inactive(bv)
 
 def debug_break(bv):
-	global adapter
+	adapter = get_state(bv).adapter
 	assert adapter
 	adapter.break_into()
 	# TODO: wait for actual stop
@@ -251,14 +278,15 @@ def debug_break(bv):
 	context_display(bv)
 
 def debug_go(bv):
-	global adapter
+	adapter = get_state(bv).adapter
 	assert adapter
 	(reason, data) = adapter.go()
 	handle_stop_return(bv, reason, data)
 	memory_dirty(bv)
 
 def debug_step(bv):
-	global adapter, state
+	debug_state = get_state(bv)
+	adapter = debug_state.adapter
 	assert adapter
 
 	(reason, data) = (None, None)
@@ -271,14 +299,14 @@ def debug_step(bv):
 		# at current rip
 
 		seq = []
-		if rip in breakpoints:
+		if rip in debug_state.breakpoints:
 			seq.append((adapter.breakpoint_clear, (rip,)))
 			seq.append((adapter.step_into, ()))
 			seq.append((adapter.breakpoint_set, (rip,)))
 		else:
 			seq.append((adapter.step_into, ()))
 
-		(reason, data) = exec_adapter_sequence(seq)
+		(reason, data) = exec_adapter_sequence(adapter, seq)
 	else:
 		raise NotImplementedError('step unimplemented for architecture %s' % bv.arch.name)
 
@@ -286,7 +314,8 @@ def debug_step(bv):
 	memory_dirty(bv)
 
 def debug_step_over(bv):
-	global adapter
+	debug_state = get_state(bv)
+	adapter = debug_state.adapter
 	assert adapter
 
 	# TODO: detect windbg adapter because dbgeng has a builtin step_into() that we don't
@@ -298,8 +327,8 @@ def debug_step_over(bv):
 		ripnext = rip + inslen
 
 		call = instxt.startswith('call ')
-		bphere = rip in breakpoints
-		bpnext = ripnext in breakpoints
+		bphere = rip in debug_state.breakpoints
+		bpnext = ripnext in debug_state.breakpoints
 
 		seq = []
 
@@ -324,7 +353,7 @@ def debug_step_over(bv):
 		else:
 			raise Exception('confused by call, bphere, bpnext state')
 
-		(reason, data) = exec_adapter_sequence(seq)
+		(reason, data) = exec_adapter_sequence(adapter, seq)
 		handle_stop_return(bv, reason, data)
 
 	else:
@@ -334,8 +363,8 @@ def debug_step_over(bv):
 	memory_dirty(bv)
 
 def debug_breakpoint_set(bv, address):
-	global breakpoints
-	global adapter
+	debug_state = get_state(bv)
+	adapter = debug_state.adapter
 	assert adapter
 
 	if adapter.breakpoint_set(address) != 0:
@@ -348,7 +377,7 @@ def debug_breakpoint_set(bv, address):
 		tag = func.create_user_address_tag(address, tt, "breakpoint")
 
 	# save it
-	breakpoints[address] = True
+	debug_state.breakpoints[address] = True
 	print('breakpoint address=0x%X set' % (address))
 
 	bp_widget = widget.get_dockwidget(bv, "Breakpoints")
@@ -358,12 +387,12 @@ def debug_breakpoint_set(bv, address):
 	return 0
 
 def debug_breakpoint_clear(bv, address):
-	global breakpoints
-	global adapter
+	debug_state = get_state(bv)
+	adapter = debug_state.adapter
 	assert adapter
 
 	# find/remove address tag
-	if address in breakpoints:
+	if address in debug_state.breakpoints:
 		# delete from adapter
 		if adapter.breakpoint_clear(address) != None:
 			print('breakpoint address=0x%X cleared' % (address))
@@ -374,13 +403,13 @@ def debug_breakpoint_clear(bv, address):
 		del_breakpoint_tags(bv, [address])
 
 		# delete from our list
-		del breakpoints[address]
+		del debug_state.breakpoints[address]
 	else:
 		print('ERROR: breakpoint not found in list')
 
 # execute a sequence of adapter commands, capturing the return of the last
 # blocking call
-def exec_adapter_sequence(seq):
+def exec_adapter_sequence(adapter, seq):
 	(reason, data) = (None, None)
 
 	for (func, args) in seq:
@@ -468,6 +497,10 @@ class DebugMainDockWidget(QWidget, DockContextHandler):
 		# layout done!
 		layout.addStretch()
 		self.setLayout(layout)
+
+	def __del__(self):
+		# This widget is tasked with cleaning up the state after the view is closed
+		delete_state(self.bv)
 
 	#--------------------------------------------------------------------------
 	# callbacks to us api/ui/dockhandler.h

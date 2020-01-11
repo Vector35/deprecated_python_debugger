@@ -34,22 +34,10 @@ class DebugMemoryWidget(QWidget, DockContextHandler):
 		pass
 
 	def notifyMemoryChanged(self):
+		adapter = binjaplug.get_state(self.bv).adapter
 		self.memory_view.mark_dirty()
 		# Refresh the editor
-		self.editor.navigate(binjaplug.adapter.reg_read('rbp'))
-
-	def resizeEvent(self, event):
-		self.editor.resizeEvent(event)
-	def wheelEvent(self, event):
-		self.editor.wheelEvent(event)
-	def mousePressEvent(self, event):
-		self.editor.mousePressEvent(event)
-	def mouseMoveEvent(self, event):
-		self.editor.mouseMoveEvent(event)
-	def mouseDoubleClickEvent(self, event):
-		self.editor.mouseDoubleClickEvent(event)
-	def contextMenuEvent(self, event):
-		self.editor.contextMenuEvent(event)
+		self.editor.navigate(adapter.reg_read('rbp'))
 
 	def shouldBeVisible(self, view_frame):
 		if view_frame is None:

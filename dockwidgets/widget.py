@@ -25,10 +25,24 @@ def create_widget(widget_class, name, parent, data, *args):
 				name: widget
 			}))
 
+		widget.destroyed.connect(lambda destroyed: destroy_widget(destroyed, widget, data, name))
+
 		return widget
 	except Exception as e:
 		traceback.print_exc(file=sys.stderr)
 		return QWidget(parent)
+
+def destroy_widget(destroyed, old, data, name):
+	# Gotta be careful to delete the correct widget here
+	for (bv, widgets) in debug_dockwidgets:
+		if bv == data:
+			for (name, widget) in widgets.items():
+				if widget == old:
+					# If there are no other references to it, this will be the only one and the call
+					# will delete it and invoke __del__.
+					widgets.pop(name)
+					return
+
 
 def register_dockwidget(widget_class, name, area, orientation, default_visibility, *args):
 	mainWindow = QApplication.allWidgets()[0].window()

@@ -11,8 +11,9 @@ from . import widget
 from .. import binjaplug
 
 class DebugRegistersListModel(QAbstractItemModel):
-	def __init__(self, parent):
+	def __init__(self, parent, bv):
 		QAbstractItemModel.__init__(self, parent)
+		self.bv = bv
 		self.columns = ["Name", "Value"]
 		self.rows = []
 		self.update_rows(None)
@@ -103,10 +104,11 @@ class DebugRegistersListModel(QAbstractItemModel):
 		register = info['name']
 
 		# Tell the debugger to update
-		binjaplug.adapter.reg_write(register, new_val)
+		adapter = binjaplug.get_state(self.bv).adapter
+		adapter.reg_write(register, new_val)
 
 		# Update internal copy to show modification
-		updated_val = binjaplug.adapter.reg_read(register)
+		updated_val = adapter.reg_read(register)
 
 		# Make sure the debugger actually let us set the register
 		self.rows[index.row()] = (register, updated_val)
@@ -172,7 +174,7 @@ class DebugRegistersWidget(QWidget, DockContextHandler):
 		self.actionHandler.setupActionHandler(self)
 
 		self.table = QTableView(self)
-		self.model = DebugRegistersListModel(self.table)
+		self.model = DebugRegistersListModel(self.table, data)
 		self.table.setModel(self.model)
 
 		self.item_delegate = DebugRegistersItemDelegate(self)

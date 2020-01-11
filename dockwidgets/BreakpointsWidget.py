@@ -13,8 +13,9 @@ from .. import binjaplug
 breakpoints = {}
 
 class DebugBreakpointsListModel(QAbstractItemModel):
-	def __init__(self, parent):
+	def __init__(self, parent, bv):
 		QAbstractItemModel.__init__(self, parent)
+		self.bv = bv
 		self.columns = ["Address", "Enabled"]
 		self.update_rows()
 
@@ -22,13 +23,15 @@ class DebugBreakpointsListModel(QAbstractItemModel):
 		self.beginResetModel()
 
 		self.rows = []
-		if binjaplug.adapter is None:
+		debug_state = binjaplug.get_state(self.bv)
+		adapter = debug_state.adapter
+		if adapter is None:
 			self.endResetModel()
 			return
 
-		for bp in binjaplug.adapter.breakpoint_list():
-			if bp in binjaplug.breakpoints.keys():
-				self.rows.append([bp, binjaplug.breakpoints[bp]])
+		for bp in adapter.breakpoint_list():
+			if bp in debug_state.breakpoints.keys():
+				self.rows.append([bp, debug_state.breakpoints[bp]])
 		
 		self.endResetModel()
 
@@ -143,7 +146,7 @@ class DebugBreakpointsWidget(QWidget, DockContextHandler):
 		self.actionHandler.setupActionHandler(self)
 
 		self.table = QTableView(self)
-		self.model = DebugBreakpointsListModel(self.table)
+		self.model = DebugBreakpointsListModel(self.table, data)
 		self.table.setModel(self.model)
 
 		self.item_delegate = DebugBreakpointsItemDelegate(self)
