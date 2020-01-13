@@ -5,7 +5,7 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, Q
 
 import binaryninja
 import binaryninjaui
-from binaryninja import BinaryView
+from binaryninja import BinaryView, Symbol, SymbolType, Type
 from binaryninjaui import DockContextHandler, UIActionHandler, LinearView, ViewFrame
 
 from . import widget
@@ -41,6 +41,27 @@ class DebugMemoryWidget(QWidget, DockContextHandler):
 			self.editor.navigate(adapter.reg_read('rbp'))
 		else:
 			self.editor.navigate(0)
+
+		old_dvs = set()
+		new_dvs = set()
+
+		for reg in adapter.reg_list():
+			addr = adapter.reg_read(reg)
+			reg_symbol_name = '$' + reg
+
+			reg_symbol = self.memory_view.get_symbol_by_raw_name(reg_symbol_name)
+			if reg_symbol is not None:
+				# Symbols are immutable so just destroy the old one
+				self.memory_view.undefine_auto_symbol(reg_symbol)
+				old_dvs.add(reg_symbol.address)
+			
+			self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, addr, reg_symbol_name, raw_name=reg_symbol_name))
+			new_dvs.add(addr)
+		
+		for old_dv in old_dvs.difference(new_dvs):
+			self.memory_view.undefine_data_var(old_dv)
+		for new_dv in new_dvs.difference(old_dvs):
+			self.memory_view.define_data_var(new_dv, Type.int(8))
 
 	def shouldBeVisible(self, view_frame):
 		if view_frame is None:
