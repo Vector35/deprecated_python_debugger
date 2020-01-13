@@ -76,6 +76,15 @@ macos_signal_to_debugadapter_reason = {
 	31: DebugAdapter.STOP_REASON.SIGNAL_USR2,
 }
 
+# asynchronously called when inside a "go" to inform us of stdout (and
+# possibly other stuff)
+def handler_async_pkt(pkt):
+	if pkt.startswith('O'):
+		msg = pkt[1:]
+		print(''.join([chr(int(msg[2*x:2*x+2], 16)) for x in range(int(len(msg)/2))]), end='')
+	else:
+		print('handler_async_pkt() got unknown packet: %s' % repr(pkt))
+
 class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 	def __init__(self, cfg={}):
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -167,7 +176,6 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		data = 'z0,%x,1' % addr
 		reply = rsp.tx_rx(self.sock, data, 'ack_then_reply')
 		if reply != 'OK':
-			print('reply was: -%s-' % reply)
 			return None
 
 		del self.breakpoints[addr]
@@ -251,10 +259,10 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 	# execution control, all return:
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go(self):
-		return self.go_generic('c')
+		return self.go_generic('c', handler_async_pkt)
 
 	def step_into(self):
-		return self.go_generic('vCont;s')
+		return self.go_generic('vCont;s', handler_async_pkt)
 
 	def step_over(self):
 		# gdb, lldb just doesn't have this, you must synthesize it yourself

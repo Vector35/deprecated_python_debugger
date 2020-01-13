@@ -41,7 +41,6 @@ class DebugThreadsListModel(QAbstractItemModel):
 			# parallel list of the incoming dict, augmented
 			#  (keys 'selected', 'bits', 'state' used in display)
 			info['state'] = ['updated', 'unchanged'][old_threads.get(tid,-1) == rip]
-			print('info[state]=%s' % info['state'])
 			self.row_info.append(info)
 
 		self.endResetModel()
@@ -67,6 +66,7 @@ class DebugThreadsListModel(QAbstractItemModel):
 	
 	def flags(self, index):
 		f = super().flags(index)
+
 		if index.column() == 1:
 			f |= Qt.ItemIsEditable
 		return f
@@ -137,7 +137,6 @@ class DebugThreadsItemDelegate(QItemDelegate):
 
 		# Draw text depending on state
 		painter.setFont(self.font)
-		print('read state: %s' % state)
 		if state == 'updated':
 			painter.setPen(option.palette.color(QPalette.Highlight).rgba())
 		elif state == 'modified':

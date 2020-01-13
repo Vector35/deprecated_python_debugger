@@ -166,13 +166,13 @@ def hex_dump(data, addr=0, grouping=1, endian='little'):
 # TODO: parse command line to select windbg/dbgeng adapter
 adapter = lldb.DebugAdapterLLDB()
 
-def handler(signal, frame):
+def handler_sigint(signal, frame):
     adapter.break_into()
 
 if __name__ == '__main__':
 	colorama.init()
 
-	signal.signal(signal.SIGINT, handler)
+	signal.signal(signal.SIGINT, handler_sigint)
 
 	user_goal = 'debug'
 	while user_goal == 'debug':

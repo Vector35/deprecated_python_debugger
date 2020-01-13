@@ -147,7 +147,7 @@ def context_display(bv):
 		statusText = 'STOPPED at 0x%016X (outside view)' % rip
 		print('address 0x%X outside of binary view, not setting cursor' % rip)
 
-	widget.get_dockwidget(bv, 'Debugger Controls').editStatus.setText(statusText)
+	debug_status(bv, statusText)
 
 	#data = adapter.mem_read(rip, 16)
 	#if data:
@@ -280,6 +280,7 @@ def debug_break(bv):
 def debug_go(bv):
 	adapter = get_state(bv).adapter
 	assert adapter
+	state_running(bv)
 	(reason, data) = adapter.go()
 	handle_stop_return(bv, reason, data)
 	memory_dirty(bv)
