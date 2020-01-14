@@ -33,7 +33,7 @@ def get_state(bv):
 		if state.bv == bv:
 			return state
 
-	# Else make a new one
+	# Else make a new one, initially inactive
 	state = DebuggerState(bv)
 	DebuggerState.states.append(state)
 	return state
@@ -181,7 +181,7 @@ def buttons_xable(bv, states):
 
 	dw = widget.get_dockwidget(bv, 'Debugger Controls')
 
-	buttons = [dw.btnRun, dw.btnRestart, dw.btnQuit, dw.btnDetach, dw.btnPause,
+	buttons = [dw.btnRun, dw.btnRestart, dw.btnQuit, dw.btnDetach, dw.btnBreak,
 		dw.btnResume, dw.btnStepInto, dw.btnStepOver]
 
 	for (button, state) in zip(buttons, states):
@@ -193,7 +193,7 @@ def debug_status(bv, message):
 
 def state_inactive(bv, msg=None):
 	debug_state = get_state(bv)
-	
+
 	# clear breakpoints
 	del_breakpoint_tags(bv)
 	debug_state.breakpoints = {}

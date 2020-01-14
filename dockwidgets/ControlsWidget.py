@@ -51,8 +51,8 @@ class DebugControlsWidget(QWidget, DockContextHandler):
 		layout.addWidget(l)
 
 		# add execution control buttons
-		self.btnPause = QPushButton("Break")
-		self.btnPause.clicked.connect(lambda : binjaplug.debug_break(self.bv))
+		self.btnBreak = QPushButton("Break")
+		self.btnBreak.clicked.connect(lambda : binjaplug.debug_break(self.bv))
 		self.btnResume = QPushButton("Go")
 		self.btnResume.clicked.connect(lambda : binjaplug.debug_go(self.bv))
 		self.btnStepInto = QPushButton("Step")
@@ -60,7 +60,7 @@ class DebugControlsWidget(QWidget, DockContextHandler):
 		self.btnStepOver = QPushButton("Step Over")
 		self.btnStepOver.clicked.connect(lambda : binjaplug.debug_step_over(self.bv))
 		lo = QHBoxLayout()
-		lo.addWidget(self.btnPause)
+		lo.addWidget(self.btnBreak)
 		lo.addWidget(self.btnResume)
 		lo.addWidget(self.btnStepInto)
 		lo.addWidget(self.btnStepOver)
@@ -75,6 +75,11 @@ class DebugControlsWidget(QWidget, DockContextHandler):
 		lo.addWidget(l)
 		lo.addWidget(self.editStatus)
 		layout.addLayout(lo)
+
+		# disabled buttons
+		for b in [self.btnRestart, self.btnQuit, self.btnDetach, self.btnBreak, \
+		  self.btnResume, self.btnStepInto, self.btnStepOver]:
+			b.setEnabled(False)
 
 		# layout done!
 		layout.addStretch()
