@@ -1,5 +1,6 @@
 import re
 import time
+import threading
 
 import binaryninja
 from binaryninja.plugin import PluginCommand
@@ -147,7 +148,7 @@ def context_display(bv):
 		statusText = 'STOPPED at 0x%016X (outside view)' % rip
 		print('address 0x%X outside of binary view, not setting cursor' % rip)
 
-	debug_status(bv, statusText)
+	state_stopped(bv, statusText)
 
 	#data = adapter.mem_read(rip, 16)
 	#if data:
@@ -273,17 +274,21 @@ def debug_break(bv):
 	adapter = get_state(bv).adapter
 	assert adapter
 	adapter.break_into()
-	# TODO: wait for actual stop
-	state_stopped(bv)
-	context_display(bv)
 
-def debug_go(bv):
+# non-blocking wrapper around adapter.go() (so user can nav around)
+def debug_go(bv, gui_updates=True):
 	adapter = get_state(bv).adapter
 	assert adapter
-	state_running(bv)
-	(reason, data) = adapter.go()
-	handle_stop_return(bv, reason, data)
-	memory_dirty(bv)
+
+	def debug_go_thread(bv):
+		if gui_updates:
+			state_running(bv)
+		(reason, data) = adapter.go()
+		if gui_updates:
+			handle_stop_return(bv, reason, data)
+			memory_dirty(bv)
+
+	threading.Thread(target=debug_go_thread, args=(bv,)).start()
 
 def debug_step(bv):
 	debug_state = get_state(bv)

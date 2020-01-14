@@ -6,6 +6,8 @@ class RspDisconnected(Exception):
 	pass
 class RspAckMissing(Exception):
 	pass
+class RspExpectedStartOfPacket(Exception):
+	pass
 
 def send_raw(sock, data):
 	sock.send(data.encode('utf-8'))
@@ -28,7 +30,8 @@ def recv_packet_data(sock):
 
 	# start packet
 	pkt = tmp
-	assert pkt == b'$'
+	if pkt != b'$':
+		raise RspExpectedStartOfPacket('got instead: %s' % str(pkt))
 
 	# consume until '#' and checksum bytes
 	while not (len(pkt)>=3 and pkt[-3] == ord('#') and pkt[-2] in hexes and pkt[-1] in hexes):

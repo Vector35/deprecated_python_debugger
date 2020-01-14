@@ -37,7 +37,10 @@ class DebugMemoryWidget(QWidget, DockContextHandler):
 		adapter = binjaplug.get_state(self.bv).adapter
 		self.memory_view.mark_dirty()
 		# Refresh the editor
-		self.editor.navigate(adapter.reg_read('rbp'))
+		if adapter:
+			self.editor.navigate(adapter.reg_read('rbp'))
+		else:
+			self.editor.navigate(0)
 
 	def shouldBeVisible(self, view_frame):
 		if view_frame is None:
