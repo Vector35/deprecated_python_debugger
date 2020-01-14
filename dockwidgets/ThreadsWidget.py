@@ -34,36 +34,43 @@ class DebugThreadsListModel(QAbstractItemModel):
 			return
 
 		# set new data
+		sel_row = None
 		for info in new_rows:
 			(tid, rip) = (info['tid'], info['rip'])
 			# actual values for the table rows
 			self.rows.append((tid, rip))
 			# parallel list of the incoming dict, augmented
 			#  (keys 'selected', 'bits', 'state' used in display)
+			if info.get('selected', False):
+				sel_row = len(self.rows)-1
 			info['state'] = ['updated', 'unchanged'][old_threads.get(tid,-1) == rip]
 			self.row_info.append(info)
 
 		self.endResetModel()
 
+		# return index to selected (row, col=0)
+		if sel_row != None:
+			return self.createIndex(sel_row, 0)
+
 	def index(self, row, column, parent):
 		if parent.isValid() or column > len(self.columns) or row >= len(self.rows):
 			return QModelIndex()
 		return self.createIndex(row, column)
-	
+
 	def parent(self, child):
 		return QModelIndex()
 
 	def hasChildren(self, parent):
 		return False
-	
+
 	def rowCount(self, parent):
 		if parent.isValid():
 			return 0
 		return len(self.rows)
-	
+
 	def columnCount(self, parent):
 		return len(self.columns)
-	
+
 	def flags(self, index):
 		f = super().flags(index)
 
@@ -83,7 +90,7 @@ class DebugThreadsListModel(QAbstractItemModel):
 			return None
 		if index.row() < 0 or index.row() >= len(self.rows):
 			return None
-		
+
 		contents = self.rows[index.row()][index.column()]
 		info = self.row_info[index.row()]
 
@@ -109,7 +116,7 @@ class DebugThreadsListModel(QAbstractItemModel):
 class DebugThreadsItemDelegate(QItemDelegate):
 	def __init__(self, parent):
 		QItemDelegate.__init__(self, parent)
-		
+
 		self.font = binaryninjaui.getMonospaceFont(parent)
 		self.font.setKerning(False)
 		self.baseline = QFontMetricsF(self.font).ascent()
@@ -118,7 +125,7 @@ class DebugThreadsItemDelegate(QItemDelegate):
 		self.char_offset = binaryninjaui.getFontVerticalOffset()
 
 		self.expected_char_widths = [10, 32]
-	
+
 	def sizeHint(self, option, idx):
 		return QSize(self.char_width * self.expected_char_widths[idx.column()] + 4, self.char_height)
 
@@ -144,7 +151,7 @@ class DebugThreadsItemDelegate(QItemDelegate):
 		else:
 			painter.setPen(option.palette.color(QPalette.WindowText).rgba())
 		painter.drawText(2 + option.rect.left(), self.char_offset + self.baseline + option.rect.top(), str(text))
-		
+
 	def setEditorData(self, editor, idx):
 		return None
 		# TODO: add checkbox to select thread
@@ -156,7 +163,7 @@ class DebugThreadsWidget(QWidget, DockContextHandler):
 	def __init__(self, parent, name, data):
 		assert type(data) == binaryninja.binaryview.BinaryView
 		self.bv = data
-		
+
 		QWidget.__init__(self, parent)
 		DockContextHandler.__init__(self, self, name)
 		self.actionHandler = UIActionHandler()
@@ -165,6 +172,7 @@ class DebugThreadsWidget(QWidget, DockContextHandler):
 		self.table = QTableView(self)
 		self.model = DebugThreadsListModel(self.table)
 		self.table.setModel(self.model)
+		self.table.clicked.connect(self.threadRowClicked)
 
 		self.item_delegate = DebugThreadsItemDelegate(self)
 		self.table.setItemDelegate(self.item_delegate)
@@ -194,9 +202,26 @@ class DebugThreadsWidget(QWidget, DockContextHandler):
 	def notifyOffsetChanged(self, offset):
 		pass
 
-	# plugin calls this from it's context_display() function
+	# called from QTableView's clicked signal
+	# index: QModelIndex
+	def threadRowClicked(self, index):
+		index = self.model.createIndex(index.row(), 0)
+		tid_str = self.model.data(index, Qt.DisplayRole)
+		#print('clicked to change to thread %s' % tid_str)
+		stateObj = binjaplug.get_state(self.bv)
+		if stateObj.state == 'STOPPED':
+			adapter = stateObj.adapter
+			tid = int(tid_str, 16)
+			adapter.thread_select(tid)
+			binjaplug.context_display(self.bv)
+		else:
+			print('cannot set thread in state %s' % stateObj.state)
+
+	# called from plugin's context_display() function
 	def notifyThreadsChanged(self, new_threads):
-		self.model.update_rows(new_threads)
+		idx_selected = self.model.update_rows(new_threads)
+		if idx_selected:
+			self.table.setCurrentIndex(idx_selected)
 
 	def contextMenuEvent(self, event):
 		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)
