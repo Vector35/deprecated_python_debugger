@@ -5,14 +5,14 @@ import threading
 import binaryninja
 from binaryninja import Symbol, SymbolType, Type, Structure, StructureType
 from binaryninja.plugin import PluginCommand
-from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler
+from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
 from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
 
 from . import DebugAdapter, ProcessView
 from . import lldb
-from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, widget
+from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, widget
 
 #------------------------------------------------------------------------------
 # globals
@@ -262,7 +262,7 @@ def del_breakpoint_tags(bv, addresses=None):
 def buttons_xable(bv, states):
 	assert len(states) == 8
 
-	dw = widget.get_dockwidget(bv, 'Debugger Controls')
+	dw = get_state(bv).debug_view.controls
 
 	buttons = [dw.btnRun, dw.btnRestart, dw.btnQuit, dw.btnDetach, dw.btnPause,
 		dw.btnResume, dw.btnStepInto, dw.btnStepOver]
@@ -271,7 +271,7 @@ def buttons_xable(bv, states):
 		button.setEnabled(bool(state))
 
 def debug_status(bv, message):
-	main = widget.get_dockwidget(bv, 'Debugger Controls')
+	main = get_state(bv).debug_view.controls
 	main.editStatus.setText(message)
 
 def state_inactive(bv, msg=None):
@@ -288,7 +288,6 @@ def state_inactive(bv, msg=None):
 def state_stopped(bv, msg=None):
 	debug_state = get_state(bv)
 	debug_state.state = 'STOPPED'
-	dw = widget.get_dockwidget(bv, 'Debugger Controls')
 	debug_status(bv, msg or debug_state.state)
 	buttons_xable(bv, [0, 1, 1, 1, 1, 1, 1, 1])
 
@@ -547,4 +546,4 @@ def initialize():
 	PluginCommand.register("Show Debugger Widget", "", showDebuggerControls)
 	PluginCommand.register_for_address("Set Breakpoint", "sets breakpoint at right-clicked address", cb_bp_set)
 	PluginCommand.register_for_address("Clear Breakpoint", "clears breakpoint at right-clicked address", cb_bp_clr)
-
+	ViewType.registerViewType(DebugView.DebugViewType())

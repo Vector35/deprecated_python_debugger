@@ -16,18 +16,20 @@ class DebugControlsWidget(QWidget, DockContextHandler):
 		self.actionHandler = UIActionHandler()
 		self.actionHandler.setupActionHandler(self)
 
-		layout = QVBoxLayout()
-		layout.addStretch()
+		self.setMinimumHeight(20)
 
-		# add "Target:"
-		self.labelTarget = QLabel("Target: ", self)
-		layout.addWidget(self.labelTarget)
-		self.labelTarget.setAlignment(QtCore.Qt.AlignCenter)
+		layout = QHBoxLayout()
+		# layout.addStretch()
 
-		# add "Session Control:"
-		l = QLabel("Session Control:", self)
-		l.setAlignment(QtCore.Qt.AlignCenter)
-		layout.addWidget(l)
+		# # add "Target:"
+		# self.labelTarget = QLabel("Target: ", self)
+		# layout.addWidget(self.labelTarget)
+		# self.labelTarget.setAlignment(QtCore.Qt.AlignCenter)
+
+		# # add "Session Control:"
+		# l = QLabel("Session Control:", self)
+		# l.setAlignment(QtCore.Qt.AlignCenter)
+		# layout.addWidget(l)
 
 		# add session control buttons
 		lo = QHBoxLayout()
@@ -45,10 +47,10 @@ class DebugControlsWidget(QWidget, DockContextHandler):
 		lo.addWidget(self.btnDetach)
 		layout.addLayout(lo)
 
-		# add "Execution Control:"
-		l = QLabel("Execution Control: ", self)
-		l.setAlignment(QtCore.Qt.AlignCenter)
-		layout.addWidget(l)
+		# # add "Execution Control:"
+		# l = QLabel("Execution Control: ", self)
+		# l.setAlignment(QtCore.Qt.AlignCenter)
+		# layout.addWidget(l)
 
 		# add execution control buttons
 		self.btnPause = QPushButton("Break")
@@ -66,18 +68,18 @@ class DebugControlsWidget(QWidget, DockContextHandler):
 		lo.addWidget(self.btnStepOver)
 		layout.addLayout(lo)
 
-		l = QLabel("Debugger State: ", self)
-		l.setAlignment(QtCore.Qt.AlignCenter)
+		# l = QLabel("Debugger State: ", self)
+		# l.setAlignment(QtCore.Qt.AlignCenter)
 		self.editStatus = QLineEdit('INACTIVE', self)
 		self.editStatus.setReadOnly(True)
 		self.editStatus.setAlignment(QtCore.Qt.AlignCenter)
 		lo = QHBoxLayout()
-		lo.addWidget(l)
+		# lo.addWidget(l)
 		lo.addWidget(self.editStatus)
 		layout.addLayout(lo)
 
 		# layout done!
-		layout.addStretch()
+		# layout.addStretch()
 		self.setLayout(layout)
 
 	def __del__(self):
@@ -93,16 +95,16 @@ class DebugControlsWidget(QWidget, DockContextHandler):
 
 	def notifyViewChanged(self, view_frame):
 		# many options on view_frame, see api/ui/viewframe.h
-
-		if view_frame is None:
-			self.bv = None
-		else:
-			view = view_frame.getCurrentViewInterface()
-			data = view.getData()
-			assert type(data) == binaryninja.binaryview.BinaryView
-			self.bv = data
-			if self.bv.file and self.bv.file.filename:
-				self.labelTarget.setText('Target: ' + self.bv.file.filename)
+		pass
+		# if view_frame is None:
+		# 	self.bv = None
+		# else:
+		# 	view = view_frame.getCurrentViewInterface()
+		# 	data = view.getData()
+		# 	assert type(data) == binaryninja.binaryview.BinaryView
+		# 	self.bv = data
+		# 	if self.bv.file and self.bv.file.filename:
+		# 		self.labelTarget.setText('Target: ' + self.bv.file.filename)
 
 	def contextMenuEvent(self, event):
 		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)
