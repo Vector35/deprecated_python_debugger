@@ -6,6 +6,6 @@
 try:
 	from . import binjaplug
 	binjaplug.initialize()
-except ModuleNotFoundError:
+except (ModuleNotFoundError, ImportError):
 	print('binjaplug not found, assuming this is cli mode')
 

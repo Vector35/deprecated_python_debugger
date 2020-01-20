@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 
-from binascii import hexlify, unhexlify
-import capstone
-import colorama
 import re
+import os
+import sys
+import signal
 import readline
 from struct import pack, unpack
-import signal
-import sys
+from binascii import hexlify, unhexlify
+
+import colorama
+import capstone
 
 sys.path.append('..')
+import debugger.helpers as helpers
 import debugger.lldb as lldb
 import debugger.DebugAdapter as DebugAdapter
 
@@ -164,15 +167,28 @@ def hex_dump(data, addr=0, grouping=1, endian='little'):
 #--------------------------------------------------------------------------
 
 # TODO: parse command line to select windbg/dbgeng adapter
-adapter = lldb.DebugAdapterLLDB()
 
 def handler_sigint(signal, frame):
-    adapter.break_into()
+	global adapter
+	print('sending "break into" signal')
+	adapter.break_into()
 
 if __name__ == '__main__':
 	colorama.init()
 
 	signal.signal(signal.SIGINT, handler_sigint)
+
+	adapter = None
+	if not sys.argv[1:]:
+		raise Exception('specify target on command line')
+	arg1 = sys.argv[1]
+	if '~' in arg1:
+		arg1 = os.expanduser(arg1)
+	if os.path.exists(arg1):
+		adapter = helpers.launch_get_adapter(arg1)
+	else:
+		(host, port) = arg1.split(':')
+		adapter = helpers.connect_get_adapter(host, int(port))
 
 	user_goal = 'debug'
 	while user_goal == 'debug':
@@ -260,6 +276,7 @@ if __name__ == '__main__':
 						(reason, data) = adapter.step_into()
 					elif text == 'p':
 						print('step over not implemented')
+						(reason, data) = (DebugAdapter.STOP_REASON.UNKNOWN, '')
 					else:
 						assert 0
 

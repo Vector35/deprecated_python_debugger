@@ -86,9 +86,11 @@ def handler_async_pkt(pkt):
 		print('handler_async_pkt() got unknown packet: %s' % repr(pkt))
 
 class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
-	def __init__(self, cfg={}):
+	def __init__(self, **kwargs):
+		host = kwargs.get('host', 'localhost')
+		port = kwargs.get('port', 31337)
 		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.sock.connect(('localhost', 31337))
+		self.sock.connect((host, port))
 
 		# register state
 		self.reg_id_to_name = {}
