@@ -14,7 +14,7 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QW
 from . import helpers
 from . import DebugAdapter, ProcessView
 from . import lldb
-from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, widget
+from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, ConsoleWidget, widget
 
 #------------------------------------------------------------------------------
 # globals
@@ -532,11 +532,11 @@ def cb_bp_clr(bv, address):
 #------------------------------------------------------------------------------
 
 def initialize():
-	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Breakpoints", Qt.RightDockWidgetArea, Qt.Vertical, True)
-	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Registers", Qt.RightDockWidgetArea, Qt.Vertical, True)
-	widget.register_dockwidget(ThreadsWidget.DebugThreadsWidget, "Threads", Qt.RightDockWidgetArea, Qt.Vertical, True)
-	widget.register_dockwidget(StackWidget.DebugStackWidget, "Stack", Qt.RightDockWidgetArea, Qt.Vertical, True)
-	widget.register_dockwidget(MemoryWidget.DebugMemoryWidget, "Memory", Qt.BottomDockWidgetArea, Qt.Vertical, True)
+	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Breakpoints", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
+	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Registers", Qt.RightDockWidgetArea, Qt.Vertical, False)
+	widget.register_dockwidget(ThreadsWidget.DebugThreadsWidget, "Threads", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
+	widget.register_dockwidget(StackWidget.DebugStackWidget, "Stack", Qt.LeftDockWidgetArea, Qt.Vertical, False)
+	widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 
 	PluginCommand.register_for_address("Set Breakpoint", "sets breakpoint at right-clicked address", cb_bp_set)
 	PluginCommand.register_for_address("Clear Breakpoint", "clears breakpoint at right-clicked address", cb_bp_clr)
