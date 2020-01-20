@@ -1,3 +1,4 @@
+import os
 import re
 import time
 import threading
@@ -10,6 +11,7 @@ from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
 
+from . import helpers
 from . import DebugAdapter, ProcessView
 from . import lldb
 from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, widget
@@ -321,7 +323,14 @@ def handle_stop_return(bv, reason, data):
 #------------------------------------------------------------------------------
 
 def debug_run(bv):
-	adapter = lldb.DebugAdapterLLDB()
+	fpath = bv.file.filename
+
+	if not os.path.exists(fpath):
+		raise Exception('cannot find debug target: ' + fpath)
+
+	#adapter = lldb.DebugAdapterLLDB()
+	adapter = helpers.launch_get_adapter(fpath)
+
 	get_state(bv).adapter = adapter
 
 	if bv and bv.entry_point:
