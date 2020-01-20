@@ -509,18 +509,6 @@ def exec_adapter_sequence(adapter, seq):
 	return (reason, data)
 
 #------------------------------------------------------------------------------
-# tools menu stuff
-#------------------------------------------------------------------------------
-
-def hideDebuggerControls(binaryView):
-	global dock_handler
-	dock_handler.setVisible("Debugger Controls", False)
-
-def showDebuggerControls(binaryView):
-	global dock_handler
-	dock_handler.setVisible("Debugger Controls", True)
-
-#------------------------------------------------------------------------------
 # right click plugin
 #------------------------------------------------------------------------------
 
@@ -535,15 +523,12 @@ def cb_bp_clr(bv, address):
 #------------------------------------------------------------------------------
 
 def initialize():
-	widget.register_dockwidget(ControlsWidget.DebugControlsWidget, "Debugger Controls", Qt.BottomDockWidgetArea, Qt.Horizontal, True)
 	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Breakpoints", Qt.RightDockWidgetArea, Qt.Vertical, True)
 	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Registers", Qt.RightDockWidgetArea, Qt.Vertical, True)
 	widget.register_dockwidget(ThreadsWidget.DebugThreadsWidget, "Threads", Qt.RightDockWidgetArea, Qt.Vertical, True)
 	widget.register_dockwidget(StackWidget.DebugStackWidget, "Stack", Qt.RightDockWidgetArea, Qt.Vertical, True)
 	widget.register_dockwidget(MemoryWidget.DebugMemoryWidget, "Memory", Qt.BottomDockWidgetArea, Qt.Vertical, True)
 
-	PluginCommand.register("Hide Debugger Widget", "", hideDebuggerControls)
-	PluginCommand.register("Show Debugger Widget", "", showDebuggerControls)
 	PluginCommand.register_for_address("Set Breakpoint", "sets breakpoint at right-clicked address", cb_bp_set)
 	PluginCommand.register_for_address("Clear Breakpoint", "clears breakpoint at right-clicked address", cb_bp_clr)
 	ViewType.registerViewType(DebugView.DebugViewType())
