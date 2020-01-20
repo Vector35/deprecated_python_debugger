@@ -3,15 +3,16 @@ import time
 import threading
 
 import binaryninja
+from binaryninja import Symbol, SymbolType, Type, Structure, StructureType
 from binaryninja.plugin import PluginCommand
-from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler
+from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
 from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
 
-from . import DebugAdapter
+from . import DebugAdapter, ProcessView
 from . import lldb
-from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, widget
+from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, widget
 
 #------------------------------------------------------------------------------
 # globals
@@ -24,6 +25,9 @@ class DebuggerState:
 		self.state = 'INACTIVE'
 		# address -> adapter id
 		self.breakpoints = {}
+		self.memory_view = ProcessView.DebugProcessView(bv)
+		self.old_symbols = []
+		self.old_dvs = set()
 
 	states = []
 
@@ -137,6 +141,16 @@ def context_display(bv):
 			})
 		stack_widget.notifyStackChanged(stack)
 
+	#--------------------------------------------------------------------------
+	# Update Memory
+	#--------------------------------------------------------------------------
+	update_memory_view(bv)
+	memory_dirty(bv)
+
+	#--------------------------------------------------------------------------
+	# Update Status
+	#--------------------------------------------------------------------------
+
 	rip = adapter.reg_read('rip')
 
 	# select instruction currently at
@@ -160,6 +174,75 @@ def context_display(bv):
 def memory_dirty(bv):
 	widget.get_dockwidget(bv, 'Memory').notifyMemoryChanged()
 
+# Create symbols and variables for the memory view
+def update_memory_view(bv):
+	state = get_state(bv)
+	adapter = state.adapter
+	memory_view = state.memory_view
+
+	assert adapter is not None
+	assert memory_view is not None
+	
+	memory_view.mark_dirty()
+	
+	addr_regs = {}
+	reg_addrs = {}
+
+	for reg in adapter.reg_list():
+		addr = adapter.reg_read(reg)
+		reg_symbol_name = '$' + reg
+
+		if addr not in addr_regs.keys():
+			addr_regs[addr] = [reg_symbol_name]
+		else:
+			addr_regs[addr].append(reg_symbol_name)
+		reg_addrs[reg] = addr
+
+	for symbol in state.old_symbols:
+		# Symbols are immutable so just destroy the old one
+		memory_view.undefine_auto_symbol(symbol)
+
+	for dv in state.old_dvs:
+		memory_view.undefine_data_var(dv)
+
+	state.old_symbols = []
+	state.old_dvs = set()
+	new_dvs = set()
+
+	for (addr, regs) in addr_regs.items():
+		symbol_name = "@".join(regs)
+		fancy_name = ",".join(regs)
+		
+		memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, addr, fancy_name, raw_name=symbol_name))
+		state.old_symbols.append(memory_view.get_symbol_by_raw_name(symbol_name))
+		new_dvs.add(addr)
+	
+	for new_dv in new_dvs:
+		memory_view.define_data_var(new_dv, Type.int(8))
+		state.old_dvs.add(new_dv)
+
+	# Special struct for stack frame
+	if bv.arch.name == 'x86_64':
+		width = reg_addrs['rbp'] - reg_addrs['rsp']
+		if width > 0:
+			if width > 0x1000:
+				width = 0x1000
+			struct = Structure()
+			struct.type = StructureType.StructStructureType
+			struct.width = width
+			memory_view.undefine_data_var(reg_addrs['rsp'])
+			memory_view.undefine_data_var(reg_addrs['rbp'])
+
+			for i in range(0, width + 1, bv.arch.address_size):
+				struct.insert(i, Type.pointer(bv.arch, Type.void()))
+
+			memory_view.define_data_var(reg_addrs['rsp'], Type.structure_type(struct))
+			memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, reg_addrs['rsp'], "$stack_frame", raw_name="$stack_frame"))
+
+			state.old_symbols.append(memory_view.get_symbol_by_raw_name("$stack_frame"))
+			state.old_dvs.add(reg_addrs['rsp'])
+
+
 # breakpoint TAG removal - strictly presentation
 # (doesn't remove actual breakpoints, just removes the binja tags that mark them)
 #
@@ -179,7 +262,7 @@ def del_breakpoint_tags(bv, addresses=None):
 def buttons_xable(bv, states):
 	assert len(states) == 8
 
-	dw = widget.get_dockwidget(bv, 'Debugger Controls')
+	dw = get_state(bv).debug_view.controls
 
 	buttons = [dw.btnRun, dw.btnRestart, dw.btnQuit, dw.btnDetach, dw.btnBreak,
 		dw.btnResume, dw.btnStepInto, dw.btnStepOver]
@@ -188,7 +271,7 @@ def buttons_xable(bv, states):
 		button.setEnabled(bool(state))
 
 def debug_status(bv, message):
-	main = widget.get_dockwidget(bv, 'Debugger Controls')
+	main = get_state(bv).debug_view.controls
 	main.editStatus.setText(message)
 
 def state_inactive(bv, msg=None):
@@ -205,7 +288,6 @@ def state_inactive(bv, msg=None):
 def state_stopped(bv, msg=None):
 	debug_state = get_state(bv)
 	debug_state.state = 'STOPPED'
-	dw = widget.get_dockwidget(bv, 'Debugger Controls')
 	debug_status(bv, msg or debug_state.state)
 	buttons_xable(bv, [0, 1, 1, 1, 1, 1, 1, 1])
 
@@ -464,4 +546,4 @@ def initialize():
 	PluginCommand.register("Show Debugger Widget", "", showDebuggerControls)
 	PluginCommand.register_for_address("Set Breakpoint", "sets breakpoint at right-clicked address", cb_bp_set)
 	PluginCommand.register_for_address("Clear Breakpoint", "clears breakpoint at right-clicked address", cb_bp_clr)
-
+	ViewType.registerViewType(DebugView.DebugViewType())
