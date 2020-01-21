@@ -4,7 +4,7 @@ import time
 import threading
 
 import binaryninja
-from binaryninja import Symbol, SymbolType, Type, Structure, StructureType
+from binaryninja import Symbol, SymbolType, Type, Structure, StructureType, execute_on_main_thread_and_wait
 from binaryninja.plugin import PluginCommand
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
 from PySide2 import QtCore
@@ -380,11 +380,11 @@ def debug_go(bv, gui_updates=True):
 
 	def debug_go_thread(bv):
 		if gui_updates:
-			state_running(bv)
+			execute_on_main_thread_and_wait(lambda: state_running(bv))
 		(reason, data) = adapter.go()
 		if gui_updates:
-			handle_stop_return(bv, reason, data)
-			memory_dirty(bv)
+			execute_on_main_thread_and_wait(lambda: handle_stop_return(bv, reason, data))
+			execute_on_main_thread_and_wait(lambda: memory_dirty(bv))
 
 	threading.Thread(target=debug_go_thread, args=(bv,)).start()
 
