@@ -9,7 +9,6 @@ from struct import pack, unpack
 from binascii import hexlify, unhexlify
 
 import colorama
-import capstone
 
 sys.path.append('..')
 import debugger.helpers as helpers
@@ -69,7 +68,7 @@ def context_display(pkt_T=None):
 
 	data = adapter.mem_read(rip, 16)
 	if data:
-		(asmstr, asmlen) = disasm1(data, rip)
+		(asmstr, asmlen) = helpers.disasm1(data, rip)
 		print('%s%016X%s: %s\t%s' % \
 			(GREEN, rip, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
 
@@ -90,27 +89,6 @@ def debug_status():
 #--------------------------------------------------------------------------
 # UTILITIES
 #--------------------------------------------------------------------------
-
-def disasm1(data, addr):
-	md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
-	gen = md.disasm(data, addr)
-	insn = next(gen)
-	return ('%s %s' % (insn.mnemonic, insn.op_str), insn.size)
-
-def disasm(data, addr):
-	if not data:
-		return
-	lines = []
-	md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
-	offset = 0
-	for i in md.disasm(data, addr):
-		addrstr = '%s%016X%s' % (GREEN, i.address, NORMAL)
-		bytestr = hexlify(data[offset:offset+i.size]).decode('utf-8').ljust(16)
-		asmstr = i.mnemonic + ' ' + i.op_str
-		line = '%s: %s %s' % (addrstr, bytestr, asmstr)
-		lines.append(line)
-		offset += i.size
-	return '\n'.join(lines)
 
 def hex_dump(data, addr=0, grouping=1, endian='little'):
 	result = ''
@@ -182,13 +160,16 @@ if __name__ == '__main__':
 	if not sys.argv[1:]:
 		raise Exception('specify target on command line')
 	arg1 = sys.argv[1]
-	if '~' in arg1:
-		arg1 = os.expanduser(arg1)
-	if os.path.exists(arg1):
-		adapter = helpers.launch_get_adapter(arg1)
-	else:
+	if ':' in arg1:
 		(host, port) = arg1.split(':')
 		adapter = helpers.connect_get_adapter(host, int(port))
+	else:
+		if '~' in arg1:
+			arg1 = os.expanduser(arg1)
+		arg1 = os.path.abspath(arg1)
+		if not os.path.exists(arg1):
+			raise Exception('file not found: %s' % arg1)
+		adapter = helpers.launch_get_adapter(arg1)
 
 	user_goal = 'debug'
 	while user_goal == 'debug':
@@ -257,7 +238,7 @@ if __name__ == '__main__':
 			elif text.startswith('u '):
 				addr = int(text[2:],16)
 				data = adapter.mem_read(addr, 32)
-				print(disasm(data, addr))
+				print(helpers.disasm(data, addr))
 			elif text == 'lm':
 				module2addr = adapter.mem_modules()
 				for module in sorted(module2addr, key=lambda m: module2addr[m]):

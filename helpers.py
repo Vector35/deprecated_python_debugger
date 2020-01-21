@@ -5,7 +5,13 @@ import socket
 import platform
 import subprocess
 
+import binaryninja
+
 import debugger.lldb as lldb
+
+#--------------------------------------------------------------------------
+# TARGET LAUNCHING
+#--------------------------------------------------------------------------
 
 def get_available_port():
 	for port in range(31337, 31337 + 256):
@@ -77,3 +83,30 @@ def launch_get_adapter(fpath_target):
 	else:
 		raise Exception('unsupported system: %s' % system)
 
+#--------------------------------------------------------------------------
+# DISASSEMBLING
+#--------------------------------------------------------------------------
+
+def disasm1(data, addr, arch='x86_64'):
+	arch = binaryninja.Architecture[arch]
+	toksAndLen = arch.get_instruction_text(data, addr)
+	if not toksAndLen or toksAndLen[1]==0:
+		return None
+	toks = toksAndLen[0]
+	strs = ''.join(list(map(lambda x: x.text, toks)))
+	return [strs, toksAndLen[1]]
+
+def disasm(data, addr, arch='x86_64'):
+	if not data:
+		return
+	lines = []
+	offs = 0
+	while offs < len(data):
+		addrstr = '%s%016X%s' % (GREEN, i.address, NORMAL)
+		(asmstr, length) = disasm1(data, addr+offs, arch)
+		bytestr = hexlify(data[offs:offs+length]).decode('utf-8').ljust(16)
+		asmstr = i.mnemonic + ' ' + i.op_str
+		line = '%s: %s %s' % (addrstr, bytestr, asmstr)
+		lines.append(line)
+		offs += i.size
+	return '\n'.join(lines)

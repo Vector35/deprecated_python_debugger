@@ -5,7 +5,6 @@
 import os
 import sys
 
-import capstone
 from struct import unpack
 
 sys.path.append('..')
