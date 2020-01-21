@@ -187,3 +187,5 @@ class DebugBreakpointsWidget(QWidget, DockContextHandler):
 		else:
 			return True
 
+	def sizeHint(self):
+		return QSize(300, 100)

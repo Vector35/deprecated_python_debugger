@@ -1,7 +1,7 @@
 from PySide2 import QtCore
 from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize, QTimer
 from PySide2.QtGui import QPalette, QFontMetricsF
-from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QStyle, QSplitter, QLabel
+from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QStyle, QSplitter, QLabel, QDockWidget
 
 import binaryninja
 import binaryninjaui
@@ -25,8 +25,16 @@ class DebugView(QWidget, View):
 
 		self.setupView(self)
 
-		self.current_offset = 0
+		self.previous_widgets = []
+		self.debug_widgets = [
+			"Breakpoints",
+			"Registers",
+			"Threads",
+			"Stack",
+			"Debugger Console"
+		]
 
+		self.current_offset = 0
 		self.splitter = QSplitter(Qt.Orientation.Horizontal, self)
 
 		frame = ViewFrame.viewFrameForWidget(self)
@@ -156,6 +164,36 @@ class DebugView(QWidget, View):
 			self.is_raw_disassembly = raw
 
 		self.binary_text.setLines(lines)
+
+	def showEvent(self, event):
+		mainWindow = QApplication.allWidgets()[0].window()
+		dock_handler = mainWindow.findChild(DockHandler, '__DockHandler')
+
+		# Save the open widget list
+		self.previous_widgets = []
+		for child in mainWindow.findChildren(QDockWidget):
+			if child.isVisible():
+				self.previous_widgets.append(child.windowTitle())
+
+		for name in self.previous_widgets:
+			dock_handler.setVisible(name, False)
+		for name in self.debug_widgets:
+			dock_handler.setVisible(name, True)
+
+	def hideEvent(self, event):
+		mainWindow = QApplication.allWidgets()[0].window()
+		dock_handler = mainWindow.findChild(DockHandler, '__DockHandler')
+
+		# Save the open widget list
+		self.debug_widgets = []
+		for child in mainWindow.findChildren(QDockWidget):
+			if child.isVisible():
+				self.debug_widgets.append(child.windowTitle())
+
+		for name in self.debug_widgets:
+			dock_handler.setVisible(name, False)
+		for name in self.previous_widgets:
+			dock_handler.setVisible(name, True)
 
 class DebugViewType(ViewType):
 	def __init__(self):
