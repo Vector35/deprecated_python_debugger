@@ -1,7 +1,7 @@
 from PySide2 import QtCore
 from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize
 from PySide2.QtGui import QPalette, QFontMetricsF
-from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QStyle, QSplitter
+from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QStyle, QSplitter, QLabel
 
 import binaryninja
 import binaryninjaui
@@ -34,9 +34,38 @@ class DebugView(QWidget, View):
 		self.actionHandler = UIActionHandler()
 		self.actionHandler.setupActionHandler(self)
 
-		self.splitter.addWidget(self.binary_editor)
-		self.splitter.addWidget(self.memory_editor)
-		self.splitter.setSizes([100, 100])
+		small_font = QApplication.font()
+		small_font.setPointSize(11)
+
+		left_layout = QVBoxLayout()
+		left_layout.setSpacing(0)
+		left_layout.setContentsMargins(0, 0, 0, 0)
+		
+		left_label = QLabel("Loaded File")
+		left_label.setFont(small_font)
+		left_layout.addWidget(left_label)
+		left_layout.addWidget(self.binary_editor)
+
+		left_widget = QWidget()
+		left_widget.setLayout(left_layout)
+
+		right_layout = QVBoxLayout()
+		right_layout.setSpacing(0)
+		right_layout.setContentsMargins(0, 0, 0, 0)
+		
+		right_label = QLabel("Debugged Process")
+		right_label.setFont(small_font)
+		right_layout.addWidget(right_label)
+		right_layout.addWidget(self.memory_editor)
+
+		right_widget = QWidget()
+		right_widget.setLayout(right_layout)
+
+		self.splitter.addWidget(left_widget)
+		self.splitter.addWidget(right_widget)
+
+		# Equally sized
+		self.splitter.setSizes([0x7fffffff, 0x7fffffff])
 
 		self.controls = ControlsWidget.DebugControlsWidget(self, "Controls", data)
 

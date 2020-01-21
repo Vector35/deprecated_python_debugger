@@ -174,7 +174,9 @@ def context_display(bv):
 
 # Mark memory as dirty, will refresh memory view
 def memory_dirty(bv):
-	widget.get_dockwidget(bv, 'Memory').notifyMemoryChanged()
+	state = get_state(bv)
+	state.memory_view.mark_dirty()
+	state.debug_view.notifyMemoryChanged()
 
 # Create symbols and variables for the memory view
 def update_memory_view(bv):
@@ -323,7 +325,7 @@ def handle_stop_return(bv, reason, data):
 #------------------------------------------------------------------------------
 
 def debug_run(bv):
-	fpath = bv.file.filename
+	fpath = bv.file.original_filename
 
 	if not os.path.exists(fpath):
 		raise Exception('cannot find debug target: ' + fpath)
