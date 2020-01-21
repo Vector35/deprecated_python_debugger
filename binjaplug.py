@@ -176,7 +176,8 @@ def context_display(bv):
 def memory_dirty(bv):
 	state = get_state(bv)
 	state.memory_view.mark_dirty()
-	state.debug_view.notifyMemoryChanged()
+	if state.debug_view is not None:
+		state.debug_view.notifyMemoryChanged()
 
 # Create symbols and variables for the memory view
 def update_memory_view(bv):
@@ -263,20 +264,20 @@ def del_breakpoint_tags(bv, addresses=None):
 			for tag in delqueue:
 				func.remove_user_address_tag(address, tag)
 
-def buttons_xable(bv, states):
-	assert len(states) == 8
+def buttons_xable(bv, **kwargs):
+	controls = get_state(bv).debug_view.controls
+	if controls is not None:
+		controls.setActionsEnabled(**kwargs)
 
-	dw = get_state(bv).debug_view.controls
-
-	buttons = [dw.btnRun, dw.btnRestart, dw.btnQuit, dw.btnDetach, dw.btnBreak,
-		dw.btnResume, dw.btnStepInto, dw.btnStepOver]
-
-	for (button, state) in zip(buttons, states):
-		button.setEnabled(bool(state))
+def buttons_set_default(bv, default):
+	controls = get_state(bv).debug_view.controls
+	if controls is not None:
+		controls.setDefaultProcessAction(default)
 
 def debug_status(bv, message):
-	main = get_state(bv).debug_view.controls
-	main.editStatus.setText(message)
+	controls = get_state(bv).debug_view.controls
+	if controls is not None:
+		controls.editStatus.setText(message)
 
 def state_inactive(bv, msg=None):
 	debug_state = get_state(bv)
@@ -287,25 +288,29 @@ def state_inactive(bv, msg=None):
 
 	debug_state.state = 'INACTIVE'
 	debug_status(bv, msg or debug_state.state)
-	buttons_xable(bv, [1, 0, 0, 0, 0, 0, 0, 0])
+	buttons_xable(bv, Starting=True, Stopping=False, Stepping=False, Break=False, Resume=False)
+	buttons_set_default(bv, "Run")
 
 def state_stopped(bv, msg=None):
 	debug_state = get_state(bv)
 	debug_state.state = 'STOPPED'
 	debug_status(bv, msg or debug_state.state)
-	buttons_xable(bv, [0, 1, 1, 1, 1, 1, 1, 1])
+	buttons_xable(bv, Starting=False, Stopping=True, Stepping=True, Break=True, Resume=True)
+	buttons_set_default(bv, "Quit")
 
 def state_running(bv, msg=None):
 	debug_state = get_state(bv)
 	debug_state.state = 'RUNNING'
 	debug_status(bv, msg or debug_state.state)
-	buttons_xable(bv, [0, 0, 0, 0, 1, 0, 0, 0])
+	buttons_xable(bv, Starting=False, Stopping=True, Stepping=False, Break=True, Resume=False)
+	buttons_set_default(bv, "Quit")
 
 def state_error(bv, msg=None):
 	debug_state = get_state(bv)
 	debug_state.state = 'ERROR'
 	debug_status(bv, msg or debug_state.state)
-	buttons_xable(bv, [1, 1, 1, 1, 1, 1, 1, 1])
+	buttons_xable(bv, Run=True, Restart=True, Quit=True, Attach=True, Detach=True, Break=True, Resume=True, StepInto=True, StepOver=True, StepReturn=True)
+	buttons_set_default(bv, "Run")
 
 def handle_stop_return(bv, reason, data):
 	if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:

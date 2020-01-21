@@ -2,94 +2,126 @@ import binaryninja
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler
 from PySide2 import QtCore
 from PySide2.QtCore import Qt
-from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
+from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QToolBar, QToolButton, QMenu, QAction
 
 from .. import binjaplug
 
-class DebugControlsWidget(QWidget, DockContextHandler):
+class DebugControlsWidget(QToolBar):
 	def __init__(self, parent, name, data):
 		assert type(data) == binaryninja.binaryview.BinaryView
 		self.bv = data
 
-		QWidget.__init__(self, parent)
-		DockContextHandler.__init__(self, self, name)
-		self.actionHandler = UIActionHandler()
-		self.actionHandler.setupActionHandler(self)
+		QToolBar.__init__(self, parent)
 
-		self.setMinimumHeight(20)
+		self.setStyleSheet("""
+		QToolButton{padding: 4px 14px 4px 14px; font-size: 14pt;}
+		QToolButton:disabled{color: palette(alternate-base)}
+		""")
 
-		layout = QHBoxLayout()
-		# layout.addStretch()
+		self.actionRun = QAction("Run", self)
+		self.actionRun.triggered.connect(lambda: binjaplug.debug_run(self.bv))
+		self.actionRestart = QAction("Restart", self)
+		self.actionRestart.triggered.connect(lambda: binjaplug.debug_restart(self.bv))
+		self.actionQuit = QAction("Quit", self)
+		self.actionQuit.triggered.connect(lambda: binjaplug.debug_quit(self.bv))
+		self.actionAttach = QAction("Attach... (todo)", self)
+		self.actionAttach.triggered.connect(lambda: ())
+		self.actionDetach = QAction("Detach", self)
+		self.actionDetach.triggered.connect(lambda: binjaplug.debug_detach(self.bv))
+		self.actionSettings = QAction("Adapter Settings... (todo)", self)
+		self.actionSettings.triggered.connect(lambda: ())
+		self.actionBreak = QAction("Break", self)
+		self.actionBreak.triggered.connect(lambda: binjaplug.debug_break(self.bv))
+		self.actionResume = QAction("Resume", self)
+		self.actionResume.triggered.connect(lambda: binjaplug.debug_go(self.bv))
+		self.actionStepInto = QAction("Step Into", self)
+		self.actionStepInto.triggered.connect(lambda: binjaplug.debug_step(self.bv))
+		self.actionStepOver = QAction("Step Over", self)
+		self.actionStepOver.triggered.connect(lambda: binjaplug.debug_step_over(self.bv))
+		self.actionStepReturn = QAction("Step Return (todo)", self)
+		self.actionStepReturn.triggered.connect(lambda: ())
 
-		# # add "Target:"
-		# self.labelTarget = QLabel("Target: ", self)
-		# layout.addWidget(self.labelTarget)
-		# self.labelTarget.setAlignment(QtCore.Qt.AlignCenter)
+		# session control menu
+		self.controlMenu = QMenu("Process Control", self)
+		self.btnRun = self.controlMenu.addAction(self.actionRun)
+		self.btnRestart = self.controlMenu.addAction(self.actionRestart)
+		self.btnQuit = self.controlMenu.addAction(self.actionQuit)
+		self.controlMenu.addSeparator()
+		self.btnAttach = self.controlMenu.addAction(self.actionAttach)
+		self.btnDetach = self.controlMenu.addAction(self.actionDetach)
+		self.controlMenu.addSeparator()
+		self.btnSettings = self.controlMenu.addAction(self.actionSettings)
 
-		# # add "Session Control:"
-		# l = QLabel("Session Control:", self)
-		# l.setAlignment(QtCore.Qt.AlignCenter)
-		# layout.addWidget(l)
+		self.btnControl = QToolButton(self)
+		self.btnControl.setMenu(self.controlMenu)
+		self.btnControl.setPopupMode(QToolButton.MenuButtonPopup)
+		self.btnControl.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+		self.btnControl.setDefaultAction(self.actionRun)
+		self.addWidget(self.btnControl)
 
-		# add session control buttons
-		lo = QHBoxLayout()
-		self.btnRun = QPushButton("Run")
-		self.btnRun.clicked.connect(lambda : binjaplug.debug_run(self.bv))
-		self.btnRestart = QPushButton("Restart")
-		self.btnRestart.clicked.connect(lambda : binjaplug.debug_restart(self.bv))
-		self.btnQuit = QPushButton("Quit")
-		self.btnQuit.clicked.connect(lambda : binjaplug.debug_quit(self.bv))
-		self.btnDetach = QPushButton("Detach")
-		self.btnDetach.clicked.connect(lambda : binjaplug.debug_detach(self.bv))
-		lo.addWidget(self.btnRun)
-		lo.addWidget(self.btnRestart)
-		lo.addWidget(self.btnQuit)
-		lo.addWidget(self.btnDetach)
-		layout.addLayout(lo)
-
-		# # add "Execution Control:"
-		# l = QLabel("Execution Control: ", self)
-		# l.setAlignment(QtCore.Qt.AlignCenter)
-		# layout.addWidget(l)
-
-		# add execution control buttons
-		self.btnBreak = QPushButton("Break")
-		self.btnBreak.clicked.connect(lambda : binjaplug.debug_break(self.bv))
-		self.btnResume = QPushButton("Go")
-		self.btnResume.clicked.connect(lambda : binjaplug.debug_go(self.bv))
-		self.btnStepInto = QPushButton("Step")
-		self.btnStepInto.clicked.connect(lambda : binjaplug.debug_step(self.bv))
-		self.btnStepOver = QPushButton("Step Over")
-		self.btnStepOver.clicked.connect(lambda : binjaplug.debug_step_over(self.bv))
-		lo = QHBoxLayout()
-		lo.addWidget(self.btnBreak)
-		lo.addWidget(self.btnResume)
-		lo.addWidget(self.btnStepInto)
-		lo.addWidget(self.btnStepOver)
-		layout.addLayout(lo)
+		# execution control buttons
+		self.btnBreak = self.addAction(self.actionBreak)
+		self.btnResume = self.addAction(self.actionResume)
+		self.btnStepInto = self.addAction(self.actionStepInto)
+		self.btnStepOver = self.addAction(self.actionStepOver)
+		self.btnStepReturn = self.addAction(self.actionStepReturn)
 
 		# l = QLabel("Debugger State: ", self)
-		# l.setAlignment(QtCore.Qt.AlignCenter)
 		self.editStatus = QLineEdit('INACTIVE', self)
 		self.editStatus.setReadOnly(True)
 		self.editStatus.setAlignment(QtCore.Qt.AlignCenter)
-		lo = QHBoxLayout()
-		# lo.addWidget(l)
-		lo.addWidget(self.editStatus)
-		layout.addLayout(lo)
+		self.addWidget(self.editStatus)
 
-		# disabled buttons
-		for b in [self.btnRestart, self.btnQuit, self.btnDetach, self.btnBreak, \
-		  self.btnResume, self.btnStepInto, self.btnStepOver]:
-			b.setEnabled(False)
-
-		# layout done!
-		# layout.addStretch()
-		self.setLayout(layout)
+		# disable buttons
+		self.setActionsEnabled(Run=True, Restart=False, Quit=False, Attach=True, Detach=False, Break=False, Resume=False, StepInto=False, StepOver=False, StepReturn=False)
 
 	def __del__(self):
+		# TODO: Move this elsewhere
 		# This widget is tasked with cleaning up the state after the view is closed
 		binjaplug.delete_state(self.bv)
+
+	def setActionsEnabled(self, **kwargs):
+		def enableStarting(e):
+			self.actionRun.setEnabled(e)
+			self.actionAttach.setEnabled(e)
+
+		def enableStopping(e):
+			self.actionRestart.setEnabled(e)
+			self.actionQuit.setEnabled(e)
+			self.actionDetach.setEnabled(e)
+
+		def enableStepping(e):
+			self.actionStepInto.setEnabled(e)
+			self.actionStepOver.setEnabled(e)
+			self.actionStepReturn.setEnabled(e)
+
+		actions = {
+			"Run": lambda e: self.actionRun.setEnabled(e),
+			"Restart": lambda e: self.actionRestart.setEnabled(e),
+			"Quit": lambda e: self.actionQuit.setEnabled(e),
+			"Attach": lambda e: self.actionAttach.setEnabled(e),
+			"Detach": lambda e: self.actionDetach.setEnabled(e),
+			"Break": lambda e: self.actionBreak.setEnabled(e),
+			"Resume": lambda e: self.actionResume.setEnabled(e),
+			"StepInto": lambda e: self.actionStepInto.setEnabled(e),
+			"StepOver": lambda e: self.actionStepOver.setEnabled(e),
+			"StepReturn": lambda e: self.actionStepReturn.setEnabled(e),
+			"Starting": enableStarting,
+			"Stopping": enableStopping,
+			"Stepping": enableStepping,
+		}
+		for (action, enabled) in kwargs.items():
+			actions[action](enabled)
+
+	def setDefaultProcessAction(self, action):
+		actions = {
+			"Run": self.actionRun,
+			"Restart": self.actionRestart,
+			"Quit": self.actionQuit,
+			"Attach": self.actionAttach,
+			"Detach": self.actionDetach,
+		}
+		self.btnControl.setDefaultAction(actions[action])
 
 	#--------------------------------------------------------------------------
 	# callbacks to us api/ui/dockhandler.h
