@@ -58,16 +58,51 @@ if __name__ == '__main__':
 	for fname in ['helloworld', 'helloworld_thread', 'helloworld_loop']:
 		fpath = os.path.join('testbins', fname)
 
-		data = get_file_data(fpath)	
+		data = get_file_data(fpath)
 		entry = get_entry(data)
-		
+
 		print('file %s has entrypoint 0x%X' % (fpath, entry))
 
 		print('launching %s' % fpath)
 		adapter = helpers.launch_get_adapter(fpath)
-		adapter.breakpoint_set(entry)
-		adapter.go()
-		assert adapter.reg_read('rip') == entry
+
+		# breakpoint set/clear should fail at 0
+		assert adapter.breakpoint_clear(0) != 0
+		assert adapter.breakpoint_set(0) != 0
+
+		# breakpoint set/clear should succeed at entrypoint
+		assert adapter.breakpoint_set(entry) == 0
+		assert adapter.breakpoint_clear(entry) == 0
+		assert adapter.breakpoint_set(entry) == 0
+
+		# proceed to breakpoint
+		(reason, info) = adapter.go()
+		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		rip = adapter.reg_read('rip')
+		print('rip: 0x%X' % rip)
+		assert rip == entry
+
+		# single step
+		data = adapter.mem_read(rip, 15)
+		assert len(data) == 15
+		(asmstr, asmlen) = helpers.disasm1(data, 0)
+		assert adapter.breakpoint_clear(entry) == 0
+		(reason, info) = adapter.step_into()
+		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		rip2 = adapter.reg_read('rip')
+		print('rip2: 0x%X' % rip2)
+		assert rip + asmlen == rip2
+
+		# reg write
+		rax = adapter.reg_read('rax')
+		rbx = adapter.reg_read('rbx')
+		print('rax: 0x%X' % rax)
+		print('rbx: 0x%X' % rbx)
+		adapter.reg_write('rax', 0xDEADBEEF)
+		rax2 = adapter.reg_read('rax')
+		print('rax2: 0x%X' % rax2)
+		assert rax2 == 0xDEADBEEF
+
 		print('quiting')
 		adapter.quit()
 

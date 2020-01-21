@@ -51,6 +51,7 @@ def assert_ack(sock):
 		raise RspDisconnected('disconnection while waiting for ack')
 	if resp != b'+':
 		raise RspAckMissing('got instead: %s' % str(resp))
+	return b'+'
 
 #def is_connected(sock):
 #	print('testing RSP connection')
@@ -69,9 +70,9 @@ def tx_rx(sock, data, expect='ack_then_reply', handler_async_pkt=None):
 	send_packet_data(sock, data)
 
 	if expect == 'nothing':
-		pass
+		return b''
 	elif expect == 'ack_then_nothing':
-		assert_ack(sock)
+		return assert_ack(sock)
 	elif expect == 'ack_then_reply':
 		assert_ack(sock)
 		return recv_packet_data(sock)
@@ -102,6 +103,7 @@ def tx_rx(sock, data, expect='ack_then_reply', handler_async_pkt=None):
 	elif expect == 'ack_then_ok':
 		assert_ack(sock)
 		assert recv_packet_data(sock) == 'OK'
+		return 'OK'
 	else:
 		print('dunno how to expect %s' % expect)
 
