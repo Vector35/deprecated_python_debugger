@@ -1,0 +1,14 @@
+# make -f Makefile-macos
+all: helloworld helloworld_loop helloworld_thread
+
+helloworld: helloworld.c
+	gcc -Wl,-no_pie helloworld.c -o helloworld
+
+helloworld_thread: helloworld_thread.c
+	gcc -Wl,-no_pie helloworld_thread.c -o helloworld_thread
+
+helloworld_loop: helloworld_loop.c
+	gcc -Wl,-no_pie helloworld_loop.c -o helloworld_loop
+
+clean:
+	rm -rf helloworld helloworld_thread helloworld_loop

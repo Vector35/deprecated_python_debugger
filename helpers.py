@@ -12,7 +12,7 @@ def get_available_port():
 		ok = True
 		sock = None
 		try:
-			print('trying port %d' % port)
+			#print('trying port %d' % port)
 			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 			sock.bind(('localhost', port))
 		except Exception as e:
@@ -21,7 +21,7 @@ def get_available_port():
 		if sock:
 			sock.close()
 		if ok:
-			print('returning port: %d' % port)
+			#print('returning port: %d' % port)
 			return port
 
 def connect_get_adapter(host, port):
