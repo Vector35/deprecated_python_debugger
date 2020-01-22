@@ -360,7 +360,7 @@ STDMETHOD(SessionStatus)(
 			}
 			else
 			{
-				printf("wtf's up with GetExitCode() ?\n");
+				printf("wtf's up with GetExitCode()? it returned %X\n", hResult);
 			}
 			break;
 		case DEBUG_SESSION_ACTIVE:

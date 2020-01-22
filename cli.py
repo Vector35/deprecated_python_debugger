@@ -4,7 +4,9 @@ import re
 import os
 import sys
 import signal
-import readline
+import platform
+if platform.system() != 'Windows':
+	import readline
 from struct import pack, unpack
 from binascii import hexlify, unhexlify
 
@@ -171,6 +173,9 @@ if __name__ == '__main__':
 			raise Exception('file not found: %s' % arg1)
 		adapter = helpers.launch_get_adapter(arg1)
 
+	if not adapter:
+		raise Exception('couldn\'t acquire adapter')
+
 	user_goal = 'debug'
 	while user_goal == 'debug':
 		try:
@@ -256,8 +261,7 @@ if __name__ == '__main__':
 					elif text == 't':
 						(reason, data) = adapter.step_into()
 					elif text == 'p':
-						print('step over not implemented')
-						(reason, data) = (DebugAdapter.STOP_REASON.UNKNOWN, '')
+						(reason, data) = adapter.step_over()
 					else:
 						assert 0
 

@@ -7,6 +7,7 @@ import subprocess
 
 import binaryninja
 
+import debugger.dbgeng as dbgeng
 import debugger.lldb as lldb
 
 #--------------------------------------------------------------------------
@@ -51,7 +52,9 @@ def launch_get_adapter(fpath_target):
 	system = platform.system()
 
 	if system == 'Windows':
-		return
+		adapt = dbgeng.DebugAdapterDbgeng()
+		adapt.exec(fpath_target)
+		return adapt
 
 	if system == 'Darwin':
 		# resolve path to debugserver
