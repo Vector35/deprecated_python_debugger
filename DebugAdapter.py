@@ -68,10 +68,10 @@ class DebugAdapter:
 
 	# breakpoints
 	def breakpoint_set(self, address):
-		''' set software breakpoint at address, return breakpoint id '''
+		''' set software breakpoint at address '''
 		pass
 	def breakpoint_clear(self, address):
-		''' delete breakpoint by id '''
+		''' delete breakpoint by address '''
 		pass
 	def breakpoint_list(self):
 		''' return list of addresses '''

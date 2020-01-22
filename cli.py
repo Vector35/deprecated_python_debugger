@@ -202,17 +202,14 @@ if __name__ == '__main__':
 			elif text.startswith('bp '):
 				addr = int(text[3:], 16)
 				bpid = adapter.breakpoint_set(addr)
-				if bpid == None:
-					print('ERROR')
-				else:
-					print('breakpoint %d set at 0x%X' % (bpid, addr))
+				print('breakpoint set at 0x%X' % (addr))
 
 			elif text.startswith('bc '):
-				bpid = int(text[3:])
+				addr = int(text[3:], 16)
 				if adapter.breakpoint_clear(bpid) == None:
 					print('ERROR')
 				else:
-					print('breakpoint id %d cleared' % bpid)
+					print('breakpoint at 0x%X cleared' % addr)
 
 			elif text == 'bl':
 				print('breakpoint list:')

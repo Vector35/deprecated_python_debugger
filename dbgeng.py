@@ -55,9 +55,9 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		pfunc.argtypes = [c_ulonglong, POINTER(c_ulong)]
 		bpid = c_ulong();
 		rc = pfunc(addr, byref(bpid))
-		if rc!= 0:
-			return None
-		self.bp_addr_to_id[bpid.value] = addr
+		if rc != 0:
+			raise Exception('setting breakpoint, dll returned %d' % rc)
+		self.bp_addr_to_id[addr] = bpid.value
 
 	def breakpoint_clear(self, addr):
 		if not addr in self.bp_addr_to_id:
@@ -66,7 +66,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		self.dll.breakpoint_clear(bpid)
 
 	def breakpoint_list(self):
-		return list(self.dll.bp_addr_to_id.keys())
+		return list(self.bp_addr_to_id.keys())
 
 	# registers
 	def reg_read(self, name):
