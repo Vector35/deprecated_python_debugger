@@ -14,7 +14,7 @@ class DebugStackModel(QAbstractItemModel):
 	def __init__(self, parent, bv):
 		QAbstractItemModel.__init__(self, parent)
 		self.bv = bv
-		self.columns = ["Offset", "Address", "Value", "References"]
+		self.columns = ["Offset", "Value", "References", "Address"]
 		self.rows = []
 		self.update_rows(None)
 
@@ -143,7 +143,7 @@ class DebugStackItemDelegate(QItemDelegate):
 		self.char_height = QFontMetricsF(self.font).height()
 		self.char_offset = binaryninjaui.getFontVerticalOffset()
 
-		self.expected_char_widths = [10, 20, 20, 30]
+		self.expected_char_widths = [10, 20, 30, 20]
 	
 	def sizeHint(self, option, idx):
 		return QSize(self.char_width * self.expected_char_widths[idx.column()] + 4, self.char_height)

@@ -90,7 +90,7 @@ class DebugView(QWidget, View):
 		return binaryninjaui.getMonospaceFont(self)
 
 	def navigate(self, addr):
-		return self.memory_editor.navigate(addr)
+		return self.binary_editor.getDisassembly().navigate(addr)
 
 	def notifyMemoryChanged(self):
 		adapter = binjaplug.get_state(self.bv).adapter
