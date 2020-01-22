@@ -1,5 +1,4 @@
 import binaryninja
-from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler
 from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QToolBar, QToolButton, QMenu, QAction
@@ -13,6 +12,7 @@ class DebugControlsWidget(QToolBar):
 
 		QToolBar.__init__(self, parent)
 
+		# TODO: Is there a cleaner way to do this?
 		self.setStyleSheet("""
 		QToolButton{padding: 4px 14px 4px 14px; font-size: 14pt;}
 		QToolButton:disabled{color: palette(alternate-base)}
@@ -43,14 +43,16 @@ class DebugControlsWidget(QToolBar):
 
 		# session control menu
 		self.controlMenu = QMenu("Process Control", self)
-		self.btnRun = self.controlMenu.addAction(self.actionRun)
-		self.btnRestart = self.controlMenu.addAction(self.actionRestart)
-		self.btnQuit = self.controlMenu.addAction(self.actionQuit)
+		self.controlMenu.addAction(self.actionRun)
+		self.controlMenu.addAction(self.actionRestart)
+		self.controlMenu.addAction(self.actionQuit)
 		self.controlMenu.addSeparator()
-		self.btnAttach = self.controlMenu.addAction(self.actionAttach)
-		self.btnDetach = self.controlMenu.addAction(self.actionDetach)
-		self.controlMenu.addSeparator()
-		self.btnSettings = self.controlMenu.addAction(self.actionSettings)
+		# TODO: Attach to running process
+		# self.controlMenu.addAction(self.actionAttach)
+		self.controlMenu.addAction(self.actionDetach)
+		# TODO: Switch adapter/etc (could go in regular settings)
+		# self.controlMenu.addSeparator()
+		# self.controlMenu.addAction(self.actionSettings)
 
 		self.btnControl = QToolButton(self)
 		self.btnControl.setMenu(self.controlMenu)
@@ -60,13 +62,23 @@ class DebugControlsWidget(QToolBar):
 		self.addWidget(self.btnControl)
 
 		# execution control buttons
-		self.btnBreak = self.addAction(self.actionBreak)
-		self.btnResume = self.addAction(self.actionResume)
-		self.btnStepInto = self.addAction(self.actionStepInto)
-		self.btnStepOver = self.addAction(self.actionStepOver)
-		self.btnStepReturn = self.addAction(self.actionStepReturn)
+		self.addAction(self.actionBreak)
+		self.addAction(self.actionResume)
+		self.addAction(self.actionStepInto)
+		self.addAction(self.actionStepOver)
+		# TODO: Step until returning from current function
+		# self.addAction(self.actionStepReturn)
 
-		# l = QLabel("Debugger State: ", self)
+		self.threadMenu = QMenu("Threads", self)
+
+		self.btnThreads = QToolButton(self)
+		self.btnThreads.setMenu(self.threadMenu)
+		self.btnThreads.setPopupMode(QToolButton.InstantPopup)
+		self.btnThreads.setToolButtonStyle(Qt.ToolButtonTextOnly)
+		self.addWidget(self.btnThreads)
+
+		self.setThreadList([])
+
 		self.editStatus = QLineEdit('INACTIVE', self)
 		self.editStatus.setReadOnly(True)
 		self.editStatus.setAlignment(QtCore.Qt.AlignCenter)
@@ -106,6 +118,7 @@ class DebugControlsWidget(QToolBar):
 			"StepInto": lambda e: self.actionStepInto.setEnabled(e),
 			"StepOver": lambda e: self.actionStepOver.setEnabled(e),
 			"StepReturn": lambda e: self.actionStepReturn.setEnabled(e),
+			"Threads": lambda e: self.btnThreads.setEnabled(e),
 			"Starting": enableStarting,
 			"Stopping": enableStopping,
 			"Stepping": enableStepping,
@@ -123,31 +136,28 @@ class DebugControlsWidget(QToolBar):
 		}
 		self.btnControl.setDefaultAction(actions[action])
 
-	#--------------------------------------------------------------------------
-	# callbacks to us api/ui/dockhandler.h
-	#--------------------------------------------------------------------------
-	def notifyOffsetChanged(self, offset):
-		#self.offset.setText(hex(offset))
-		pass
+	def setThreadList(self, threads):
+		def select_thread_fn(tid):
+			def select_thread(tid):
+				stateObj = binjaplug.get_state(self.bv)
+				if stateObj.state == 'STOPPED':
+					adapter = stateObj.adapter
+					adapter.thread_select(tid)
+					binjaplug.context_display(self.bv)
+				else:
+					print('cannot set thread in state %s' % stateObj.state)
 
-	def notifyViewChanged(self, view_frame):
-		# many options on view_frame, see api/ui/viewframe.h
-		pass
-		# if view_frame is None:
-		# 	self.bv = None
-		# else:
-		# 	view = view_frame.getCurrentViewInterface()
-		# 	data = view.getData()
-		# 	assert type(data) == binaryninja.binaryview.BinaryView
-		# 	self.bv = data
-		# 	if self.bv.file and self.bv.file.filename:
-		# 		self.labelTarget.setText('Target: ' + self.bv.file.filename)
+			return lambda: select_thread(tid)
 
-	def contextMenuEvent(self, event):
-		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)
-
-	def shouldBeVisible(self, view_frame):
-		if view_frame is None:
-			return False
+		self.threadMenu.clear()
+		if len(threads) > 0:
+			selected = binjaplug.get_state(self.bv).adapter.thread_selected()
+			for thread in threads:
+				item_name = "Thread {} at {}".format(thread['tid'], hex(thread['rip']))
+				action = self.threadMenu.addAction(item_name, select_thread_fn(thread['tid']))
+				if thread['tid'] == selected:
+					self.btnThreads.setDefaultAction(action)
 		else:
-			return True
+			defaultThreadAction = self.threadMenu.addAction("Thread List")
+			defaultThreadAction.setEnabled(False)
+			self.btnThreads.setDefaultAction(defaultThreadAction)

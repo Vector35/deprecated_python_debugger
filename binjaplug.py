@@ -99,6 +99,7 @@ def context_display(bv):
 		})
 	adapter.thread_select(tid_selected)
 	threads_widget.notifyThreadsChanged(threads)
+	get_state(bv).debug_view.controls.setThreadList(threads)
 
 	#----------------------------------------------------------------------
 	# Update Stack
@@ -158,10 +159,10 @@ def context_display(bv):
 	# select instruction currently at
 	if bv.read(rip, 1):
 		print('navigating to: 0x%X' % rip)
-		statusText = 'STOPPED at 0x%016X' % rip
+		statusText = 'STOPPED'
 		bv.navigate(bv.file.view, rip)
 	else:
-		statusText = 'STOPPED at 0x%016X (outside view)' % rip
+		statusText = 'STOPPED (outside view)'
 		print('address 0x%X outside of binary view, not setting cursor' % rip)
 
 	state_stopped(bv, statusText)
@@ -235,12 +236,8 @@ def update_memory_view(bv):
 			struct = Structure()
 			struct.type = StructureType.StructStructureType
 			struct.width = width
-			memory_view.undefine_data_var(reg_addrs['rsp'])
-			memory_view.undefine_data_var(reg_addrs['rbp'])
-
-			for i in range(0, width + 1, bv.arch.address_size):
+			for i in range(0, width, bv.arch.address_size):
 				struct.insert(i, Type.pointer(bv.arch, Type.void()))
-
 			memory_view.define_data_var(reg_addrs['rsp'], Type.structure_type(struct))
 			memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, reg_addrs['rsp'], "$stack_frame", raw_name="$stack_frame"))
 
@@ -288,29 +285,33 @@ def state_inactive(bv, msg=None):
 
 	debug_state.state = 'INACTIVE'
 	debug_status(bv, msg or debug_state.state)
-	buttons_xable(bv, Starting=True, Stopping=False, Stepping=False, Break=False, Resume=False)
+	buttons_xable(bv, Starting=True, Stopping=False, Stepping=False, Break=False, Resume=False, Threads=False)
 	buttons_set_default(bv, "Run")
+	if debug_state.debug_view is not None:
+		debug_state.debug_view.controls.setThreadList([])
 
 def state_stopped(bv, msg=None):
 	debug_state = get_state(bv)
 	debug_state.state = 'STOPPED'
 	debug_status(bv, msg or debug_state.state)
-	buttons_xable(bv, Starting=False, Stopping=True, Stepping=True, Break=True, Resume=True)
+	buttons_xable(bv, Starting=False, Stopping=True, Stepping=True, Break=True, Resume=True, Threads=True)
 	buttons_set_default(bv, "Quit")
 
 def state_running(bv, msg=None):
 	debug_state = get_state(bv)
 	debug_state.state = 'RUNNING'
 	debug_status(bv, msg or debug_state.state)
-	buttons_xable(bv, Starting=False, Stopping=True, Stepping=False, Break=True, Resume=False)
+	buttons_xable(bv, Starting=False, Stopping=True, Stepping=False, Break=True, Resume=False, Threads=False)
 	buttons_set_default(bv, "Quit")
 
 def state_error(bv, msg=None):
 	debug_state = get_state(bv)
 	debug_state.state = 'ERROR'
 	debug_status(bv, msg or debug_state.state)
-	buttons_xable(bv, Run=True, Restart=True, Quit=True, Attach=True, Detach=True, Break=True, Resume=True, StepInto=True, StepOver=True, StepReturn=True)
+	buttons_xable(bv, Run=True, Restart=True, Quit=True, Attach=True, Detach=True, Break=True, Resume=True, StepInto=True, StepOver=True, StepReturn=True, Threads=True)
 	buttons_set_default(bv, "Run")
+	if debug_state.debug_view is not None:
+		debug_state.debug_view.controls.setThreadList([])
 
 def handle_stop_return(bv, reason, data):
 	if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
