@@ -37,8 +37,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		self.bp_addr_to_id = {}
 
 	def __del__(self):
-		print('del self.dll')
-		del self.dll
+		print('destructor')
 
 	def thunk_stop_reason(self):
 		estat = self.dll.get_exec_status()
@@ -65,9 +64,11 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 			raise Exception('unable to attach to pid %d' % pid)
 
 	def detach(self):
+		self.dll.process_detach()
 		pass
 
 	def quit(self):
+		self.dll.quit()
 		pass
 
 	# threads
@@ -94,7 +95,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 	def breakpoint_clear(self, addr):
 		if not addr in self.bp_addr_to_id:
-			raise DebugAdapter.BreakpointClearError('bp at addr 0x%X found' % addr)
+			raise DebugAdapter.BreakpointClearError('bp at addr not 0x%X found' % addr)
 		bpid = self.bp_addr_to_id[addr]
 		self.dll.breakpoint_clear(bpid)
 		del self.bp_addr_to_id[addr]

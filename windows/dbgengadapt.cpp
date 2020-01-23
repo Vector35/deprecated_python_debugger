@@ -729,8 +729,13 @@ EASY_CTYPES_SPEC
 int quit(void)
 {
 	int rc = ERROR_UNSPECIFIED;
-	if(g_Client->EndSession(DEBUG_END_ACTIVE_TERMINATE) != S_OK)
+	if(g_Client->EndSession(DEBUG_END_ACTIVE_TERMINATE) != S_OK) {
+		printf_debug("ERROR: EndSession() failed\n");
 		goto cleanup;
+	}
+	else {
+		printf_debug("EndSession() succeeded!\n");
+	}
 	rc = 0;
 	cleanup:
 	return rc;
@@ -806,17 +811,17 @@ int breakpoint_set(uint64_t addr, ULONG *id)
 	uint8_t data[1];
 	ULONG bytes_read;
 	if(g_Data->ReadVirtual(addr, data, 1, &bytes_read) != S_OK) {
-		printf("ERROR: ReadVirtual(0x%I64X) during breakpoint precheck\n", addr);
+		printf_debug("ERROR: ReadVirtual(0x%I64X) during breakpoint precheck\n", addr);
 		return ERROR_UNSPECIFIED;
 	}
 
 	if(g_Data->WriteVirtual(addr, data, 1, NULL) != S_OK) {
-		printf("ERROR: WriteVirtual(0x%I64X) during breakpoint precheck\n", addr);
+		printf_debug("ERROR: WriteVirtual(0x%I64X) during breakpoint precheck\n", addr);
 		return ERROR_UNSPECIFIED;
 	}
 
 	if(g_Control->AddBreakpoint(DEBUG_BREAKPOINT_CODE, DEBUG_ANY_ID, &pidb) != S_OK) {
-		printf("ERROR: AddBreakpoint failed\n");
+		printf_debug("ERROR: AddBreakpoint failed\n");
 		return ERROR_DBGENG_API;
 	}
 
