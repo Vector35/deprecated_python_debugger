@@ -166,8 +166,7 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		data = 'Z0,%x,1' % addr
 		reply = rsp.tx_rx(self.sock, data, 'ack_then_reply')
 		if reply != 'OK':
-			return None
-
+			raise DebugAdapter.BreakpointSetError('rsp replied: %s' % reply)
 		self.breakpoints[addr] = True
 		return 0
 

@@ -8,6 +8,25 @@ from ctypes import *
 
 from . import DebugAdapter
 
+DEBUG_STATUS_NO_CHANGE = 0
+DEBUG_STATUS_GO = 1
+DEBUG_STATUS_GO_HANDLED = 2
+DEBUG_STATUS_GO_NOT_HANDLED = 3
+DEBUG_STATUS_STEP_OVER = 4
+DEBUG_STATUS_STEP_INTO = 5
+DEBUG_STATUS_BREAK = 6
+DEBUG_STATUS_NO_DEBUGGEE = 7
+DEBUG_STATUS_STEP_BRANCH = 8
+DEBUG_STATUS_IGNORE_EVENT = 9
+DEBUG_STATUS_RESTART_REQUESTED = 10
+DEBUG_STATUS_REVERSE_GO = 11
+DEBUG_STATUS_REVERSE_STEP_BRANCH = 12
+DEBUG_STATUS_REVERSE_STEP_OVER = 13
+DEBUG_STATUS_REVERSE_STEP_INTO = 14
+DEBUG_STATUS_OUT_OF_SYNC = 15
+DEBUG_STATUS_WAIT_INPUT = 16
+DEBUG_STATUS_TIMEOUT = 17
+
 class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	def __init__(self, **kwargs):
 		self.dll = CDLL(".\windows\dbgengadapt.dll")
@@ -16,6 +35,20 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		# keep mapping between addresses (DbgAdapter namespace) and breakpoint
 		# id's (dbgeng namespace)
 		self.bp_addr_to_id = {}
+
+	def __del__(self):
+		print('del self.dll')
+		del self.dll
+
+	def thunk_stop_reason(self):
+		estat = self.dll.get_exec_status()
+		print('estat=%d' % estat)
+		if estat == DEBUG_STATUS_BREAK:
+			return (DebugAdapter.STOP_REASON.SIGNAL_TRAP, b'')
+		if estat == DEBUG_STATUS_NO_DEBUGGEE:
+			# TODO: does exited process have a return value?
+			return (DebugAdapter.STOP_REASON.PROCESS_EXITED, 0)
+		return (DebugAdapter.STOP_REASON.UNKNOWN, estat)
 
 	#--------------------------------------------------------------------------
 	# API
@@ -56,14 +89,15 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		bpid = c_ulong();
 		rc = pfunc(addr, byref(bpid))
 		if rc != 0:
-			raise Exception('setting breakpoint, dll returned %d' % rc)
+			raise DebugAdapter.BreakpointSetError('dll returned %d' % rc)
 		self.bp_addr_to_id[addr] = bpid.value
 
 	def breakpoint_clear(self, addr):
 		if not addr in self.bp_addr_to_id:
-			raise Exception('breakpoint not found at address 0x%X' % addr)
+			raise DebugAdapter.BreakpointClearError('bp at addr 0x%X found' % addr)
 		bpid = self.bp_addr_to_id[addr]
 		self.dll.breakpoint_clear(bpid)
+		del self.bp_addr_to_id[addr]
 
 	def breakpoint_list(self):
 		return list(self.bp_addr_to_id.keys())
@@ -133,17 +167,15 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go(self):
 		self.dll.go()
-		return (DebugAdapter.STOP_REASON.UNKNOWN, b'')
+		return self.thunk_stop_reason()
 
 	def step_into(self):
 		self.dll.step_into()
-		return (DebugAdapter.STOP_REASON.UNKNOWN, b'')
+		return self.thunk_stop_reason()
 
 	def step_over(self):
-		print("stepping over")
 		self.dll.step_over()
-		input()
-		return (DebugAdapter.STOP_REASON.UNKNOWN, b'')
+		return self.thunk_stop_reason()
 
 	# testing
 	def test(self):

@@ -1,5 +1,10 @@
 from enum import Enum, auto, unique
 
+class BreakpointClearError(Exception):
+	pass
+class BreakpointSetError(Exception):
+	pass
+
 @unique
 class STOP_REASON(Enum):
 	UNKNOWN = 0

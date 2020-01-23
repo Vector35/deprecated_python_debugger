@@ -4,6 +4,8 @@
 
 import os
 import sys
+import time
+import platform
 
 from struct import unpack
 
@@ -54,28 +56,54 @@ def get_entry(data):
 			raise Exception('couldn\'t locate entry_point_command (where main is)')
 		return vmaddr + entryoff
 
+	# PE
+	if data[0:2] == b'\x4d\x5a':
+		e_lfanew = unpack('<I', data[0x3C:0x40])[0]
+		assert data[e_lfanew:e_lfanew+6] == b'\x50\x45\x00\x00\x64\x86'
+		entryoff = unpack('<I', data[e_lfanew+0x28:e_lfanew+0x2C])[0]
+		vmaddr = unpack('<Q', data[e_lfanew+0x30:e_lfanew+0x38])[0]
+		return vmaddr + entryoff
+
+	raise Exception('unrecognized file type')
+
 if __name__ == '__main__':
-	for fname in ['helloworld', 'helloworld_thread', 'helloworld_loop']:
+	executables = ['helloworld', 'helloworld_thread', 'helloworld_loop']
+	if platform.system() == 'Windows':
+		executables = [x+'.exe' for x in executables]
+
+	#executables = ['helloworld_thread.exe']
+	for fname in executables:
 		fpath = os.path.join('testbins', fname)
 
 		data = get_file_data(fpath)
 		entry = get_entry(data)
 
 		print('file %s has entrypoint 0x%X' % (fpath, entry))
-
 		print('launching %s' % fpath)
 		adapter = helpers.launch_get_adapter(fpath)
+		print('rip: 0x%X' % adapter.reg_read('rip'))
 
 		# breakpoint set/clear should fail at 0
-		assert adapter.breakpoint_clear(0) != 0
-		assert adapter.breakpoint_set(0) != 0
+		try:
+			adapter.breakpoint_clear(0)
+		except DebugAdapter.BreakpointClearError:
+			pass
+
+		try:
+			adapter.breakpoint_set(0)
+		except DebugAdapter.BreakpointSetError:
+			pass
 
 		# breakpoint set/clear should succeed at entrypoint
-		assert adapter.breakpoint_set(entry) == 0
-		assert adapter.breakpoint_clear(entry) == 0
-		assert adapter.breakpoint_set(entry) == 0
+		print('setting breakpoint at 0x%X' % entry)
+		adapter.breakpoint_set(entry)
+		print('clearing breakpoint at 0x%X' % entry)
+		adapter.breakpoint_clear(entry)
+		print('setting breakpoint at 0x%X' % entry)
+		adapter.breakpoint_set(entry)
 
 		# proceed to breakpoint
+		print('going')
 		(reason, info) = adapter.go()
 		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
 		rip = adapter.reg_read('rip')
@@ -86,7 +114,7 @@ if __name__ == '__main__':
 		data = adapter.mem_read(rip, 15)
 		assert len(data) == 15
 		(asmstr, asmlen) = helpers.disasm1(data, 0)
-		assert adapter.breakpoint_clear(entry) == 0
+		adapter.breakpoint_clear(entry)
 		(reason, info) = adapter.step_into()
 		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
 		rip2 = adapter.reg_read('rip')
@@ -105,4 +133,8 @@ if __name__ == '__main__':
 
 		print('quiting')
 		adapter.quit()
+		adapter = None
 
+		time.sleep(2)
+
+	print('TESTS PASSED!')
