@@ -1,5 +1,7 @@
 from enum import Enum, auto, unique
 
+class GeneralError(Exception):
+	pass
 class BreakpointClearError(Exception):
 	pass
 class BreakpointSetError(Exception):

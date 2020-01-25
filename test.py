@@ -6,6 +6,7 @@ import os
 import sys
 import time
 import platform
+import threading
 
 from struct import unpack
 
@@ -66,14 +67,83 @@ def get_entry(data):
 
 	raise Exception('unrecognized file type')
 
-if __name__ == '__main__':
-	executables = ['helloworld', 'helloworld_thread', 'helloworld_loop']
-	if platform.system() == 'Windows':
-		executables = [x+'.exe' for x in executables]
+#------------------------------------------------------------------------------
+# UTILITIES
+#------------------------------------------------------------------------------
 
-	#executables = ['helloworld_thread.exe']
-	for fname in executables:
-		fpath = os.path.join('testbins', fname)
+# 'helloworld' -> '.\testbins\helloworld.exe'
+# or
+# 'helloworld' -> './testbins/helloworld
+def test_prog_to_fpath(prog):
+	if platform.system() == 'Windows':
+		prog = prog + '.exe'
+	return os.path.join('testbins', prog)
+
+def break_into(adapter):
+	print('sending break')
+	adapter.break_into()
+
+#------------------------------------------------------------------------------
+# MAIN
+#------------------------------------------------------------------------------
+
+if __name__ == '__main__':
+	test_progs = ['helloworld', 'helloworld_thread', 'helloworld_loop']
+
+	#
+	# thread test
+	#
+	fpath = test_prog_to_fpath('helloworld_thread')
+	adapter = helpers.launch_get_adapter(fpath)
+	print('scheduling break in .5 seconds')
+	threading.Timer(.5, break_into, [adapter]).start()
+	print('going')
+	adapter.go()
+	print('back')
+	print('switching to bad thread')
+	try:
+		adapter.thread_select(999)
+	except DebugAdapter.GeneralError:
+		pass
+	print('asking for threads')
+	if platform.system() == 'Windows':
+		# main thread at WaitForMultipleObjects() + 4 created threads + debugger thread
+		nthreads_expected = 6
+	else:
+		# main thread at pthread_join() + 4 created threads
+		nthreads_expected = 4
+	tids = adapter.thread_list()
+	assert len(tids) == nthreads_expected
+	tid_active = adapter.thread_selected()
+	rips = []
+	for tid in tids:
+		adapter.thread_select(tid)
+		rip = adapter.reg_read('rip')
+		rips.append(rip)
+		seltxt = '<--' if tid == tid_active else ''
+		print('thread %02d: rip=0x%016X %s' % (tid, rip, seltxt))
+	assert rips[0] != rips[1] # thread at WaitForMultipleObjects()/pthread_join() should be different
+	print('switching to bad thread')
+	try:
+		adapter.thread_select(999)
+	except DebugAdapter.GeneralError:
+		pass
+	print('scheduling break in .5 seconds')
+	threading.Timer(.5, break_into, [adapter]).start()
+	print('going')
+	adapter.go()
+	print('back')
+	print('checking for %d threads' % nthreads_expected)
+	assert len(adapter.thread_list()) == nthreads_expected
+	print('done')
+	adapter.quit()
+	sys.exit(0)
+
+	#
+	# basic test
+	#
+	for prog in test_progs:
+		fpath = test_prog_to_fpath(prog)
 
 		data = get_file_data(fpath)
 		entry = get_entry(data)
@@ -134,7 +204,5 @@ if __name__ == '__main__':
 		print('quiting')
 		adapter.quit()
 		adapter = None
-
-		time.sleep(2)
 
 	print('TESTS PASSED!')

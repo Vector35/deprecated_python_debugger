@@ -27,6 +27,9 @@ DEBUG_STATUS_OUT_OF_SYNC = 15
 DEBUG_STATUS_WAIT_INPUT = 16
 DEBUG_STATUS_TIMEOUT = 17
 
+# dll uses return values to indicate success/failure while we use exceptions
+ERROR_UNSPECIFIED = -1
+
 class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	def __init__(self, **kwargs):
 		self.dll = CDLL(".\windows\dbgengadapt.dll")
@@ -37,7 +40,8 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		self.bp_addr_to_id = {}
 
 	def __del__(self):
-		print('destructor')
+		#print('destructor')
+		pass
 
 	def thunk_stop_reason(self):
 		estat = self.dll.get_exec_status()
@@ -74,13 +78,20 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	# threads
 	def thread_list(self):
 		threads_n = self.dll.get_number_threads()
+		if threads_n < 0:
+			raise DebugAdapter.GeneralError("retrieving thread list")
 		return list(range(threads_n))
 
 	def thread_selected(self):
-		return self.dll.get_current_thread()	
+		tid = self.dll.get_current_thread()
+		if tid < 0:
+			raise DebugAdapter.GeneralError("retrieving selected thread")
+		return tid
 
 	def thread_select(self, tid):
-		self.dll.set_current_thread(tid)
+		rc = self.dll.set_current_thread(tid)
+		if rc < 0:
+			raise DebugAdapter.GeneralError("selecting thread")
 
 	# breakpoints
 	def breakpoint_set(self, addr):
