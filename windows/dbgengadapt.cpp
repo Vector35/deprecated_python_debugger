@@ -932,6 +932,66 @@ int reg_write(char *name, uint64_t value)
 }
 
 EASY_CTYPES_SPEC
+int reg_count(int *count)
+{
+	ULONG ulcount;
+	if(g_Registers->GetNumberRegisters(&ulcount) != S_OK) {
+		printf_debug("ERROR: GetNumberRegisters()\n")
+		return ERROR_UNSPECIFIED;
+	}
+	*count = ulcount;
+	return 0;
+}
+
+EASY_CTYPES_SPEC
+int reg_name(int idx, char *name)
+{
+	HRESULT rc;
+	
+	ULONG len;
+	DEBUG_REGISTER_DESCRIPTION descr;
+
+	rc = g_Registers->GetDescription(idx, name, 256, &len, &descr);
+	if(rc != S_OK) {
+		printf_debug("ERROR: GetDescription() returned %08X\n", rc);
+		return ERROR_UNSPECIFIED;
+	}
+}
+
+EASY_CTYPES_SPEC
+int reg_width(char *name, int *width)
+{
+	ULONG regidx;
+	if(g_Registers->GetIndexByName(name, &regidx) != S_OK) {
+		printf_debug("ERROR: GetIndexByName()\n");
+		return ERROR_UNSPECIFIED;
+	}
+
+	ULONG len;
+	char tmp[256];
+	DEBUG_REGISTER_DESCRIPTION descr;
+	if(g_Registers->GetDescription(regidx, tmp, 256, &len, &descr) != S_OK) {
+		printf_debug("ERROR: GetDescription() returned %08X\n", rc);
+		return ERROR_UNSPECIFIED;
+	}
+
+	switch(descr.Type) {
+		case DEBUG_VALUE_INT8: *width = 8; return 0;
+		case DEBUG_VALUE_INT16: *width = 16; return 0;
+		case DEBUG_VALUE_INT32: *width = 32; return 0;
+		case DEBUG_VALUE_INT64: *width = 64; return 0;
+		case DEBUG_VALUE_FLOAT32: *width = 32; return 0;
+		case DEBUG_VALUE_FLOAT64: *width = 64; return 0;
+		case DEBUG_VALUE_FLOAT80: *width = 80; return 0;
+		case DEBUG_VALUE_FLOAT128: *width = 128; return 0;
+		case DEBUG_VALUE_VECTOR64: *width = 64; return 0;
+		case DEBUG_VALUE_VECTOR128: *width = 128; return 0;
+		default:
+			return ERROR_UNSPECIFIED;
+	}
+}
+
+EASY_CTYPES_SPEC
 int get_exec_status(void)
 {
 	ULONG status = ERROR_UNSPECIFIED;

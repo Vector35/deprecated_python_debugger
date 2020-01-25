@@ -88,6 +88,15 @@ def break_into(adapter):
 #------------------------------------------------------------------------------
 
 if __name__ == '__main__':
+	# one-off tests
+	if sys.argv[1:] and sys.argv[1] == 'oneoff':
+		adapter = helpers.launch_get_adapter(test_prog_to_fpath('helloworld'))
+		for (ridx,rname) in enumerate(adapter.reg_list()):
+			width = adapter.reg_bits(rname)
+			print('%d: %s (%d bits)' % (ridx, rname, width))
+		adapter.quit()
+		sys.exit(0)
+
 	test_progs = ['helloworld', 'helloworld_thread', 'helloworld_loop']
 
 	#
@@ -137,7 +146,6 @@ if __name__ == '__main__':
 	assert len(adapter.thread_list()) == nthreads_expected
 	print('done')
 	adapter.quit()
-	sys.exit(0)
 
 	#
 	# basic test
@@ -190,6 +198,13 @@ if __name__ == '__main__':
 		rip2 = adapter.reg_read('rip')
 		print('rip2: 0x%X' % rip2)
 		assert rip + asmlen == rip2
+
+		# registers
+		for (ridx,rname) in enumerate(adapter.reg_list()):
+			width = adapter.reg_bits(rname)
+			print('%d: %s (%d bits)' % (ridx, rname, width))
+		assert adapter.reg_bits('rax') == 64
+		assert adapter.reg_bits('rax') == 64
 
 		# reg write
 		rax = adapter.reg_read('rax')

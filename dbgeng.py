@@ -116,29 +116,42 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 	# registers
 	def reg_read(self, name):
-		pfunc = self.dll.reg_read
-		pfunc.restype = c_int
-		pfunc.argtypes = [c_char_p, POINTER(c_ulonglong)]
 		val = c_ulonglong()
-		rc = pfunc(c_char_p(name.encode('utf-8')), byref(val))
-		if rc != 0:
-			return None
+		name = c_char_p(name.encode('utf-8'))
+		if self.dll.reg_read(name, byref(val)) != 0:
+			raise DebugAdapter.GeneralError("reading register")
 		return val.value
 
 	def reg_write(self, name, value):
-		pfunc = self.dll.reg_write
-		pfunc.restype = c_int
-		pfunc.argtypes = [c_char_p, c_ulonglong]
-		rc = pfunc(c_char_p(name.encode('utf-8')), value)
-		if rc != 0:
-			return None
-		return 0
+		name = c_char_p(name.encode('utf-8'))
+		if self.dll.reg_write(name, value) != 0:
+			raise DebugAdapter.GeneralError("writing register")
 
 	def reg_list(self):
-		pass
+		regcount = c_int()
+		if self.dll.reg_count(byref(regcount)):
+			raise DebugAdapter.GeneralError("retrieving register count")
+		regcount = regcount.value
+		regname = create_string_buffer(512);
 
-	def reg_bits(self, reg):
-		pass
+		result = []
+		for regidx in range(regcount):
+			if self.dll.reg_name(regidx, regname) != 0:
+				raise DebugAdapter.GeneralError("translating register index to name")
+			result.append(regname.value.decode('utf-8'))
+
+		return result
+
+	def reg_bits(self, name):
+		name = c_char_p(name.encode('utf-8'))
+		val = c_int()
+		if self.dll.reg_read(name, byref(val)) != 0:
+			raise DebugAdapter.GeneralError("reading register")
+
+		result = c_int()
+		if self.dll.reg_width(name, byref(result)) != 0:
+			raise DebugAdapter.GeneralError("retrieving register width")
+		return result.value
 
 	# mem
 	def mem_read(self, address, length):
