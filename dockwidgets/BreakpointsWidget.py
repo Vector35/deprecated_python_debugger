@@ -29,9 +29,10 @@ class DebugBreakpointsListModel(QAbstractItemModel):
 			self.endResetModel()
 			return
 
-		for bp in adapter.breakpoint_list():
-			if bp in debug_state.breakpoints.keys():
-				self.rows.append([bp, debug_state.breakpoints[bp]])
+		for remote_bp in adapter.breakpoint_list():
+			local_bp = debug_state.memory_view.remote_addr_to_local(remote_bp)
+			if local_bp in debug_state.breakpoints.keys():
+				self.rows.append([local_bp, debug_state.breakpoints[local_bp]])
 		
 		self.endResetModel()
 

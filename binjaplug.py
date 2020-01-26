@@ -155,17 +155,17 @@ def context_display(bv):
 	# Update Status
 	#--------------------------------------------------------------------------
 
-	rip = adapter.reg_read('rip')
-	rip = debug_state.memory_view.remote_addr_to_local(rip)
+	remote_rip = adapter.reg_read('rip')
+	local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
 
 	# select instruction currently at
-	if bv.read(rip, 1):
-		print('navigating to: 0x%X' % rip)
+	if bv.read(local_rip, 1):
+		print('navigating to: 0x%X' % local_rip)
 		statusText = 'STOPPED'
-		bv.navigate(bv.file.view, rip)
+		bv.navigate(bv.file.view, local_rip)
 	else:
 		statusText = 'STOPPED (outside view)'
-		print('address 0x%X outside of binary view, not setting cursor' % rip)
+		print('address 0x%X outside of binary view, not setting cursor' % remote_rip)
 
 	state_stopped(bv, statusText)
 
@@ -254,7 +254,7 @@ def del_breakpoint_tags(bv, addresses=None):
 	debug_state = get_state(bv)
 
 	if addresses == None:
-		addresses = debug_state.breakpoints
+		addresses = [debug_state.memory_view.local_addr_to_remote(addr) for addr in debug_state.breakpoints]
 
 	for address in addresses:
 		# delete breakpoint tags from all functions containing this address
@@ -349,12 +349,13 @@ def debug_run(bv):
 
 	debug_state = get_state(bv)
 	debug_state.adapter = adapter
+	debug_state.memory_view.update_base()
 
 	if bv and bv.entry_point:
-		remote_entry = debug_state.memory_view.local_addr_to_remote(bv.entry_point)
-		print("Local entry: {} remote entry: {}".format(bv.entry_point, remote_entry))
+		local_entry = bv.entry_point
+		remote_entry = debug_state.memory_view.local_addr_to_remote(local_entry)
 		debug_breakpoint_set(bv, remote_entry)
-		bv.navigate(bv.file.view, bv.entry_point)
+		bv.navigate(bv.file.view, local_entry)
 
 	state_stopped(bv)
 	context_display(bv)
@@ -410,17 +411,18 @@ def debug_step(bv):
 	(reason, data) = (None, None)
 
 	if bv.arch.name == 'x86_64':
-		rip = adapter.reg_read('rip')
+		remote_rip = adapter.reg_read('rip')
+		local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
 
 		# if currently a breakpoint at rip, temporarily clear it
 		# TODO: detect windbg adapter because dbgeng's step behavior might ignore breakpoint
 		# at current rip
 
 		seq = []
-		if rip in debug_state.breakpoints:
-			seq.append((adapter.breakpoint_clear, (rip,)))
+		if local_rip in debug_state.breakpoints:
+			seq.append((adapter.breakpoint_clear, (remote_rip,)))
 			seq.append((adapter.step_into, ()))
-			seq.append((adapter.breakpoint_set, (rip,)))
+			seq.append((adapter.breakpoint_set, (remote_rip,)))
 		else:
 			seq.append((adapter.step_into, ()))
 
@@ -444,11 +446,12 @@ def debug_step_over(bv):
 
 		instxt = bv.get_disassembly(local_rip)
 		inslen = bv.get_instruction_length(local_rip)
+		local_ripnext = local_rip + inslen
 		remote_ripnext = remote_rip + inslen
 
 		call = instxt.startswith('call ')
-		bphere = remote_rip in debug_state.breakpoints
-		bpnext = remote_ripnext in debug_state.breakpoints
+		bphere = local_rip in debug_state.breakpoints
+		bpnext = local_ripnext in debug_state.breakpoints
 
 		seq = []
 
@@ -525,23 +528,25 @@ def debug_step_return(bv):
 	memory_dirty(bv)
 
 
-def debug_breakpoint_set(bv, address):
+def debug_breakpoint_set(bv, remote_address):
 	debug_state = get_state(bv)
 	adapter = debug_state.adapter
 	assert adapter
 
-	if adapter.breakpoint_set(address) != 0:
+	if adapter.breakpoint_set(remote_address) != 0:
 		print('ERROR: breakpoint set failed')
 		return None
 
+	local_address = debug_state.memory_view.remote_addr_to_local(remote_address)
+
 	# create tag
 	tt = bv.tag_types["Crashes"]
-	for func in bv.get_functions_containing(address):
-		tag = func.create_user_address_tag(address, tt, "breakpoint")
+	for func in bv.get_functions_containing(local_address):
+		tag = func.create_user_address_tag(local_address, tt, "breakpoint")
 
 	# save it
-	debug_state.breakpoints[address] = True
-	print('breakpoint address=0x%X set' % (address))
+	debug_state.breakpoints[local_address] = True
+	print('breakpoint address=0x%X (remote=0x%X) set' % (local_address, remote_address))
 
 	bp_widget = widget.get_dockwidget(bv, "Breakpoints")
 	if bp_widget is not None:
@@ -549,24 +554,26 @@ def debug_breakpoint_set(bv, address):
 
 	return 0
 
-def debug_breakpoint_clear(bv, address):
+def debug_breakpoint_clear(bv, remote_address):
 	debug_state = get_state(bv)
 	adapter = debug_state.adapter
 	assert adapter
 
+	local_address = debug_state.memory_view.remote_addr_to_local(remote_address)
+
 	# find/remove address tag
-	if address in debug_state.breakpoints:
+	if local_address in debug_state.breakpoints:
 		# delete from adapter
-		if adapter.breakpoint_clear(address) != None:
-			print('breakpoint address=0x%X cleared' % (address))
+		if adapter.breakpoint_clear(remote_address) != None:
+			print('breakpoint address=0x%X (remote=0x%X) cleared' % (local_address, remote_address))
 		else:
 			print('ERROR: clearing breakpoint')
 
 		# delete breakpoint tags from all functions containing this address
-		del_breakpoint_tags(bv, [address])
+		del_breakpoint_tags(bv, [local_address])
 
 		# delete from our list
-		del debug_state.breakpoints[address]
+		del debug_state.breakpoints[local_address]
 	else:
 		print('ERROR: breakpoint not found in list')
 
@@ -587,11 +594,15 @@ def exec_adapter_sequence(adapter, seq):
 # right click plugin
 #------------------------------------------------------------------------------
 
-def cb_bp_set(bv, address):
-	debug_breakpoint_set(bv, address)
+def cb_bp_set(bv, local_address):
+	debug_state = get_state(bv)
+	remote_address = debug_state.memory_view.local_addr_to_remote(local_address)
+	debug_breakpoint_set(bv, remote_address)
 
-def cb_bp_clr(bv, address):
-	debug_breakpoint_clear(bv, address)
+def cb_bp_clr(bv, local_address):
+	debug_state = get_state(bv)
+	remote_address = debug_state.memory_view.local_addr_to_remote(local_address)
+	debug_breakpoint_clear(bv, remote_address)
 
 #------------------------------------------------------------------------------
 # "main"

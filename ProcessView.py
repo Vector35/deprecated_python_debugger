@@ -15,6 +15,7 @@ class DebugProcessView(BinaryView):
 	def __init__(self, parent):
 		self.memory = DebugMemoryView(parent)
 		self.local_view = parent
+		self.remote_base = 0
 		BinaryView.__init__(self, parent_view=self.memory, file_metadata=self.memory.file)
 
 		# TODO: Read segments from debugger
@@ -42,9 +43,15 @@ class DebugProcessView(BinaryView):
 		self.memory.mark_dirty()
 
 	"""
+	Update cached base address for the remote process
+	"""
+	def update_base(self):
+		self.remote_base = self.get_remote_base()
+
+	"""
 	Get the base address of the binary in the debugged process
 	"""
-	def get_remote_start(self):	
+	def get_remote_base(self):	
 		adapter = binjaplug.get_state(self.local_view).adapter
 		modules = adapter.mem_modules()
 		assert self.local_view.file.original_filename in modules
@@ -55,29 +62,36 @@ class DebugProcessView(BinaryView):
 	(eg in a PIE binary)
 	"""
 	def is_code_aslr(self):
-		return self.get_remote_start() != self.local_view.start
+		return self.remote_base != self.local_view.start
 
 	"""
 	Given a local address (relative to the analysis binaryview),
 	find its remote address (relative to the debugged process) after ASLR
+	If the address is not within our view, it will be unchanged
 	"""
 	def local_addr_to_remote(self, local_addr):
-		# TODO: Make sure the addr is within the loaded segments for our binary
-		# Else return the original
 		local_base = self.local_view.start
-		remote_base = self.get_remote_start()
+		remote_base = self.remote_base
+		if local_addr < local_base or local_addr >= local_base + len(self.local_view):
+			# Not within our local binary, return original
+			return local_addr
 		return local_addr - local_base + remote_base
 
 	"""
 	Given a remote address (relative to the debugged process) after ASLR,
 	find its local address (relative to the analysis binaryview)
+	If the address is not within our view, it will be unchanged
 	"""
 	def remote_addr_to_local(self, remote_addr):
 		# TODO: Make sure the addr is within the loaded segments for our binary
 		# Else return the original
 		local_base = self.local_view.start
-		remote_base = self.get_remote_start()
-		return remote_addr - remote_base + local_base
+		remote_base = self.remote_base
+		local_addr = remote_addr - remote_base + local_base
+		if local_addr < local_base or local_addr >= local_base + len(self.local_view):
+			# Not within our local binary, return original
+			return remote_addr
+		return local_addr
 
 class DebugMemoryView(BinaryView):
 	name = "Debugged Process Memory"
