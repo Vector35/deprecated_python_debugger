@@ -145,6 +145,8 @@ def context_display(bv):
 				'refs': refs
 			})
 		stack_widget.notifyStackChanged(stack)
+	else:
+		raise NotImplementedError('only x86_64 so far')
 
 	#--------------------------------------------------------------------------
 	# Update Memory
@@ -279,19 +281,19 @@ def update_highlights(bv):
 # breakpoint TAG removal - strictly presentation
 # (doesn't remove actual breakpoints, just removes the binja tags that mark them)
 #
-def del_breakpoint_tags(bv, addresses=None):
+def del_breakpoint_tags(bv, local_addresses=None):
 	debug_state = get_state(bv)
 
-	if addresses == None:
-		addresses = [debug_state.memory_view.local_addr_to_remote(addr) for addr in debug_state.breakpoints]
+	if local_addresses == None:
+		local_addresses = [debug_state.memory_view.local_addr_to_remote(addr) for addr in debug_state.breakpoints]
 
-	for address in addresses:
+	for local_address in local_addresses:
 		# delete breakpoint tags from all functions containing this address
-		for func in bv.get_functions_containing(address):
+		for func in bv.get_functions_containing(local_address):
 			func.set_auto_instr_highlight(local_address, binaryninja.HighlightStandardColor.NoHighlightColor)
-			delqueue = [tag for tag in func.get_address_tags_at(address) if tag.data == 'breakpoint']
+			delqueue = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
 			for tag in delqueue:
-				func.remove_user_address_tag(address, tag)
+				func.remove_user_address_tag(local_address, tag)
 	update_highlights(bv)
 
 def buttons_xable(bv, **kwargs):
@@ -421,13 +423,26 @@ def debug_break(bv):
 
 # non-blocking wrapper around adapter.go() (so user can nav around)
 def debug_go(bv, gui_updates=True):
-	adapter = get_state(bv).adapter
+	debug_state = get_state(bv)
+	adapter = debug_state.adapter
 	assert adapter
+
+	remote_rip = adapter.reg_read('rip')
+	local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
+	bphere = local_rip in debug_state.breakpoints
+
+	seq = []
+	if bphere:
+		seq.append((adapter.breakpoint_clear, (remote_rip,)))
+		seq.append((adapter.go, ()))
+		seq.append((adapter.breakpoint_set, (remote_rip,)))
+	else:
+		seq.append((adapter.go, ()))
 
 	def debug_go_thread(bv):
 		if gui_updates:
 			execute_on_main_thread_and_wait(lambda: state_running(bv))
-		(reason, data) = adapter.go()
+		(reason, data) = exec_adapter_sequence(adapter, seq)
 		if gui_updates:
 			execute_on_main_thread_and_wait(lambda: handle_stop_return(bv, reason, data))
 			execute_on_main_thread_and_wait(lambda: memory_dirty(bv))
@@ -487,7 +502,12 @@ def debug_step_over(bv):
 		seq = []
 
 		if not call:
-			seq.append((adapter.step_into, ()))
+			if bphere:
+				seq.append((adapter.breakpoint_clear, (remote_rip,)))
+				seq.append((adapter.step_into, ()))
+				seq.append((adapter.breakpoint_set, (remote_rip,)))
+			else:
+				seq.append((adapter.step_into, ()))
 		elif bphere and bpnext:
 			seq.append((adapter.breakpoint_clear, (remote_rip,)))
 			seq.append((adapter.go, ()))
@@ -530,6 +550,8 @@ def debug_step_return(bv):
 		if len(funcs) != 0:
 			mlil = funcs[0].mlil
 			
+			bphere = local_rip in debug_state.breakpoints
+
 			# Set a bp on every ret in the function and go
 			old_bps = set()
 			new_bps = set()
@@ -541,11 +563,15 @@ def debug_step_return(bv):
 						new_bps.add(debug_state.memory_view.local_addr_to_remote(insn.address))
 
 			seq = []
+			if bphere and not local_rip in new_bps and not local_rip in old_bps:
+				seq.append((adapter.breakpoint_clear, (remote_rip,)))
 			for bp in new_bps:
 				seq.append((adapter.breakpoint_set, (bp,)))
 			seq.append((adapter.go, ()))
 			for bp in new_bps:
 				seq.append((adapter.breakpoint_clear, (bp,)))
+			if bphere and not local_rip in new_bps and not local_rip in old_bps:
+				seq.append((adapter.breakpoint_set, (remote_rip,)))
 
 			(reason, data) = exec_adapter_sequence(adapter, seq)
 			handle_stop_return(bv, reason, data)
@@ -573,7 +599,9 @@ def debug_breakpoint_set(bv, remote_address):
 	# create tag
 	tt = bv.tag_types["Crashes"]
 	for func in bv.get_functions_containing(local_address):
-		tag = func.create_user_address_tag(local_address, tt, "breakpoint")
+		tags = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
+		if len(tags) == 0:
+			tag = func.create_user_address_tag(local_address, tt, "breakpoint")
 
 	# save it
 	debug_state.breakpoints[local_address] = True
