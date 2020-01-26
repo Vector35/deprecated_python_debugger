@@ -1,6 +1,6 @@
 # nmake -f Makefile-win
 
-all: helloworld.exe helloworld_loop.exe helloworld_thread.exe
+all: helloworld.exe helloworld_loop.exe helloworld_thread.exe helloworld_func.exe
 
 helloworld.exe: helloworld.c
 	cl helloworld.c /Fe:helloworld.exe /link /DYNAMICBASE:NO
@@ -11,5 +11,8 @@ helloworld_thread.exe: helloworld_thread.c
 helloworld_loop.exe: helloworld_loop.c
 	cl helloworld_loop.c /Fe:helloworld_loop.exe /link /DYNAMICBASE:NO
 
+helloworld_func.exe: helloworld_func.c
+	cl helloworld_func.c /Fe:helloworld_func.exe /link /DYNAMICBASE:NO
+
 clean:
-	del /Q helloworld.exe helloworld_thread.exe helloworld_loop.exe
+	del /Q helloworld.exe helloworld_thread.exe helloworld_loop.exe helloworld_func.exe
