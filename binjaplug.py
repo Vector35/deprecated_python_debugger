@@ -58,7 +58,8 @@ def delete_state(bv):
 #--------------------------------------------------------------------------
 
 def context_display(bv):
-	adapter = get_state(bv).adapter
+	debug_state = get_state(bv)
+	adapter = debug_state.adapter
 
 	#----------------------------------------------------------------------
 	# Update Registers
@@ -99,7 +100,7 @@ def context_display(bv):
 		})
 	adapter.thread_select(tid_selected)
 	threads_widget.notifyThreadsChanged(threads)
-	get_state(bv).debug_view.controls.setThreadList(threads)
+	debug_state.debug_view.controls.setThreadList(threads)
 
 	#----------------------------------------------------------------------
 	# Update Stack
@@ -155,6 +156,7 @@ def context_display(bv):
 	#--------------------------------------------------------------------------
 
 	rip = adapter.reg_read('rip')
+	rip = debug_state.memory_view.remote_addr_to_local(rip)
 
 	# select instruction currently at
 	if bv.read(rip, 1):
@@ -345,10 +347,13 @@ def debug_run(bv):
 	#adapter = lldb.DebugAdapterLLDB()
 	adapter = helpers.launch_get_adapter(fpath)
 
-	get_state(bv).adapter = adapter
+	debug_state = get_state(bv)
+	debug_state.adapter = adapter
 
 	if bv and bv.entry_point:
-		debug_breakpoint_set(bv, bv.entry_point)
+		remote_entry = debug_state.memory_view.local_addr_to_remote(bv.entry_point)
+		print("Local entry: {} remote entry: {}".format(bv.entry_point, remote_entry))
+		debug_breakpoint_set(bv, remote_entry)
 		bv.navigate(bv.file.view, bv.entry_point)
 
 	state_stopped(bv)
@@ -356,10 +361,11 @@ def debug_run(bv):
 	memory_dirty(bv)
 
 def debug_quit(bv):
-	adapter = get_state(bv).adapter
+	debug_state = get_state(bv)
+	adapter = debug_state.adapter
 	if adapter:
 		adapter.quit()
-		get_state(bv).adapter = None
+		debug_state.adapter = None
 	state_inactive(bv)
 	memory_dirty(bv)
 
@@ -369,10 +375,11 @@ def debug_restart(bv):
 	debug_run(bv) # sets state
 
 def debug_detach(bv):
-	adapter = get_state(bv).adapter
+	debug_state = get_state(bv)
+	adapter = debug_state.adapter
 	assert adapter
 	adapter.detach()
-	get_state(bv).adapter = None
+	debug_state.adapter = None
 	state_inactive(bv)
 
 def debug_break(bv):
@@ -432,35 +439,37 @@ def debug_step_over(bv):
 	# TODO: detect windbg adapter because dbgeng has a builtin step_into() that we don't
 	# have to synthesize
 	if bv.arch.name == 'x86_64':
-		rip = adapter.reg_read('rip')
-		instxt = bv.get_disassembly(rip)
-		inslen = bv.get_instruction_length(rip)
-		ripnext = rip + inslen
+		remote_rip = adapter.reg_read('rip')
+		local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
+
+		instxt = bv.get_disassembly(local_rip)
+		inslen = bv.get_instruction_length(local_rip)
+		remote_ripnext = remote_rip + inslen
 
 		call = instxt.startswith('call ')
-		bphere = rip in debug_state.breakpoints
-		bpnext = ripnext in debug_state.breakpoints
+		bphere = remote_rip in debug_state.breakpoints
+		bpnext = remote_ripnext in debug_state.breakpoints
 
 		seq = []
 
 		if not call:
 			seq.append((adapter.step_into, ()))
 		elif bphere and bpnext:
-			seq.append((adapter.breakpoint_clear, (rip,)))
+			seq.append((adapter.breakpoint_clear, (remote_rip,)))
 			seq.append((adapter.go, ()))
-			seq.append((adapter.breakpoint_set, (rip,)))
+			seq.append((adapter.breakpoint_set, (remote_rip,)))
 		elif bphere and not bpnext:
-			seq.append((adapter.breakpoint_clear, (rip,)))
-			seq.append((adapter.breakpoint_set, (ripnext,)))
+			seq.append((adapter.breakpoint_clear, (remote_rip,)))
+			seq.append((adapter.breakpoint_set, (remote_ripnext,)))
 			seq.append((adapter.go, ()))
-			seq.append((adapter.breakpoint_clear, (ripnext,)))
-			seq.append((adapter.breakpoint_set, (rip,)))
+			seq.append((adapter.breakpoint_clear, (remote_ripnext,)))
+			seq.append((adapter.breakpoint_set, (remote_rip,)))
 		elif not bphere and bpnext:
 			seq.append((adapter.go, ()))
 		elif not bphere and not bpnext:
-			seq.append((adapter.breakpoint_set, (ripnext,)))
+			seq.append((adapter.breakpoint_set, (remote_ripnext,)))
 			seq.append((adapter.go, ()))
-			seq.append((adapter.breakpoint_clear, (ripnext,)))
+			seq.append((adapter.breakpoint_clear, (remote_ripnext,)))
 		else:
 			raise Exception('confused by call, bphere, bpnext state')
 
@@ -479,10 +488,11 @@ def debug_step_return(bv):
 	assert adapter
 
 	if bv.arch.name == 'x86_64':
-		rip = adapter.reg_read('rip')
+		remote_rip = adapter.reg_read('rip')
+		local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
 		
 		# TODO: If we don't have a function loaded, walk the stack
-		funcs = bv.get_functions_containing(rip)
+		funcs = bv.get_functions_containing(local_rip)
 		if len(funcs) != 0:
 			mlil = funcs[0].mlil
 			
@@ -492,9 +502,9 @@ def debug_step_return(bv):
 			for insn in mlil.instructions:
 				if insn.operation == binaryninja.MediumLevelILOperation.MLIL_RET or insn.operation == binaryninja.MediumLevelILOperation.MLIL_TAILCALL:
 					if insn.address in debug_state.breakpoints:
-						rets.add(insn.address)
+						rets.add(debug_state.memory_view.local_addr_to_remote(insn.address))
 					else:
-						new_bps.add(insn.address)
+						new_bps.add(debug_state.memory_view.local_addr_to_remote(insn.address))
 
 			seq = []
 			for bp in new_bps:

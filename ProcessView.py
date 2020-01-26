@@ -14,6 +14,7 @@ class DebugProcessView(BinaryView):
 	name = "Debugged Process"
 	def __init__(self, parent):
 		self.memory = DebugMemoryView(parent)
+		self.local_view = parent
 		BinaryView.__init__(self, parent_view=self.memory, file_metadata=self.memory.file)
 
 		# TODO: Read segments from debugger
@@ -39,6 +40,44 @@ class DebugProcessView(BinaryView):
 
 	def mark_dirty(self):
 		self.memory.mark_dirty()
+
+	"""
+	Get the base address of the binary in the debugged process
+	"""
+	def get_remote_start(self):	
+		adapter = binjaplug.get_state(self.local_view).adapter
+		modules = adapter.mem_modules()
+		assert self.local_view.file.original_filename in modules
+		return modules[self.local_view.file.original_filename]
+
+	"""
+	Determine if the debugged process is using ASLR for its code segment
+	(eg in a PIE binary)
+	"""
+	def is_code_aslr(self):
+		return self.get_remote_start() != self.local_view.start
+
+	"""
+	Given a local address (relative to the analysis binaryview),
+	find its remote address (relative to the debugged process) after ASLR
+	"""
+	def local_addr_to_remote(self, local_addr):
+		# TODO: Make sure the addr is within the loaded segments for our binary
+		# Else return the original
+		local_base = self.local_view.start
+		remote_base = self.get_remote_start()
+		return local_addr - local_base + remote_base
+
+	"""
+	Given a remote address (relative to the debugged process) after ASLR,
+	find its local address (relative to the analysis binaryview)
+	"""
+	def remote_addr_to_local(self, remote_addr):
+		# TODO: Make sure the addr is within the loaded segments for our binary
+		# Else return the original
+		local_base = self.local_view.start
+		remote_base = self.get_remote_start()
+		return remote_addr - remote_base + local_base
 
 class DebugMemoryView(BinaryView):
 	name = "Debugged Process Memory"
