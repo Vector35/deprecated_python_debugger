@@ -45,6 +45,11 @@
 #include <windows.h>
 #include <dbgeng.h>
 
+#include <map>
+#include <vector>
+#include <string>
+using namespace std;
+
 #define EASY_CTYPES_SPEC extern "C" __declspec(dllexport)
 
 #define ERROR_UNSPECIFIED -1
@@ -60,11 +65,10 @@ IDebugRegisters *g_Registers = NULL;
 IDebugSymbols *g_Symbols = NULL;
 IDebugSystemObjects *g_Objects = NULL;
 
-ULONG g_ExitCode;
-
 ULONG lastSessionStatus;
 bool b_PROCESS_CREATED;
 ULONG64 image_base;
+map<string, uint64_t> image2addr;
 
 /* forward declarations */
 void status_to_str(ULONG status, char *str);
@@ -303,7 +307,10 @@ STDMETHOD(LoadModule)(
 	HRESULT hRes;
 
 	//printf_debug("EventCallbacks::LoadModule()\n");
-	printf_debug("loaded module %s to address %I64x\n", ModuleName, BaseOffset);
+	printf_debug("EventCallbacks::LoadModule()\n");
+	printf_debug("loaded module:%s (image:%s) to address %I64x\n", ModuleName, ImageName, BaseOffset);
+
+	image2addr[ImageName] = BaseOffset;
 
 	return DEBUG_STATUS_GO;
 }
@@ -314,7 +321,23 @@ STDMETHOD(UnloadModule)(
         _In_ ULONG64 BaseOffset
         )
 {
+	vector<string> kill_list;
+
 	printf_debug("EventCallbacks::UnloadModule()\n");
+	printf_debug("loaded image:%s to address %I64x\n", ImageBaseName, BaseOffset);
+
+	/* collect image(s) that load to the given address */
+	for(auto i=image2addr.begin(); i != image2addr.end(); i++) {
+		if(i->second == BaseOffset) {
+			kill_list.push_back(i->first);
+		}
+	}
+
+	/* delete from map those collected image(s) */
+	for(auto i=kill_list.begin(); i != kill_list.end(); i++) {
+		image2addr.erase(*i);
+	}
+
 	return DEBUG_STATUS_NO_CHANGE;
 }
 
@@ -880,6 +903,26 @@ int mem_write(uint64_t addr, uint8_t *data, uint32_t len)
 }
 
 EASY_CTYPES_SPEC
+int module_num(int *result)
+{
+	*result = image2addr.size();
+	return 0;
+}
+
+EASY_CTYPES_SPEC
+int module_get(int index, char *image, uint64_t *addr)
+{
+	if(index < 0 || index >= image2addr.size())
+		return ERROR_UNSPECIFIED;
+
+	auto i = image2addr.begin();
+	for(int j=0; j<index; ++j) i++; // doesn't work: i+=1 or i+=index
+	strcpy(image, (i->first).c_str());
+	*addr = i->second;
+	return 0;
+}
+
+EASY_CTYPES_SPEC
 int reg_read(char *name, uint64_t *result)
 {
 	int rc = ERROR_UNSPECIFIED;
@@ -956,6 +999,8 @@ int reg_name(int idx, char *name)
 		printf_debug("ERROR: GetDescription() returned %08X\n", rc);
 		return ERROR_UNSPECIFIED;
 	}
+
+	return 0;
 }
 
 EASY_CTYPES_SPEC

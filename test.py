@@ -98,10 +98,13 @@ def assert_general_error(func):
 if __name__ == '__main__':
 	# one-off tests
 	if sys.argv[1:] and sys.argv[1] == 'oneoff':
-		adapter = helpers.launch_get_adapter(test_prog_to_fpath('helloworld'))
-		for (ridx,rname) in enumerate(adapter.reg_list()):
-			width = adapter.reg_bits(rname)
-			print('%d: %s (%d bits)' % (ridx, rname, width))
+		fpath = test_prog_to_fpath('helloworld')
+		adapter = helpers.launch_get_adapter(fpath)
+		entry = get_entry(get_file_data(fpath))
+		print('entry: 0x%X' % entry)
+		adapter.breakpoint_set(entry)
+		adapter.go()
+		print(adapter.mem_modules())
 		adapter.quit()
 		sys.exit(0)
 

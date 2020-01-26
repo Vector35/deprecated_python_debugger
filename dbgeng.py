@@ -183,7 +183,21 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		return 0
 
 	def mem_modules(self):
-		pass
+		module2addr = {}
+
+		modules_n = c_int()
+		if self.dll.module_num(byref(modules_n)) != 0:
+			raise DebugAdapter.GeneralError("retrieving module list size")
+		modules_n = modules_n.value
+
+		image_path = create_string_buffer(4096) # or MAX_PATH, whatever
+		image_addr = c_ulonglong()
+		for idx in range(modules_n):
+			if self.dll.module_get(idx, byref(image_path), byref(image_addr)) != 0:
+				raise DebugAdapter.GeneralError("retrieving module name")
+			module2addr[image_path.value.decode('utf-8')] = image_addr.value
+
+		return module2addr
 
 	# break
 	def break_into(self):
