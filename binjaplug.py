@@ -490,7 +490,7 @@ def debug_step_return(bv):
 			old_bps = set()
 			new_bps = set()
 			for insn in mlil.instructions:
-				if insn.operation == binaryninja.MediumLevelILOperation.MLIL_RET:
+				if insn.operation == binaryninja.MediumLevelILOperation.MLIL_RET or insn.operation == binaryninja.MediumLevelILOperation.MLIL_TAILCALL:
 					if insn.address in debug_state.breakpoints:
 						rets.add(insn.address)
 					else:
