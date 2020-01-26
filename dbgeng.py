@@ -124,6 +124,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 	def reg_write(self, name, value):
 		name = c_char_p(name.encode('utf-8'))
+		value = c_ulonglong(value)
 		if self.dll.reg_write(name, value) != 0:
 			raise DebugAdapter.GeneralError("writing register")
 
@@ -163,7 +164,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 		rc = pfunc(address, length, result)
 		if rc != 0:
-			return None
+			raise DebugAdapter.GeneralError("reading from address 0x%X" % address)
 
 		return b''.join(map(lambda x: x.to_bytes(1,'big'), list(result)))
 
@@ -177,7 +178,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		pfunc.argtypes = [c_ulonglong, POINTER(c_uint8), c_ulong]
 		rc = pfunc(address, u8_arr, len(data))
 		if rc != 0:
-			return None
+			raise DebugAdapter.GeneralError("writing to address 0x%X" % address)
 
 		return 0
 

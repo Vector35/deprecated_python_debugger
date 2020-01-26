@@ -83,6 +83,14 @@ def break_into(adapter):
 	print('sending break')
 	adapter.break_into()
 
+def assert_general_error(func):
+	raised = False
+	try:
+		func()
+	except DebugAdapter.GeneralError:
+		raised = True
+	assert raised
+
 #------------------------------------------------------------------------------
 # MAIN
 #------------------------------------------------------------------------------
@@ -110,10 +118,7 @@ if __name__ == '__main__':
 	adapter.go()
 	print('back')
 	print('switching to bad thread')
-	try:
-		adapter.thread_select(999)
-	except DebugAdapter.GeneralError:
-		pass
+	assert_general_error(lambda: adapter.thread_select(999))
 	print('asking for threads')
 	if platform.system() == 'Windows':
 		# main thread at WaitForMultipleObjects() + 4 created threads + debugger thread
@@ -133,10 +138,7 @@ if __name__ == '__main__':
 		print('thread %02d: rip=0x%016X %s' % (tid, rip, seltxt))
 	assert rips[0] != rips[1] # thread at WaitForMultipleObjects()/pthread_join() should be different
 	print('switching to bad thread')
-	try:
-		adapter.thread_select(999)
-	except DebugAdapter.GeneralError:
-		pass
+	assert_general_error(lambda: adapter.thread_select(999))
 	print('scheduling break in .5 seconds')
 	threading.Timer(.5, break_into, [adapter]).start()
 	print('going')
@@ -202,19 +204,35 @@ if __name__ == '__main__':
 		# registers
 		for (ridx,rname) in enumerate(adapter.reg_list()):
 			width = adapter.reg_bits(rname)
-			print('%d: %s (%d bits)' % (ridx, rname, width))
+			#print('%d: %s (%d bits)' % (ridx, rname, width))
 		assert adapter.reg_bits('rax') == 64
-		assert adapter.reg_bits('rax') == 64
+		assert adapter.reg_bits('rbx') == 64
+		assert_general_error(lambda: adapter.reg_bits('rzx'))
 
-		# reg write
+		# reg read/write
 		rax = adapter.reg_read('rax')
 		rbx = adapter.reg_read('rbx')
-		print('rax: 0x%X' % rax)
-		print('rbx: 0x%X' % rbx)
-		adapter.reg_write('rax', 0xDEADBEEF)
-		rax2 = adapter.reg_read('rax')
-		print('rax2: 0x%X' % rax2)
-		assert rax2 == 0xDEADBEEF
+		assert_general_error(lambda: adapter.reg_read('rzx'))
+		adapter.reg_write('rax', 0xDEADBEEFAAAAAAAA)
+		assert adapter.reg_read('rax') == 0xDEADBEEFAAAAAAAA
+		adapter.reg_write('rbx', 0xCAFEBABEBBBBBBBB)
+		assert_general_error(lambda: adapter.reg_read('rzx'))
+		assert adapter.reg_read('rbx') == 0xCAFEBABEBBBBBBBB
+		adapter.reg_write('rax', rax)
+		assert adapter.reg_read('rax') == rax
+		adapter.reg_write('rbx', rbx)
+		assert adapter.reg_read('rbx') == rbx
+
+		# mem read/write
+		addr = adapter.reg_read('rip')
+		data = adapter.mem_read(addr, 256)
+		assert_general_error(lambda: adapter.mem_write(0, b'heheHAHAherherHARHAR'))
+		data2 = b'\xAA' * 256
+		adapter.mem_write(addr, data2)
+		assert_general_error(lambda: adapter.mem_read(0, 256))
+		assert adapter.mem_read(addr, 256) == data2
+		adapter.mem_write(addr, data)
+		assert adapter.mem_read(addr, 256) == data
 
 		print('quiting')
 		adapter.quit()
