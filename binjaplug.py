@@ -30,6 +30,7 @@ class DebuggerState:
 		self.memory_view = ProcessView.DebugProcessView(bv)
 		self.old_symbols = []
 		self.old_dvs = set()
+		self.last_rip = 0
 
 	states = []
 
@@ -155,13 +156,23 @@ def context_display(bv):
 	# Update Status
 	#--------------------------------------------------------------------------
 
-	remote_rip = adapter.reg_read('rip')
-	local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
+	if bv.arch.name == 'x86_64':
+		remote_rip = adapter.reg_read('rip')
+		local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
+	else:
+		raise NotImplementedError('only x86_64 so far')
+
+	# Clear old highlighted rip
+	for func in bv.get_functions_containing(debug_state.last_rip):
+		func.set_auto_instr_highlight(debug_state.last_rip, binaryninja.HighlightStandardColor.NoHighlightColor)
+	update_highlights(bv)
+	debug_state.last_rip = local_rip
 
 	# select instruction currently at
 	if bv.read(local_rip, 1):
 		print('navigating to: 0x%X' % local_rip)
 		statusText = 'STOPPED'
+
 		bv.navigate(bv.file.view, local_rip)
 	else:
 		statusText = 'STOPPED (outside view)'
@@ -246,6 +257,24 @@ def update_memory_view(bv):
 			state.old_symbols.append(memory_view.get_symbol_by_raw_name("$stack_frame"))
 			state.old_dvs.add(reg_addrs['rsp'])
 
+# Highlight lines 
+def update_highlights(bv):
+	debug_state = get_state(bv)
+	adapter = debug_state.adapter
+
+	for bp in debug_state.breakpoints:
+		for func in bv.get_functions_containing(bp):
+			func.set_auto_instr_highlight(bp, binaryninja.HighlightStandardColor.RedHighlightColor)
+	
+	if adapter is not None:
+		if bv.arch.name == 'x86_64':
+			remote_rip = adapter.reg_read('rip')
+			local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
+		else:
+			raise NotImplementedError('only x86_64 so far')
+
+		for func in bv.get_functions_containing(local_rip):
+			func.set_auto_instr_highlight(local_rip, binaryninja.HighlightStandardColor.BlueHighlightColor)
 
 # breakpoint TAG removal - strictly presentation
 # (doesn't remove actual breakpoints, just removes the binja tags that mark them)
@@ -259,9 +288,11 @@ def del_breakpoint_tags(bv, addresses=None):
 	for address in addresses:
 		# delete breakpoint tags from all functions containing this address
 		for func in bv.get_functions_containing(address):
+			func.set_auto_instr_highlight(local_address, binaryninja.HighlightStandardColor.NoHighlightColor)
 			delqueue = [tag for tag in func.get_address_tags_at(address) if tag.data == 'breakpoint']
 			for tag in delqueue:
 				func.remove_user_address_tag(address, tag)
+	update_highlights(bv)
 
 def buttons_xable(bv, **kwargs):
 	controls = get_state(bv).debug_view.controls
@@ -547,6 +578,7 @@ def debug_breakpoint_set(bv, remote_address):
 	# save it
 	debug_state.breakpoints[local_address] = True
 	print('breakpoint address=0x%X (remote=0x%X) set' % (local_address, remote_address))
+	update_highlights(bv)
 
 	bp_widget = widget.get_dockwidget(bv, "Breakpoints")
 	if bp_widget is not None:
