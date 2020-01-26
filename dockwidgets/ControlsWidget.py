@@ -86,6 +86,7 @@ class DebugControlsWidget(QToolBar):
 
 		# disable buttons
 		self.setActionsEnabled(Run=True, Restart=False, Quit=False, Attach=True, Detach=False, Break=False, Resume=False, StepInto=False, StepOver=False, StepReturn=False)
+		self.setResumeBreak(False)
 
 	def __del__(self):
 		# TODO: Move this elsewhere
@@ -135,6 +136,10 @@ class DebugControlsWidget(QToolBar):
 			"Detach": self.actionDetach,
 		}
 		self.btnControl.setDefaultAction(actions[action])
+
+	def setResumeBreak(self, is_resume):
+		self.actionResume.setVisible(is_resume)
+		self.actionBreak.setVisible(not is_resume)
 
 	def setThreadList(self, threads):
 		def select_thread_fn(tid):

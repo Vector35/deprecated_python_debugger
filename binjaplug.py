@@ -289,6 +289,7 @@ def state_inactive(bv, msg=None):
 	buttons_set_default(bv, "Run")
 	if debug_state.debug_view is not None:
 		debug_state.debug_view.controls.setThreadList([])
+		debug_state.debug_view.controls.setResumeBreak(False)
 
 def state_stopped(bv, msg=None):
 	debug_state = get_state(bv)
@@ -296,6 +297,8 @@ def state_stopped(bv, msg=None):
 	debug_status(bv, msg or debug_state.state)
 	buttons_xable(bv, Starting=False, Stopping=True, Stepping=True, Break=True, Resume=True, Threads=True)
 	buttons_set_default(bv, "Quit")
+	if debug_state.debug_view is not None:
+		debug_state.debug_view.controls.setResumeBreak(True)
 
 def state_running(bv, msg=None):
 	debug_state = get_state(bv)
@@ -303,6 +306,8 @@ def state_running(bv, msg=None):
 	debug_status(bv, msg or debug_state.state)
 	buttons_xable(bv, Starting=False, Stopping=True, Stepping=False, Break=True, Resume=False, Threads=False)
 	buttons_set_default(bv, "Quit")
+	if debug_state.debug_view is not None:
+		debug_state.debug_view.controls.setResumeBreak(False)
 
 def state_error(bv, msg=None):
 	debug_state = get_state(bv)
@@ -312,6 +317,7 @@ def state_error(bv, msg=None):
 	buttons_set_default(bv, "Run")
 	if debug_state.debug_view is not None:
 		debug_state.debug_view.controls.setThreadList([])
+		debug_state.debug_view.controls.setResumeBreak(True)	
 
 def handle_stop_return(bv, reason, data):
 	if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
