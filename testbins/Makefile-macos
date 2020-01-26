@@ -1,5 +1,5 @@
 # make -f Makefile-macos
-all: helloworld helloworld_loop helloworld_thread helloworld_func
+all: helloworld helloworld_loop helloworld_thread helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie
 
 helloworld: helloworld.c
 	gcc -Wl,-no_pie helloworld.c -o helloworld
@@ -13,5 +13,17 @@ helloworld_loop: helloworld_loop.c
 helloworld_func: helloworld_func.c
 	gcc -Wl,-no_pie helloworld_func.c -o helloworld_func
 
+helloworld_pie: helloworld.c
+	gcc -Wl,-pie helloworld.c -o helloworld_pie
+
+helloworld_thread_pie: helloworld_thread.c
+	gcc -Wl,-pie helloworld_thread.c -o helloworld_thread_pie
+
+helloworld_loop_pie: helloworld_loop.c
+	gcc -Wl,-pie helloworld_loop.c -o helloworld_loop_pie
+
+helloworld_func_pie: helloworld_func.c
+	gcc -Wl,-pie helloworld_func.c -o helloworld_func_pie
+
 clean:
-	rm -rf helloworld helloworld_thread helloworld_loop helloworld_func
+	rm -rf helloworld helloworld_thread helloworld_loop helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie
