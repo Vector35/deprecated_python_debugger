@@ -473,6 +473,48 @@ def debug_step_over(bv):
 	state = 'stopped'
 	memory_dirty(bv)
 
+def debug_step_return(bv):
+	debug_state = get_state(bv)
+	adapter = debug_state.adapter
+	assert adapter
+
+	if bv.arch.name == 'x86_64':
+		rip = adapter.reg_read('rip')
+		
+		# TODO: If we don't have a function loaded, walk the stack
+		funcs = bv.get_functions_containing(rip)
+		if len(funcs) != 0:
+			mlil = funcs[0].mlil
+			
+			# Set a bp on every ret in the function and go
+			old_bps = set()
+			new_bps = set()
+			for insn in mlil.instructions:
+				if insn.operation == binaryninja.MediumLevelILOperation.MLIL_RET:
+					if insn.address in debug_state.breakpoints:
+						rets.add(insn.address)
+					else:
+						new_bps.add(insn.address)
+
+			seq = []
+			for bp in new_bps:
+				seq.append((adapter.breakpoint_set, (bp,)))
+			seq.append((adapter.go, ()))
+			for bp in new_bps:
+				seq.append((adapter.breakpoint_clear, (bp,)))
+
+			(reason, data) = exec_adapter_sequence(adapter, seq)
+			handle_stop_return(bv, reason, data)
+		else:
+			print("Can't find current function")
+
+	else:
+		raise NotImplementedError('step over unimplemented for architecture %s' % bv.arch.name)
+
+	state = 'stopped'
+	memory_dirty(bv)
+
+
 def debug_breakpoint_set(bv, address):
 	debug_state = get_state(bv)
 	adapter = debug_state.adapter

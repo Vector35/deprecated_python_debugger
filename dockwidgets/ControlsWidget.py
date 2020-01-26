@@ -38,8 +38,8 @@ class DebugControlsWidget(QToolBar):
 		self.actionStepInto.triggered.connect(lambda: binjaplug.debug_step(self.bv))
 		self.actionStepOver = QAction("Step Over", self)
 		self.actionStepOver.triggered.connect(lambda: binjaplug.debug_step_over(self.bv))
-		self.actionStepReturn = QAction("Step Return (todo)", self)
-		self.actionStepReturn.triggered.connect(lambda: ())
+		self.actionStepReturn = QAction("Step Return", self)
+		self.actionStepReturn.triggered.connect(lambda: binjaplug.debug_step_return(self.bv))
 
 		# session control menu
 		self.controlMenu = QMenu("Process Control", self)
@@ -67,7 +67,7 @@ class DebugControlsWidget(QToolBar):
 		self.addAction(self.actionStepInto)
 		self.addAction(self.actionStepOver)
 		# TODO: Step until returning from current function
-		# self.addAction(self.actionStepReturn)
+		self.addAction(self.actionStepReturn)
 
 		self.threadMenu = QMenu("Threads", self)
 
