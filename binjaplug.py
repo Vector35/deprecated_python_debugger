@@ -407,8 +407,16 @@ def debug_quit(bv):
 	debug_state = get_state(bv)
 	adapter = debug_state.adapter
 	if adapter:
-		adapter.quit()
-		debug_state.adapter = None
+		try:
+			adapter.quit()
+		except BrokenPipeError:
+			pass
+		except ConnectionResetError:
+			pass
+		except OSError:
+			pass
+		finally:
+			debug_state.adapter = None
 	state_inactive(bv)
 	memory_dirty(bv)
 
@@ -421,8 +429,16 @@ def debug_detach(bv):
 	debug_state = get_state(bv)
 	adapter = debug_state.adapter
 	assert adapter
-	adapter.detach()
-	debug_state.adapter = None
+	try:
+		adapter.detach()
+	except BrokenPipeError:
+		pass
+	except ConnectionResetError:
+		pass
+	except OSError:
+		pass
+	finally:
+		debug_state.adapter = None
 	state_inactive(bv)
 
 def debug_break(bv):
@@ -668,6 +684,9 @@ def exec_adapter_sequence(adapter, seq):
 	for (func, args) in seq:
 		if func in [adapter.step_into, adapter.step_over, adapter.go]:
 			(reason, data) = func(*args)
+			if reason == DebugAdapter.STOP_REASON.PROCESS_EXITED or reason == DebugAdapter.STOP_REASON.BACKEND_DISCONNECTED:
+				# Process is dead, stop sequence
+				break
 		else:
 			func(*args)
 
