@@ -190,16 +190,16 @@ def context_display(bv):
 
 # Mark memory as dirty, will refresh memory view
 def memory_dirty(bv):
-	state = get_state(bv)
-	state.memory_view.mark_dirty()
-	if state.debug_view is not None:
-		state.debug_view.notifyMemoryChanged()
+	debug_state = get_state(bv)
+	debug_state.memory_view.mark_dirty()
+	if debug_state.debug_view is not None:
+		debug_state.debug_view.notifyMemoryChanged()
 
 # Create symbols and variables for the memory view
 def update_memory_view(bv):
-	state = get_state(bv)
-	adapter = state.adapter
-	memory_view = state.memory_view
+	debug_state = get_state(bv)
+	adapter = debug_state.adapter
+	memory_view = debug_state.memory_view
 
 	assert adapter is not None
 	assert memory_view is not None
@@ -219,15 +219,15 @@ def update_memory_view(bv):
 			addr_regs[addr].append(reg_symbol_name)
 		reg_addrs[reg] = addr
 
-	for symbol in state.old_symbols:
+	for symbol in debug_state.old_symbols:
 		# Symbols are immutable so just destroy the old one
 		memory_view.undefine_auto_symbol(symbol)
 
-	for dv in state.old_dvs:
+	for dv in debug_state.old_dvs:
 		memory_view.undefine_data_var(dv)
 
-	state.old_symbols = []
-	state.old_dvs = set()
+	debug_state.old_symbols = []
+	debug_state.old_dvs = set()
 	new_dvs = set()
 
 	for (addr, regs) in addr_regs.items():
@@ -235,12 +235,12 @@ def update_memory_view(bv):
 		fancy_name = ",".join(regs)
 		
 		memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, addr, fancy_name, raw_name=symbol_name))
-		state.old_symbols.append(memory_view.get_symbol_by_raw_name(symbol_name))
+		debug_state.old_symbols.append(memory_view.get_symbol_by_raw_name(symbol_name))
 		new_dvs.add(addr)
 	
 	for new_dv in new_dvs:
 		memory_view.define_data_var(new_dv, Type.int(8))
-		state.old_dvs.add(new_dv)
+		debug_state.old_dvs.add(new_dv)
 
 	# Special struct for stack frame
 	if bv.arch.name == 'x86_64':
@@ -256,8 +256,8 @@ def update_memory_view(bv):
 			memory_view.define_data_var(reg_addrs['rsp'], Type.structure_type(struct))
 			memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, reg_addrs['rsp'], "$stack_frame", raw_name="$stack_frame"))
 
-			state.old_symbols.append(memory_view.get_symbol_by_raw_name("$stack_frame"))
-			state.old_dvs.add(reg_addrs['rsp'])
+			debug_state.old_symbols.append(memory_view.get_symbol_by_raw_name("$stack_frame"))
+			debug_state.old_dvs.add(reg_addrs['rsp'])
 
 # Highlight lines 
 def update_highlights(bv):
@@ -340,6 +340,15 @@ def state_running(bv, msg=None):
 	debug_state.state = 'RUNNING'
 	debug_status(bv, msg or debug_state.state)
 	buttons_xable(bv, Starting=False, Stopping=True, Stepping=False, Break=True, Resume=False, Threads=False)
+	buttons_set_default(bv, "Quit")
+	if debug_state.debug_view is not None:
+		debug_state.debug_view.controls.setResumeBreak(False)
+
+def state_busy(bv, msg=None):
+	debug_state = get_state(bv)
+	debug_state.state = 'RUNNING'
+	debug_status(bv, msg or debug_state.state)
+	buttons_xable(bv, Starting=False, Stopping=True, Stepping=False, Break=False, Resume=False, Threads=False)
 	buttons_set_default(bv, "Quit")
 	if debug_state.debug_view is not None:
 		debug_state.debug_view.controls.setResumeBreak(False)
@@ -427,19 +436,21 @@ def debug_go(bv, gui_updates=True):
 	adapter = debug_state.adapter
 	assert adapter
 
-	remote_rip = adapter.reg_read('rip')
-	local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
-	bphere = local_rip in debug_state.breakpoints
-
-	seq = []
-	if bphere:
-		seq.append((adapter.breakpoint_clear, (remote_rip,)))
-		seq.append((adapter.go, ()))
-		seq.append((adapter.breakpoint_set, (remote_rip,)))
-	else:
-		seq.append((adapter.go, ()))
-
 	def debug_go_thread(bv):
+		if gui_updates:
+			execute_on_main_thread_and_wait(lambda: state_busy(bv, 'RESUMING'))
+		remote_rip = adapter.reg_read('rip')
+		local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
+		bphere = local_rip in debug_state.breakpoints
+
+		seq = []
+		if bphere:
+			seq.append((adapter.breakpoint_clear, (remote_rip,)))
+			seq.append((adapter.go, ()))
+			seq.append((adapter.breakpoint_set, (remote_rip,)))
+		else:
+			seq.append((adapter.go, ()))
+
 		if gui_updates:
 			execute_on_main_thread_and_wait(lambda: state_running(bv))
 		(reason, data) = exec_adapter_sequence(adapter, seq)
@@ -454,135 +465,147 @@ def debug_step(bv):
 	adapter = debug_state.adapter
 	assert adapter
 
-	(reason, data) = (None, None)
+	def debug_step_thread():
+		execute_on_main_thread_and_wait(lambda: state_busy(bv, "STEPPING"))
+		(reason, data) = (None, None)
 
-	if bv.arch.name == 'x86_64':
-		remote_rip = adapter.reg_read('rip')
-		local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
+		if bv.arch.name == 'x86_64':
+			remote_rip = adapter.reg_read('rip')
+			local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
 
-		# if currently a breakpoint at rip, temporarily clear it
-		# TODO: detect windbg adapter because dbgeng's step behavior might ignore breakpoint
-		# at current rip
+			# if currently a breakpoint at rip, temporarily clear it
+			# TODO: detect windbg adapter because dbgeng's step behavior might ignore breakpoint
+			# at current rip
 
-		seq = []
-		if local_rip in debug_state.breakpoints:
-			seq.append((adapter.breakpoint_clear, (remote_rip,)))
-			seq.append((adapter.step_into, ()))
-			seq.append((adapter.breakpoint_set, (remote_rip,)))
+			seq = []
+			if local_rip in debug_state.breakpoints:
+				seq.append((adapter.breakpoint_clear, (remote_rip,)))
+				seq.append((adapter.step_into, ()))
+				seq.append((adapter.breakpoint_set, (remote_rip,)))
+			else:
+				seq.append((adapter.step_into, ()))
+
+			(reason, data) = exec_adapter_sequence(adapter, seq)
 		else:
-			seq.append((adapter.step_into, ()))
+			raise NotImplementedError('step unimplemented for architecture %s' % bv.arch.name)
 
-		(reason, data) = exec_adapter_sequence(adapter, seq)
-	else:
-		raise NotImplementedError('step unimplemented for architecture %s' % bv.arch.name)
-
-	handle_stop_return(bv, reason, data)
-	memory_dirty(bv)
+		execute_on_main_thread_and_wait(lambda: handle_stop_return(bv, reason, data))
+		execute_on_main_thread_and_wait(lambda: memory_dirty(bv))
+	
+	threading.Thread(target=debug_step_thread).start()
 
 def debug_step_over(bv):
 	debug_state = get_state(bv)
 	adapter = debug_state.adapter
 	assert adapter
 
-	# TODO: detect windbg adapter because dbgeng has a builtin step_into() that we don't
-	# have to synthesize
-	if bv.arch.name == 'x86_64':
-		remote_rip = adapter.reg_read('rip')
-		local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
+	def debug_step_over_thread():
+		execute_on_main_thread_and_wait(lambda: state_busy(bv, "STEPPING"))
+		# TODO: detect windbg adapter because dbgeng has a builtin step_into() that we don't
+		# have to synthesize
+		if bv.arch.name == 'x86_64':
+			remote_rip = adapter.reg_read('rip')
+			local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
 
-		instxt = bv.get_disassembly(local_rip)
-		inslen = bv.get_instruction_length(local_rip)
-		local_ripnext = local_rip + inslen
-		remote_ripnext = remote_rip + inslen
+			instxt = bv.get_disassembly(local_rip)
+			inslen = bv.get_instruction_length(local_rip)
+			local_ripnext = local_rip + inslen
+			remote_ripnext = remote_rip + inslen
 
-		call = instxt.startswith('call ')
-		bphere = local_rip in debug_state.breakpoints
-		bpnext = local_ripnext in debug_state.breakpoints
+			call = instxt.startswith('call ')
+			bphere = local_rip in debug_state.breakpoints
+			bpnext = local_ripnext in debug_state.breakpoints
 
-		seq = []
+			seq = []
 
-		if not call:
-			if bphere:
+			if not call:
+				if bphere:
+					seq.append((adapter.breakpoint_clear, (remote_rip,)))
+					seq.append((adapter.step_into, ()))
+					seq.append((adapter.breakpoint_set, (remote_rip,)))
+				else:
+					seq.append((adapter.step_into, ()))
+			elif bphere and bpnext:
 				seq.append((adapter.breakpoint_clear, (remote_rip,)))
-				seq.append((adapter.step_into, ()))
+				seq.append((adapter.go, ()))
 				seq.append((adapter.breakpoint_set, (remote_rip,)))
+			elif bphere and not bpnext:
+				seq.append((adapter.breakpoint_clear, (remote_rip,)))
+				seq.append((adapter.breakpoint_set, (remote_ripnext,)))
+				seq.append((adapter.go, ()))
+				seq.append((adapter.breakpoint_clear, (remote_ripnext,)))
+				seq.append((adapter.breakpoint_set, (remote_rip,)))
+			elif not bphere and bpnext:
+				seq.append((adapter.go, ()))
+			elif not bphere and not bpnext:
+				seq.append((adapter.breakpoint_set, (remote_ripnext,)))
+				seq.append((adapter.go, ()))
+				seq.append((adapter.breakpoint_clear, (remote_ripnext,)))
 			else:
-				seq.append((adapter.step_into, ()))
-		elif bphere and bpnext:
-			seq.append((adapter.breakpoint_clear, (remote_rip,)))
-			seq.append((adapter.go, ()))
-			seq.append((adapter.breakpoint_set, (remote_rip,)))
-		elif bphere and not bpnext:
-			seq.append((adapter.breakpoint_clear, (remote_rip,)))
-			seq.append((adapter.breakpoint_set, (remote_ripnext,)))
-			seq.append((adapter.go, ()))
-			seq.append((adapter.breakpoint_clear, (remote_ripnext,)))
-			seq.append((adapter.breakpoint_set, (remote_rip,)))
-		elif not bphere and bpnext:
-			seq.append((adapter.go, ()))
-		elif not bphere and not bpnext:
-			seq.append((adapter.breakpoint_set, (remote_ripnext,)))
-			seq.append((adapter.go, ()))
-			seq.append((adapter.breakpoint_clear, (remote_ripnext,)))
+				raise Exception('confused by call, bphere, bpnext state')
+
+			(reason, data) = exec_adapter_sequence(adapter, seq)
+			execute_on_main_thread_and_wait(lambda: handle_stop_return(bv, reason, data))
+
 		else:
-			raise Exception('confused by call, bphere, bpnext state')
+			raise NotImplementedError('step over unimplemented for architecture %s' % bv.arch.name)
 
-		(reason, data) = exec_adapter_sequence(adapter, seq)
-		handle_stop_return(bv, reason, data)
+		state = 'stopped'
+		execute_on_main_thread_and_wait(lambda: memory_dirty(bv))
 
-	else:
-		raise NotImplementedError('step over unimplemented for architecture %s' % bv.arch.name)
-
-	state = 'stopped'
-	memory_dirty(bv)
+	threading.Thread(target=debug_step_over_thread).start()
 
 def debug_step_return(bv):
 	debug_state = get_state(bv)
 	adapter = debug_state.adapter
 	assert adapter
 
-	if bv.arch.name == 'x86_64':
-		remote_rip = adapter.reg_read('rip')
-		local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
-		
-		# TODO: If we don't have a function loaded, walk the stack
-		funcs = bv.get_functions_containing(local_rip)
-		if len(funcs) != 0:
-			mlil = funcs[0].mlil
+	def debug_step_return_thread():
+		execute_on_main_thread_and_wait(lambda: state_busy(bv, "STEPPING"))
+		if bv.arch.name == 'x86_64':
+			remote_rip = adapter.reg_read('rip')
+			local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
 			
-			bphere = local_rip in debug_state.breakpoints
+			# TODO: If we don't have a function loaded, walk the stack
+			funcs = bv.get_functions_containing(local_rip)
+			if len(funcs) != 0:
+				mlil = funcs[0].mlil
+				
+				bphere = local_rip in debug_state.breakpoints
 
-			# Set a bp on every ret in the function and go
-			old_bps = set()
-			new_bps = set()
-			for insn in mlil.instructions:
-				if insn.operation == binaryninja.MediumLevelILOperation.MLIL_RET or insn.operation == binaryninja.MediumLevelILOperation.MLIL_TAILCALL:
-					if insn.address in debug_state.breakpoints:
-						rets.add(debug_state.memory_view.local_addr_to_remote(insn.address))
-					else:
-						new_bps.add(debug_state.memory_view.local_addr_to_remote(insn.address))
+				# Set a bp on every ret in the function and go
+				old_bps = set()
+				new_bps = set()
+				for insn in mlil.instructions:
+					if insn.operation == binaryninja.MediumLevelILOperation.MLIL_RET or insn.operation == binaryninja.MediumLevelILOperation.MLIL_TAILCALL:
+						if insn.address in debug_state.breakpoints:
+							rets.add(debug_state.memory_view.local_addr_to_remote(insn.address))
+						else:
+							new_bps.add(debug_state.memory_view.local_addr_to_remote(insn.address))
 
-			seq = []
-			if bphere and not local_rip in new_bps and not local_rip in old_bps:
-				seq.append((adapter.breakpoint_clear, (remote_rip,)))
-			for bp in new_bps:
-				seq.append((adapter.breakpoint_set, (bp,)))
-			seq.append((adapter.go, ()))
-			for bp in new_bps:
-				seq.append((adapter.breakpoint_clear, (bp,)))
-			if bphere and not local_rip in new_bps and not local_rip in old_bps:
-				seq.append((adapter.breakpoint_set, (remote_rip,)))
+				seq = []
+				if bphere and not local_rip in new_bps and not local_rip in old_bps:
+					seq.append((adapter.breakpoint_clear, (remote_rip,)))
+				for bp in new_bps:
+					seq.append((adapter.breakpoint_set, (bp,)))
+				seq.append((adapter.go, ()))
+				for bp in new_bps:
+					seq.append((adapter.breakpoint_clear, (bp,)))
+				if bphere and not local_rip in new_bps and not local_rip in old_bps:
+					seq.append((adapter.breakpoint_set, (remote_rip,)))
 
-			(reason, data) = exec_adapter_sequence(adapter, seq)
-			handle_stop_return(bv, reason, data)
+				(reason, data) = exec_adapter_sequence(adapter, seq)
+				execute_on_main_thread_and_wait(lambda: handle_stop_return(bv, reason, data))
+			else:
+				print("Can't find current function")
+
 		else:
-			print("Can't find current function")
+			raise NotImplementedError('step over unimplemented for architecture %s' % bv.arch.name)
 
-	else:
-		raise NotImplementedError('step over unimplemented for architecture %s' % bv.arch.name)
+		state = 'stopped'
+		execute_on_main_thread_and_wait(lambda: memory_dirty(bv))
 
-	state = 'stopped'
-	memory_dirty(bv)
+	threading.Thread(target=debug_step_return_thread).start()
 
 
 def debug_breakpoint_set(bv, remote_address):
