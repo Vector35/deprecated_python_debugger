@@ -290,6 +290,24 @@ def update_highlights(bv):
 		for func in bv.get_functions_containing(local_rip):
 			func.set_auto_instr_highlight(local_rip, binaryninja.HighlightStandardColor.BlueHighlightColor)
 
+def update_breakpoints(bv):
+	debug_state = get_state(bv)
+	adapter = debug_state.adapter
+
+	bps = []
+	if adapter is not None:
+		for remote_bp in adapter.breakpoint_list():
+			local_bp = debug_state.memory_view.remote_addr_to_local(remote_bp)
+			if local_bp in debug_state.breakpoints.keys():
+				bps.append({
+					'enabled': debug_state.breakpoints[local_bp],
+					'address': local_bp
+				})
+
+	bp_widget = widget.get_dockwidget(bv, "Breakpoints")
+	bp_widget.notifyBreakpointsChanged(bps)
+	
+
 # breakpoint TAG removal - strictly presentation
 # (doesn't remove actual breakpoints, just removes the binja tags that mark them)
 #
@@ -659,10 +677,7 @@ def debug_breakpoint_set(bv, remote_address):
 	debug_state.breakpoints[local_address] = True
 	print('breakpoint address=0x%X (remote=0x%X) set' % (local_address, remote_address))
 	update_highlights(bv)
-
-	bp_widget = widget.get_dockwidget(bv, "Breakpoints")
-	if bp_widget is not None:
-		bp_widget.notifyBreakpointChanged()
+	update_breakpoints(bv)
 
 	return 0
 
@@ -686,6 +701,8 @@ def debug_breakpoint_clear(bv, remote_address):
 
 		# delete from our list
 		del debug_state.breakpoints[local_address]
+
+		update_breakpoints(bv)
 	else:
 		print('ERROR: breakpoint not found in list')
 

@@ -16,24 +16,17 @@ class DebugBreakpointsListModel(QAbstractItemModel):
 	def __init__(self, parent, bv):
 		QAbstractItemModel.__init__(self, parent)
 		self.bv = bv
-		self.columns = ["Address", "Enabled"]
-		self.update_rows()
+		self.columns = ["Enabled", "Address"]
+		self.update_rows(None)
 
-	def update_rows(self):
+	def update_rows(self, new_rows):
 		self.beginResetModel()
 
-		self.rows = []
-		debug_state = binjaplug.get_state(self.bv)
-		adapter = debug_state.adapter
-		if adapter is None:
-			self.endResetModel()
-			return
+		if new_rows is None:
+			self.rows = []
+		else:
+			self.rows = new_rows
 
-		for remote_bp in adapter.breakpoint_list():
-			local_bp = debug_state.memory_view.remote_addr_to_local(remote_bp)
-			if local_bp in debug_state.breakpoints.keys():
-				self.rows.append([local_bp, debug_state.breakpoints[local_bp]])
-		
 		self.endResetModel()
 
 	"""
@@ -89,7 +82,16 @@ class DebugBreakpointsListModel(QAbstractItemModel):
 			return None
 		if role != Qt.DisplayRole:
 			return None
-		return self.rows[index.row()][index.column()]
+
+		conts = self.rows[index.row()]
+
+		# Format data into displayable text
+		if index.column() == 1:
+			text = '0x%x' % conts['address']
+		else:
+			text = str(conts['enabled'])
+		return text
+
 
 class DebugBreakpointsItemDelegate(QItemDelegate):
 	def __init__(self, parent):
@@ -102,7 +104,7 @@ class DebugBreakpointsItemDelegate(QItemDelegate):
 		self.char_height = QFontMetricsF(self.font).height()
 		self.char_offset = binaryninjaui.getFontVerticalOffset()
 
-		self.expected_char_widths = [20, 10]
+		self.expected_char_widths = [10, 20]
 	
 	"""
 	virtual QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& idx) const override;
@@ -123,13 +125,7 @@ class DebugBreakpointsItemDelegate(QItemDelegate):
 		painter.setPen(Qt.NoPen)
 		painter.drawRect(option.rect)
 
-		# Format data into displayable text
-		data = idx.data()
-		if idx.column() == 0:
-			text = hex(int(data))
-		else:
-			text = str(data)
-
+		text = idx.data()
 		# Draw text
 		painter.setFont(self.font)
 		painter.setPen(option.palette.color(QPalette.WindowText).rgba())
@@ -168,6 +164,7 @@ class DebugBreakpointsWidget(QWidget, DockContextHandler):
 
 		for i in range(len(self.model.columns)):
 			self.table.setColumnWidth(i, self.item_delegate.sizeHint(self.table.viewOptions(), self.model.index(-1, i, QModelIndex())).width())
+		self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
 
 		layout = QVBoxLayout()
 		layout.setContentsMargins(0, 0, 0, 0)
@@ -178,11 +175,8 @@ class DebugBreakpointsWidget(QWidget, DockContextHandler):
 	def notifyOffsetChanged(self, offset):
 		pass
 
-	def notifyBreakpointChanged(self):
-		self.model.update_rows()
-
-	def notifyViewChanged(self, view_frame):
-		self.model.update_rows()
+	def notifyBreakpointsChanged(self, new_rows):
+		self.model.update_rows(new_rows)
 
 	def contextMenuEvent(self, event):
 		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)
