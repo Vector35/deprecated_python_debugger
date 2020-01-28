@@ -14,7 +14,7 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QW
 from . import helpers
 from . import DebugAdapter, ProcessView
 from . import lldb
-from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, ConsoleWidget, widget
+from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, ConsoleWidget, ModulesWidget, widget
 
 #------------------------------------------------------------------------------
 # globals
@@ -76,6 +76,20 @@ def context_display(bv):
 			'value': value
 		})
 	registers_widget.notifyRegistersChanged(regs)
+
+	#----------------------------------------------------------------------
+	# Update Modules
+	#----------------------------------------------------------------------
+	modules_widget = widget.get_dockwidget(bv, 'Modules')
+	mods = []
+	for (modpath, address) in adapter.mem_modules().items():
+		mods.append({
+			'address': address,
+			'modpath': modpath
+			# TODO: Length, segments, etc
+		})
+	mods.sort(key=lambda row: row['address'])
+	modules_widget.notifyModulesChanged(mods)
 
 	#----------------------------------------------------------------------
 	# Update Threads
@@ -614,6 +628,7 @@ def debug_step_return(bv):
 				execute_on_main_thread_and_wait(lambda: handle_stop_return(bv, reason, data))
 			else:
 				print("Can't find current function")
+				execute_on_main_thread_and_wait(lambda: state_stopped(bv))
 
 		else:
 			raise NotImplementedError('step over unimplemented for architecture %s' % bv.arch.name)
@@ -715,6 +730,7 @@ def initialize():
 	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Registers", Qt.RightDockWidgetArea, Qt.Vertical, False)
 	widget.register_dockwidget(ThreadsWidget.DebugThreadsWidget, "Threads", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 	widget.register_dockwidget(StackWidget.DebugStackWidget, "Stack", Qt.LeftDockWidgetArea, Qt.Vertical, False)
+	widget.register_dockwidget(ModulesWidget.DebugModulesWidget, "Modules", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 	widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 
 	PluginCommand.register_for_address("Set Breakpoint", "sets breakpoint at right-clicked address", cb_bp_set)
