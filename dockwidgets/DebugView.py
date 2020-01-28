@@ -80,11 +80,7 @@ class DebugView(QWidget, View):
 		return self.bv
 
 	def getCurrentOffset(self):
-		return self.current_offset
-	
-	def setCurrentOffset(self, offset):
-		self.current_offset = offset
-		UIContext.updateStatus(True)
+		return self.binary_editor.getDisassembly().getCurrentOffset()
 
 	def getFont(self):
 		return binaryninjaui.getMonospaceFont(self)
