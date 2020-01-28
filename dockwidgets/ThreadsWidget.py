@@ -97,11 +97,11 @@ class DebugThreadsListModel(QAbstractItemModel):
 		if role == Qt.DisplayRole:
 			# Format data into displayable text
 			if index.column() == 1:
-				# Pad out to ceil(bitlength/4) nibbles
-				text = ('%X' % contents).rjust((info['bits'] + 3) // 4, "0")
+				# Address is like a pointer
+				text = '0x%x' % contents
 			else:
 				# TID should just be integer
-				text = '%X' % contents
+				text = '%x' % contents
 			return text
 		elif role == Qt.UserRole:
 			return info['state'] # 'updated', 'modified', 'unchanged'
@@ -192,6 +192,7 @@ class DebugThreadsWidget(QWidget, DockContextHandler):
 
 		for i in range(len(self.model.columns)):
 			self.table.setColumnWidth(i, self.item_delegate.sizeHint(self.table.viewOptions(), self.model.index(-1, i, QModelIndex())).width())
+		self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
 
 		layout = QVBoxLayout()
 		layout.setContentsMargins(0, 0, 0, 0)

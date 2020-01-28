@@ -84,7 +84,7 @@ class DebugRegistersListModel(QAbstractItemModel):
 			# Format data into displayable text
 			if index.column() == 1:
 				# Pad out to ceil(bitlength/4) nibbles
-				text = ('%X' % conts).rjust((info['bits'] + 3) // 4, "0")
+				text = ('%x' % conts).rjust((info['bits'] + 3) // 4, "0")
 			else:
 				text = str(conts)
 			return text
@@ -132,7 +132,11 @@ class DebugRegistersItemDelegate(QItemDelegate):
 		self.expected_char_widths = [10, 32]
 	
 	def sizeHint(self, option, idx):
-		return QSize(self.char_width * self.expected_char_widths[idx.column()] + 4, self.char_height)
+		width = self.expected_char_widths[idx.column()]
+		data = idx.data()
+		if data is not None:
+			width = max(width, len(data))
+		return QSize(self.char_width * width + 4, self.char_height)
 
 	def paint(self, painter, option, idx):
 		# Draw background highlight in theme style
@@ -207,6 +211,7 @@ class DebugRegistersWidget(QWidget, DockContextHandler):
 
 	def notifyRegistersChanged(self, new_regs):
 		self.model.update_rows(new_regs)
+		self.table.resizeColumnsToContents()
 
 	def contextMenuEvent(self, event):
 		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)
