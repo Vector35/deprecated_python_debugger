@@ -104,12 +104,9 @@ if __name__ == '__main__':
 		print('entry: 0x%X' % entry)
 		adapter.breakpoint_set(entry)
 		adapter.go()
-		print(adapter.mem_modules())
-		print('about to go')
+		print('writing bad mem')
 		input()
-		(reason, info) = adapter.go()
-		print('returned from go, (reason,info): ', (reason,info))
-		input()
+		adapter.mem_write(0, b'heheHAHAherherHARHAR')
 		adapter.quit()
 		sys.exit(0)
 
@@ -133,7 +130,7 @@ if __name__ == '__main__':
 		nthreads_expected = 6
 	else:
 		# main thread at pthread_join() + 4 created threads
-		nthreads_expected = 4
+		nthreads_expected = 5
 	tids = adapter.thread_list()
 	assert len(tids) == nthreads_expected
 	tid_active = adapter.thread_selected()

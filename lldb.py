@@ -138,7 +138,8 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 	# threads
 	def thread_list(self):
 		reply = rsp.tx_rx(self.sock, 'qfThreadInfo', 'ack_then_reply')
-		assert reply.startswith('m')
+		if not reply.startswith('m'):
+			raise DebugAdapter.GeneralError("retrieving thread list from server after qfThreadInfo packet")
 		tids = reply[1:].split(',')
 		tids = list(map(lambda x: int(x,16), tids))
 		return tids
@@ -146,10 +147,14 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 	def thread_selected(self):
 		reply = rsp.tx_rx(self.sock, '?', 'ack_then_reply')
 		context = rsp.packet_T_to_dict(reply)
-		assert 'thread' in context
+		if not 'thread' in context:
+			raise DebugAdapter.GeneralError("setting thread on server after '?' packet")
 		return context.get('thread')
 
 	def thread_select(self, tid):
+		if not tid in self.thread_list():
+			raise DebugAdapter.GeneralError("tid 0x%X is not in threads list" % tid)
+
 		# set thread for step and continue operations
 		payload = 'Hc%x' % tid
 		reply = rsp.tx_rx(self.sock, payload, 'ack_then_ok')
@@ -161,7 +166,7 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 	# breakpoints
 	def breakpoint_set(self, addr):
 		if addr in self.breakpoints:
-			return None
+			raise DebugAdapter.BreakpointSetError("breakpoint set at 0x%X already exists" % addr)
 
 		data = 'Z0,%x,1' % addr
 		reply = rsp.tx_rx(self.sock, data, 'ack_then_reply')
@@ -172,12 +177,12 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 
 	def breakpoint_clear(self, addr):
 		if not addr in self.breakpoints:
-			return None
+			raise DebugAdapter.BreakpointClearError("breakpoint clear at 0x%X doesn't exist" % addr)
 
 		data = 'z0,%x,1' % addr
 		reply = rsp.tx_rx(self.sock, data, 'ack_then_reply')
 		if reply != 'OK':
-			return None
+			raise DebugAdapter.BreakpointClearError("rsp replied: %s" % reply)
 
 		del self.breakpoints[addr]
 		return 0
@@ -188,6 +193,8 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 	# register
 	def reg_read(self, name):
 		self.register_sense()
+		if not name in self.reg_name_to_info:
+			raise DebugAdapter.GeneralError("requested register %s doesnt exist" % name)
 		id_ = self.reg_name_to_id[name]
 		reply = rsp.tx_rx(self.sock, 'p%02x' % id_, 'ack_then_reply')
 		return int(''.join(reversed([reply[i:i+2] for i in range(0,len(reply),2)])), 16)
@@ -196,8 +203,7 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		self.register_sense()
 
 		if not name in self.reg_name_to_id:
-			print('ERROR: unknown register %s' % name)
-			return None
+			raise DebugAdapter.GeneralError("requested register %s doesnt exist" % name)
 
 		id_ = self.reg_name_to_id[name]
 
@@ -211,9 +217,11 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		self.register_sense()
 		return self.reg_name_to_id.keys()
 
-	def reg_bits(self, reg):
+	def reg_bits(self, name):
 		self.register_sense()
-		return int(self.reg_name_to_info[reg]["bitsize"])
+		if not name in self.reg_name_to_info:
+			raise DebugAdapter.GeneralError("requested register %s doesnt exist" % name)
+		return int(self.reg_name_to_info[name]["bitsize"])
 
 	# mem
 	def mem_read(self, address, length):
@@ -224,6 +232,9 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 
 			data = 'm' + ("%x" % address) + ',' + ("%x" % chunk)
 			reply = rsp.tx_rx(self.sock, data, 'ack_then_reply')
+			if reply.startswith('E'): # error 'E' differentiated from hex 'e' by case
+				# and len(reply)==3:
+				raise DebugAdapter.GeneralError('reading from address 0x%X' % address)
 
 			while(reply):
 				packed += pack('B', int(reply[0:2],16))
@@ -236,7 +247,8 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 	def mem_write(self, address, data):
 		payload = 'M%X,%X:%s' % (address, len(data), ''.join(['%02X'%b for b in data]))
 		reply = rsp.tx_rx(self.sock, payload, 'ack_then_reply')
-		if reply == 'OK':
+		if reply != 'OK':
+			raise DebugAdapter.GeneralError('writing to address 0x%X' % address)
 			return 0
 
 	def mem_modules(self):
