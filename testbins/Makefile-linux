@@ -1,0 +1,29 @@
+# make -f Makefile-linux
+all: helloworld helloworld_loop helloworld_thread helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie
+
+helloworld: helloworld.c
+	gcc -W -no-pie helloworld.c -o helloworld
+
+helloworld_thread: helloworld_thread.c
+	gcc -W -no-pie helloworld_thread.c -lpthread -o helloworld_thread
+
+helloworld_loop: helloworld_loop.c
+	gcc -W -no-pie helloworld_loop.c -o helloworld_loop
+
+helloworld_func: helloworld_func.c
+	gcc -W -no-pie helloworld_func.c -o helloworld_func
+
+helloworld_pie: helloworld.c
+	gcc -W -pie helloworld.c -o helloworld_pie
+
+helloworld_thread_pie: helloworld_thread.c
+	gcc -W -pie helloworld_thread.c -lpthread -o helloworld_thread_pie
+
+helloworld_loop_pie: helloworld_loop.c
+	gcc -W -pie helloworld_loop.c -o helloworld_loop_pie
+
+helloworld_func_pie: helloworld_func.c
+	gcc -W -pie helloworld_func.c -o helloworld_func_pie
+
+clean:
+	rm -rf helloworld helloworld_thread helloworld_loop helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie

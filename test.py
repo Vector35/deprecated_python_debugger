@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # unit tests for debugger
 
@@ -65,6 +65,14 @@ def get_entry(data):
 		vmaddr = unpack('<Q', data[e_lfanew+0x30:e_lfanew+0x38])[0]
 		return vmaddr + entryoff
 
+	# ELF
+	if data[0:4] == b'\x7FELF':
+		assert data[4] == 2 # EI_CLASS 64-bit
+		assert data[5] == 1 # EI_DATA little endian
+		assert data[0x10:0x12] == b'\x02\x00' # e_type ET_EXEC
+		assert data[0x12:0x14] == b'\x3E\x00' # e_machine EM_X86_64
+		return unpack('<Q', data[0x18:0x20])[0]
+
 	raise Exception('unrecognized file type')
 
 #------------------------------------------------------------------------------
@@ -113,49 +121,7 @@ if __name__ == '__main__':
 	test_progs = ['helloworld', 'helloworld_thread', 'helloworld_loop']
 
 	#
-	# thread test
-	#
-	fpath = test_prog_to_fpath('helloworld_thread')
-	adapter = helpers.launch_get_adapter(fpath)
-	print('scheduling break in .5 seconds')
-	threading.Timer(.5, break_into, [adapter]).start()
-	print('going')
-	adapter.go()
-	print('back')
-	print('switching to bad thread')
-	assert_general_error(lambda: adapter.thread_select(999))
-	print('asking for threads')
-	if platform.system() == 'Windows':
-		# main thread at WaitForMultipleObjects() + 4 created threads + debugger thread
-		nthreads_expected = 6
-	else:
-		# main thread at pthread_join() + 4 created threads
-		nthreads_expected = 5
-	tids = adapter.thread_list()
-	assert len(tids) == nthreads_expected
-	tid_active = adapter.thread_selected()
-	rips = []
-	for tid in tids:
-		adapter.thread_select(tid)
-		rip = adapter.reg_read('rip')
-		rips.append(rip)
-		seltxt = '<--' if tid == tid_active else ''
-		print('thread %02d: rip=0x%016X %s' % (tid, rip, seltxt))
-	assert rips[0] != rips[1] # thread at WaitForMultipleObjects()/pthread_join() should be different
-	print('switching to bad thread')
-	assert_general_error(lambda: adapter.thread_select(999))
-	print('scheduling break in .5 seconds')
-	threading.Timer(.5, break_into, [adapter]).start()
-	print('going')
-	adapter.go()
-	print('back')
-	print('checking for %d threads' % nthreads_expected)
-	assert len(adapter.thread_list()) == nthreads_expected
-	print('done')
-	adapter.quit()
-
-	#
-	# basic test
+	# basic tests
 	#
 	for prog in test_progs:
 		fpath = test_prog_to_fpath(prog)
@@ -242,5 +208,47 @@ if __name__ == '__main__':
 		print('quiting')
 		adapter.quit()
 		adapter = None
+
+	#
+	# thread test
+	#
+	fpath = test_prog_to_fpath('helloworld_thread')
+	adapter = helpers.launch_get_adapter(fpath)
+	print('scheduling break in .5 seconds')
+	threading.Timer(.5, break_into, [adapter]).start()
+	print('going')
+	adapter.go()
+	print('back')
+	print('switching to bad thread')
+	assert_general_error(lambda: adapter.thread_select(999))
+	print('asking for threads')
+	if platform.system() == 'Windows':
+		# main thread at WaitForMultipleObjects() + 4 created threads + debugger thread
+		nthreads_expected = 6
+	else:
+		# main thread at pthread_join() + 4 created threads
+		nthreads_expected = 5
+	tids = adapter.thread_list()
+	assert len(tids) == nthreads_expected
+	tid_active = adapter.thread_selected()
+	rips = []
+	for tid in tids:
+		adapter.thread_select(tid)
+		rip = adapter.reg_read('rip')
+		rips.append(rip)
+		seltxt = '<--' if tid == tid_active else ''
+		print('thread %02d: rip=0x%016X %s' % (tid, rip, seltxt))
+	assert rips[0] != rips[1] # thread at WaitForMultipleObjects()/pthread_join() should be different
+	print('switching to bad thread')
+	assert_general_error(lambda: adapter.thread_select(999))
+	print('scheduling break in .5 seconds')
+	threading.Timer(.5, break_into, [adapter]).start()
+	print('going')
+	adapter.go()
+	print('back')
+	print('checking for %d threads' % nthreads_expected)
+	assert len(adapter.thread_list()) == nthreads_expected
+	print('done')
+	adapter.quit()
 
 	print('TESTS PASSED!')
