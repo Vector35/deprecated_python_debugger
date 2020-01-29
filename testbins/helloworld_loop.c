@@ -9,5 +9,5 @@ int main(int ac, char **av)
 		for(j=0; j<100000000; ++j)
 			i = i*7;
 	}
-	return 0;
+	return 11;
 }

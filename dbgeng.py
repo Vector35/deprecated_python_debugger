@@ -5,27 +5,28 @@ import socket
 from struct import pack, unpack
 from binascii import hexlify, unhexlify
 from ctypes import *
-
+from enum import Enum, auto, unique
 from . import DebugAdapter
 
-DEBUG_STATUS_NO_CHANGE = 0
-DEBUG_STATUS_GO = 1
-DEBUG_STATUS_GO_HANDLED = 2
-DEBUG_STATUS_GO_NOT_HANDLED = 3
-DEBUG_STATUS_STEP_OVER = 4
-DEBUG_STATUS_STEP_INTO = 5
-DEBUG_STATUS_BREAK = 6
-DEBUG_STATUS_NO_DEBUGGEE = 7
-DEBUG_STATUS_STEP_BRANCH = 8
-DEBUG_STATUS_IGNORE_EVENT = 9
-DEBUG_STATUS_RESTART_REQUESTED = 10
-DEBUG_STATUS_REVERSE_GO = 11
-DEBUG_STATUS_REVERSE_STEP_BRANCH = 12
-DEBUG_STATUS_REVERSE_STEP_OVER = 13
-DEBUG_STATUS_REVERSE_STEP_INTO = 14
-DEBUG_STATUS_OUT_OF_SYNC = 15
-DEBUG_STATUS_WAIT_INPUT = 16
-DEBUG_STATUS_TIMEOUT = 17
+class DEBUG_STATUS(Enum):
+	NO_CHANGE = 0
+	GO = 1
+	GO_HANDLED = 2
+	GO_NOT_HANDLED = 3
+	STEP_OVER = 4
+	STEP_INTO = 5
+	BREAK = 6
+	NO_DEBUGGEE = 7
+	STEP_BRANCH = 8
+	IGNORE_EVENT = 9
+	RESTART_REQUESTED = 10
+	REVERSE_GO = 11
+	REVERSE_STEP_BRANCH = 12
+	REVERSE_STEP_OVER = 13
+	REVERSE_STEP_INTO = 14
+	OUT_OF_SYNC = 15
+	WAIT_INPUT = 16
+	TIMEOUT = 17
 
 # dll uses return values to indicate success/failure while we use exceptions
 ERROR_UNSPECIFIED = -1
@@ -44,14 +45,23 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		pass
 
 	def thunk_stop_reason(self):
-		estat = self.dll.get_exec_status()
-		print('estat=%d' % estat)
-		if estat == DEBUG_STATUS_BREAK:
+		status = c_ulong()
+		if self.dll.get_exec_status(byref(status)) != 0:
+			raise DebugAdapter.GeneralError("retrieving execution status")
+		status = DEBUG_STATUS(status.value)
+		print('execution status = ', status)
+
+		if status == DEBUG_STATUS.BREAK:
 			return (DebugAdapter.STOP_REASON.SIGNAL_TRAP, b'')
-		if estat == DEBUG_STATUS_NO_DEBUGGEE:
-			# TODO: does exited process have a return value?
-			return (DebugAdapter.STOP_REASON.PROCESS_EXITED, 0)
-		return (DebugAdapter.STOP_REASON.UNKNOWN, estat)
+
+		if status == DEBUG_STATUS.NO_DEBUGGEE:
+			code = c_ulong()
+			if self.dll.get_exit_code(byref(code)) != 0:
+				raise DebugAdapter.GeneralError("retrieving exit code")
+			return (DebugAdapter.STOP_REASON.PROCESS_EXITED, code.value)
+
+		# otherwise just return the numeric value of the status
+		return (DebugAdapter.STOP_REASON.UNKNOWN, status.value)
 
 	#--------------------------------------------------------------------------
 	# API

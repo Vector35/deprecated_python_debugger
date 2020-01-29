@@ -105,6 +105,11 @@ if __name__ == '__main__':
 		adapter.breakpoint_set(entry)
 		adapter.go()
 		print(adapter.mem_modules())
+		print('about to go')
+		input()
+		(reason, info) = adapter.go()
+		print('returned from go, (reason,info): ', (reason,info))
+		input()
 		adapter.quit()
 		sys.exit(0)
 

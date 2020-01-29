@@ -67,6 +67,8 @@ IDebugSystemObjects *g_Objects = NULL;
 
 ULONG lastSessionStatus;
 bool b_PROCESS_CREATED;
+bool b_PROCESS_EXITED;
+ULONG process_exit_code;
 ULONG64 image_base;
 map<string, uint64_t> image2addr;
 
@@ -287,6 +289,19 @@ STDMETHOD(CreateProcess)(
 	//return DEBUG_STATUS_GO;
 }
 
+STDMETHOD(ExitProcess)(
+	THIS_
+	IN ULONG ExitCode
+)
+{
+	printf_debug("EventCallbacks::ExitProcess(ExitCode=%d)\n", ExitCode);
+
+	b_PROCESS_EXITED = true;
+	process_exit_code = ExitCode;
+
+	return DEBUG_STATUS_NO_CHANGE;
+}
+
 STDMETHOD(LoadModule)(
 		THIS_
 		IN ULONG64 ImageFileHandle,
@@ -306,7 +321,7 @@ STDMETHOD(LoadModule)(
 
 	HRESULT hRes;
 
-	//printf_debug("EventCallbacks::LoadModule()\n");
+	printf_debug("EventCallbacks::LoadModule()\n");
 	printf_debug("EventCallbacks::LoadModule()\n");
 	printf_debug("loaded module:%s (image:%s) to address %I64x\n", ModuleName, ImageName, BaseOffset);
 
@@ -542,7 +557,7 @@ int wait(int timeout)
 	printf_debug("WaitForEvent() returned %08I32x\n", hResult);
 
 	if(hResult == S_OK) {
-		//printf_debug("S_OK (successful)\n");
+		printf_debug("S_OK (successful)\n");
 		return 0;
 	}
 
@@ -679,6 +694,7 @@ int process_start(char *path)
 	HRESULT hResult;
 
 	b_PROCESS_CREATED = false;
+	b_PROCESS_EXITED = false;
 
 	printf_debug("starting process: %s\n", path);
 
@@ -979,7 +995,7 @@ int reg_count(int *count)
 {
 	ULONG ulcount;
 	if(g_Registers->GetNumberRegisters(&ulcount) != S_OK) {
-		printf_debug("ERROR: GetNumberRegisters()\n")
+		printf_debug("ERROR: GetNumberRegisters()\n");
 		return ERROR_UNSPECIFIED;
 	}
 	*count = ulcount;
@@ -1015,7 +1031,8 @@ int reg_width(char *name, int *width)
 	ULONG len;
 	char tmp[256];
 	DEBUG_REGISTER_DESCRIPTION descr;
-	if(g_Registers->GetDescription(regidx, tmp, 256, &len, &descr) != S_OK) {
+	int rc = g_Registers->GetDescription(regidx, tmp, 256, &len, &descr);
+	if(rc != S_OK) {
 		printf_debug("ERROR: GetDescription() returned %08X\n", rc);
 		return ERROR_UNSPECIFIED;
 	}
@@ -1037,18 +1054,30 @@ int reg_width(char *name, int *width)
 }
 
 EASY_CTYPES_SPEC
-int get_exec_status(void)
+int get_exec_status(unsigned long *status)
 {
-	ULONG status = ERROR_UNSPECIFIED;
-	if(g_Control->GetExecutionStatus(&status) != S_OK) {
+	*status = ERROR_UNSPECIFIED;
+	if(g_Control->GetExecutionStatus(status) != S_OK) {
 		printf_debug("ERROR: GetExecutionStatus() failed\n");
 		return ERROR_UNSPECIFIED;
 	}
 
 	char buf[64];
-	status_to_str(status, buf);
+	status_to_str(*status, buf);
 	printf_debug("get_exec_status() returning %s\n", buf);
-	return status;
+	return 0;
+}
+
+EASY_CTYPES_SPEC
+int get_exit_code(unsigned long *code)
+{
+	if(!b_PROCESS_EXITED) {
+		printf_debug("ERROR: attempt to retrieve exit code of a non-exited process\n");
+		return ERROR_UNSPECIFIED;
+	}
+
+	*code = process_exit_code;
+	return 0;
 }
 
 EASY_CTYPES_SPEC

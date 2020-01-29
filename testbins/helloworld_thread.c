@@ -61,5 +61,5 @@ int main(int ac, char **av)
 	pthread_join(thread_id[3], NULL);
 #endif
 
-	return 0;
+	return 12;
 }
