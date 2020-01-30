@@ -81,7 +81,25 @@ def launch_get_adapter(fpath_target):
 		return connect_get_adapter('localhost', port)
 
 	elif system == 'Linux':
-		pass
+		# resolve path to gdbserver
+		path_gdbserver = shutil.which('gdbserver')
+		if not os.path.exists(path_gdbserver):
+			raise Exception('cannot locate gdbserver')
+
+		# get available port
+		port = get_available_port()
+		if port == None:
+			raise Exception('no available ports')
+
+		# invoke gdbserver
+		args = [path_gdbserver, 'localhost:%d'%port, fpath_target]
+		try:
+			subprocess.Popen(args, stdin=None, stdout=None, stderr=None, preexec_fn=preexec)
+		except Exception:
+			raise Exception('invoking gdbserver (used path: %s)' % path_gdbserver)
+
+		# connect to it
+		return connect_get_adapter('localhost', port)
 
 	else:
 		raise Exception('unsupported system: %s' % system)
