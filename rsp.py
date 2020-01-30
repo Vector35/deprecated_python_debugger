@@ -157,6 +157,16 @@ def packet_T_to_dict(data, lookup_reg={}):
 
 		(key, val) = key_vals.split(':')
 
+		# un-RLE
+		if '*' in val:
+			tmp = ''
+			lookup = set([i for (i,char) in enumerate(val) if char=='*'])
+			for (i,char) in enumerate(val):
+				if i in lookup or i-1 in lookup: continue
+				length = ord(val[i+2])-28 if i+1 in lookup else 1
+				tmp += char * length
+			val = tmp
+
 		if key == 'thread':
 			context['thread'] = int(val, 16)
 		elif re.match(r'^[0-9a-fA-F]+$', key):
