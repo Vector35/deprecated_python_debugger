@@ -69,13 +69,16 @@ def assert_ack(sock):
 def tx_rx(sock, data, expect='ack_then_reply', handler_async_pkt=None):
 	send_packet_data(sock, data)
 
+	reply = None
+
 	if expect == 'nothing':
-		return b''
+		reply = ''
 	elif expect == 'ack_then_nothing':
-		return assert_ack(sock)
+		assert_ack(sock)
+		reply = ''
 	elif expect == 'ack_then_reply':
 		assert_ack(sock)
-		return recv_packet_data(sock)
+		reply = recv_packet_data(sock)
 	elif expect == 'mixed_output_ack_then_reply':
 		ack_received = False
 		while 1:
@@ -99,13 +102,18 @@ def tx_rx(sock, data, expect='ack_then_reply', handler_async_pkt=None):
 				# return first non-output packet
 				break
 		assert ack_received
-		return reply
+		result = reply
 	elif expect == 'ack_then_ok':
 		assert_ack(sock)
-		assert recv_packet_data(sock) == 'OK'
-		return 'OK'
+		reply = recv_packet_data(sock)
+		assert reply == 'OK'
 	else:
 		print('dunno how to expect %s' % expect)
+
+	if '*' in reply:
+		reply = un_rle(reply)
+
+	return reply
 
 def send_ack(sock):
 	packet = '+'

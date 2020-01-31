@@ -6,6 +6,10 @@
 import sys
 import pyshark
 
+sys.path.append('.')
+sys.path.append('..')
+import rsp
+
 RED = '\x1B[31m'
 GREEN = '\x1B[32m'
 NORMAL = '\x1B[0m'
@@ -34,6 +38,11 @@ for pkt in cap.sniff_continuously():
 		else:
 			result += '\\x%02X' % byte
 
-	print(result + NORMAL)
+	print(result, end='')
+	if '*' in result:
+		result = rsp.un_rle(result)
+		print('\nrle-decoded: ' + result, end='')
+
+	print(NORMAL)
 
 cap.close()
