@@ -92,7 +92,8 @@ def launch_get_adapter(fpath_target):
 			raise Exception('no available ports')
 
 		# invoke gdbserver
-		args = [path_gdbserver, 'localhost:%d'%port, fpath_target]
+		args = [path_gdbserver, '--once', '--no-startup-with-shell', 'localhost:%d'%port, fpath_target]
+		print(' '.join(args))
 		try:
 			subprocess.Popen(args, stdin=None, stdout=None, stderr=None, preexec_fn=preexec)
 		except Exception:
