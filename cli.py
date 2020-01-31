@@ -14,7 +14,6 @@ import colorama
 
 sys.path.append('..')
 import debugger.helpers as helpers
-import debugger.lldb as lldb
 import debugger.DebugAdapter as DebugAdapter
 
 RED = '\x1B[31m'

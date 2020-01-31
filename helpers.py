@@ -9,6 +9,7 @@ import binaryninja
 
 import debugger.dbgeng as dbgeng
 import debugger.lldb as lldb
+import debugger.gdb as gdb
 
 #--------------------------------------------------------------------------
 # TARGET LAUNCHING
@@ -32,10 +33,14 @@ def get_available_port():
 			return port
 
 def connect_get_adapter(host, port):
-	# return LLDB adapter connected to that gdbserver
+	system = platform.system()
+
 	for tries in range(4):
 		try:
-			adapt = lldb.DebugAdapterLLDB(host=host, port=port)
+			if system == 'Darwin':
+				adapt = lldb.DebugAdapterLLDB(host=host, port=port)
+			elif system == 'Linux':
+				adapt = gdb.DebugAdapterGdb(host=host, port=port)
 			return adapt
 		except ConnectionRefusedError:
 			# allow quarter second for debugserver to start listening

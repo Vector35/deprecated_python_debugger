@@ -56,6 +56,9 @@ def parse_target_xml(sock):
 			if 'regnum' in attrs:
 				regnum = int(attrs['regnum'])
 				print('-------- fast-forwarding regnum to %d' % regnum)
+			if 'bitsize' in attrs:
+				bitsize = int(attrs['bitsize'])
+				print('has bitsize %d' % bitsize)
 			print('assigning reg %s num %d' % (regname, regnum))
 			regname2num[regname] = regnum
 			regnum += 1
