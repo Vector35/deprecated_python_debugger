@@ -17,3 +17,5 @@ do
 	echo "Press Ctrl-C to quit." && sleep .1
 done
 ```
+  weak xml reply: $l<target><architecture>i386:x86-64</architecture><osabi>GNU/Linux</osabi></target>#ef
+strong xml reply: $l<?xml version="1.0"?><!DOCTYPE target SYSTEM "gdb-target.dtd"><target><architecture>i386:x86-64</architecture>

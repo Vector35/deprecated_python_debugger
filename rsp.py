@@ -136,7 +136,7 @@ def register_scan(sock):
 		for key_vals in reply.split(';'):
 			if not key_vals:
 				continue
-				
+
 			if not ':' in key_vals:
 				print(key_vals)
 				assert(0)
@@ -144,7 +144,7 @@ def register_scan(sock):
 			(key, val) = key_vals.split(':')
 
 			info[key] = val
-		
+
 		#print('reg %d is %s' % (i, name))
 		result[i] = info
 
@@ -179,7 +179,15 @@ def packet_T_to_dict(data, lookup_reg={}):
 		val = un_rle(val)
 
 		if key == 'thread':
-			context['thread'] = int(val, 16)
+			tid = None
+			if val.startswith('p'):
+				assert '.' in val
+				(core_id, thread_id) = val[1:].split('.')
+				# TODO: deal with cores
+				context['thread'] = int(thread_id, 16)
+			else:
+				context['thread'] = int(val, 16)
+
 		elif re.match(r'^[0-9a-fA-F]+$', key):
 			rid = int(key, 16)
 			reg_name = lookup_reg.get(rid, 'r%d' % rid)
