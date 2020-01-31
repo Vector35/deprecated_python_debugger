@@ -142,6 +142,18 @@ def register_scan(sock):
 
 	return result
 
+def un_rle(data):
+	if not '*' in data:
+		return data
+
+	tmp = ''
+	lookup = set([i for (i,char) in enumerate(data) if char=='*'])
+	for (i,char) in enumerate(data):
+		if i in lookup or i-1 in lookup: continue
+		length = ord(data[i+2])-28 if i+1 in lookup else 1
+		tmp += char * length
+	return tmp
+
 def packet_T_to_dict(data, lookup_reg={}):
 	# map the info to a context dictionary
 	context = {}
@@ -156,16 +168,7 @@ def packet_T_to_dict(data, lookup_reg={}):
 			assert(0)
 
 		(key, val) = key_vals.split(':')
-
-		# un-RLE
-		if '*' in val:
-			tmp = ''
-			lookup = set([i for (i,char) in enumerate(val) if char=='*'])
-			for (i,char) in enumerate(val):
-				if i in lookup or i-1 in lookup: continue
-				length = ord(val[i+2])-28 if i+1 in lookup else 1
-				tmp += char * length
-			val = tmp
+		val = un_rle(val)
 
 		if key == 'thread':
 			context['thread'] = int(val, 16)
