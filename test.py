@@ -242,8 +242,9 @@ if __name__ == '__main__':
 	assert rips[0] != rips[1] # thread at WaitForMultipleObjects()/pthread_join() should be different
 	print('switching to bad thread')
 	assert_general_error(lambda: adapter.thread_select(999))
-	print('scheduling break in .5 seconds')
-	threading.Timer(.5, break_into, [adapter]).start()
+	secs = .5
+	print('scheduling break in %d second(s)' % secs)
+	threading.Timer(secs, break_into, [adapter]).start()
 	print('going')
 	adapter.go()
 	print('back')

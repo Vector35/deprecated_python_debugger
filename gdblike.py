@@ -31,8 +31,8 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		# address -> True
 		self.breakpoints = {}
 
-		# thread state
-		self.thread_idx_selected = None
+		# client tracks selected thread
+		self.tid = None
 
 	#--------------------------------------------------------------------------
 	# API
@@ -81,25 +81,32 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		return result
 
 	def thread_selected(self):
-		reply = rsp.tx_rx(self.sock, '?')
-		context = rsp.packet_T_to_dict(reply)
-		if not 'thread' in context:
-			raise DebugAdapter.GeneralError("setting thread on server after '?' packet")
-		return context.get('thread')
+		if self.tid == None:
+			return None
+
+		if rsp.tx_rx(self.sock, 'T%X'%self.tid) != 'OK':
+			self.tid == None
+
+		return self.tid
 
 	def thread_select(self, tid):
-		if not tid in self.thread_list():
-			raise DebugAdapter.GeneralError("tid 0x%X is not in threads list" % tid)
+		if rsp.tx_rx(self.sock, 'T%X'%self.tid) != 'OK':
+			raise DebugAdapter.GeneralError("tid 0x%X is not alive" % tid)
 
 		self.reg_cache = {}
 
 		# set thread for step and continue operations
 		payload = 'Hc%x' % tid
-		reply = rsp.tx_rx(self.sock, payload, 'ack_then_ok')
+		if rsp.tx_rx(self.sock, payload) != 'OK':
+			raise DebugAdapter.GeneralError('setting tid 0x%X for step and continue' % tid)
 
 		# set thread for other operations
 		payload = 'Hg%x' % tid
-		reply = rsp.tx_rx(self.sock, payload, 'ack_then_ok')
+		if rsp.tx_rx(self.sock, payload) != 'OK':
+			raise DebugAdapter.GeneralError('setting tid 0x%X for other operations' % tid)
+
+		#
+		self.tid = tid
 
 	# breakpoints
 	def breakpoint_set(self, addr):
@@ -241,15 +248,21 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go(self):
 		self.reg_cache = {}
-		return self.go_generic('c', handler_async_pkt)
+		#return self.go_generic('c', handler_async_pkt)
+		rc = self.go_generic('vCont;c:-1', handler_async_pkt)
+		self.set_thread_after_stop()
+		return rc
 
 	def step_into(self):
 		self.reg_cache = {}
-		return self.go_generic('vCont;s', handler_async_pkt)
+		rc = self.go_generic('vCont;s', handler_async_pkt)
+		self.set_thread_after_stop()
+		return rc
 
 	def step_over(self):
 		# gdb, lldb just doesn't have this, you must synthesize it yourself
 		self.reg_cache = {}
+		self.set_thread_after_stop()
 		raise NotImplementedError('step over')
 
 	#--------------------------------------------------------------------------
@@ -272,4 +285,11 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			if not reply: break
 
 		return result
+
+	def set_thread_after_stop(self):
+		reply = rsp.tx_rx(self.sock, '?')
+		context = rsp.packet_T_to_dict(reply)
+		if not 'thread' in context:
+			raise DebugAdapter.GeneralError('determing thread responsible for stop')
+		self.tid = context.get('thread')
 
