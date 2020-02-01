@@ -73,9 +73,6 @@ def tx_rx(sock, data, expect='ack_then_reply', handler_async_pkt=None):
 
 	if expect == 'nothing':
 		reply = ''
-	elif expect == 'ack_then_nothing':
-		assert_ack(sock)
-		reply = ''
 	elif expect == 'ack_then_reply':
 		assert_ack(sock)
 		reply = recv_packet_data(sock)
@@ -107,6 +104,10 @@ def tx_rx(sock, data, expect='ack_then_reply', handler_async_pkt=None):
 		assert_ack(sock)
 		reply = recv_packet_data(sock)
 		assert reply == 'OK'
+	elif expect == 'ack_then_empty':
+		assert_ack(sock)
+		reply = recv_packet_data(sock)
+		assert reply == ''
 	else:
 		print('dunno how to expect %s' % expect)
 

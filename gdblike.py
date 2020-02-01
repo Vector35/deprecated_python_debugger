@@ -34,9 +34,6 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		# thread state
 		self.thread_idx_selected = None
 
-		#
-		self.last_api_call = ''
-
 	#--------------------------------------------------------------------------
 	# API
 	#--------------------------------------------------------------------------
@@ -44,16 +41,13 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	# session start/stop
 	def exec(self, path):
 		# TODO: find/launch gdb/debugserver
-		self.last_api_call = 'exec'
 		pass
 
 	def attach(self, pid):
 		# TODO: find/launch gdb/debugserver
-		self.last_api_call = 'attach'
 		pass
 
 	def detach(self):
-		self.last_api_call = 'detach'
 		try:
 			rsp.send_packet_data(self.sock, 'D')
 			self.sock.shutdown(socket.SHUT_RDWR)
@@ -63,7 +57,6 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			pass
 
 	def quit(self):
-		self.last_api_call = 'quit'
 		try:
 			rsp.send_packet_data(self.sock, 'k')
 			self.sock.shutdown(socket.SHUT_RDWR)
@@ -74,11 +67,9 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 	# threads
 	def thread_list(self):
-		self.last_api_call = 'thread_list'
 		raise NotImplementedError("subclass should implement this")
 
 	def thread_selected(self):
-		self.last_api_call = 'thread_selected'
 		reply = rsp.tx_rx(self.sock, '?', 'ack_then_reply')
 		context = rsp.packet_T_to_dict(reply)
 		if not 'thread' in context:
@@ -86,9 +77,10 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		return context.get('thread')
 
 	def thread_select(self, tid):
-		self.last_api_call = 'thread_select'
 		if not tid in self.thread_list():
 			raise DebugAdapter.GeneralError("tid 0x%X is not in threads list" % tid)
+
+		self.reg_cache = {}
 
 		# set thread for step and continue operations
 		payload = 'Hc%x' % tid
@@ -100,7 +92,6 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 	# breakpoints
 	def breakpoint_set(self, addr):
-		self.last_api_call = 'breakpoint_set'
 		if addr in self.breakpoints:
 			raise DebugAdapter.BreakpointSetError("breakpoint set at 0x%X already exists" % addr)
 
@@ -112,7 +103,6 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		return 0
 
 	def breakpoint_clear(self, addr):
-		self.last_api_call = 'breakpoint_clear'
 		if not addr in self.breakpoints:
 			raise DebugAdapter.BreakpointClearError("breakpoint clear at 0x%X doesn't exist" % addr)
 
@@ -125,19 +115,15 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		return 0
 
 	def breakpoint_list(self):
-		self.last_api_call = 'breakpoint_list'
 		return self.breakpoints
 
 	# register
 	def reg_read(self, name):
-		cache_clean = (self.last_api_call == 'reg_read')
-
-		self.last_api_call = 'reg_read'
-
 		if not name in self.reg_info:
 			raise DebugAdapter.GeneralError("requested register %s doesnt exist" % name)
 
-		if name in self.reg_cache and cache_clean:
+		if name in self.reg_cache:
+			print('RETURNING CACHED VALUE! %s = 0x%X' % (name, self.reg_cache[name]))
 			return self.reg_cache[name]
 
 		# see if gdb will respond to a single register query
@@ -157,31 +143,45 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		return self.reg_cache[name]
 
 	def reg_write(self, name, value):
-		self.last_api_call = 'reg_write'
-		if not name in self.reg_name_to_id:
+		if not name in self.reg_info:
 			raise DebugAdapter.GeneralError("requested register %s doesnt exist" % name)
 
-		id_ = self.reg_name_to_id[name]
+		del self.reg_cache[name]
 
-		valstr = '%016x'%value
+		width = self.reg_info[name]['width']
+		fmtstrs = {8:'%02X', 16:'%04X', 32:'%08X', 64:'%016X'}
+		valstr = fmtstrs[width] % value
 		valstr = [valstr[i:i+2] for i in range(0,len(valstr),2)]
 		valstr = ''.join(reversed(valstr))
-		payload = 'P %d=%s' % (id_, valstr)
-		reply = rsp.tx_rx(self.sock, payload, 'ack_then_ok')
+
+		# see if gdb will respond to a single register set
+		payload = 'P%d=%s' % (self.reg_info[name]['id'], valstr)
+		reply = rsp.tx_rx(self.sock, payload)
+		if reply != '':
+			return
+
+		# otherwise, do a general purpose register query, followed by a set
+		blob = rsp.tx_rx(self.sock, 'g')
+		offset = self.reg_info[name].get('offset')
+		if offset == None:
+			raise DebugAdapter.GeneralError('requested register %s doesnt have offset' % name)
+		a = 2*(offset//8)
+		b = 2*((offset+width)//8)
+		payload = 'G'+blob[0:a]+valstr+blob[b:]
+		reply = rsp.tx_rx(self.sock, payload)
+		if reply != 'OK':
+			raise DebugAdapter.GeneralError('setting register %s' % name)
 
 	def reg_list(self):
-		self.last_api_call = 'reg_list'
 		return self.reg_info.keys()
 
 	def reg_bits(self, name):
-		self.last_api_call = 'reg_bits'
 		if not name in self.reg_info:
 			raise DebugAdapter.GeneralError("requested register %s doesnt exist" % name)
 		return int(self.reg_info[name]['width'])
 
 	# mem
 	def mem_read(self, address, length):
-		self.last_api_call = 'mem_read'
 		packed = b''
 
 		while(length):
@@ -202,7 +202,6 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		return packed
 
 	def mem_write(self, address, data):
-		self.last_api_call = 'mem_write'
 		payload = 'M%X,%X:%s' % (address, len(data), ''.join(['%02X'%b for b in data]))
 		reply = rsp.tx_rx(self.sock, payload, 'ack_then_reply')
 		if reply != 'OK':
@@ -210,7 +209,6 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			return 0
 
 	def mem_modules(self):
-		self.last_api_call = 'mem_modules'
 		module2addr = {}
 		reply = rsp.tx_rx(self.sock, 'jGetLoadedDynamicLibrariesInfos:{"fetch_all_solibs":true}')
 		for (addr, path) in re.findall(r'"load_address":(\d+).*?"pathname":"([^"]+)"', reply):
@@ -220,63 +218,47 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 	# break
 	def break_into(self):
-		self.last_api_call = 'break_into'
 		rsp.send_raw(self.sock, '\x03')
 		# TODO: detect error
 		return True
 
 	def break_reason(self):
-		self.last_api_call = 'break_reason'
 		pkt_T = rsp.tx_rx(self.sock, '?', 'ack_then_reply')
 		#print(pkt_T)
 
 	# execution control, all return:
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go(self):
-		self.last_api_call = 'go'
+		self.reg_cache = {}
 		return self.go_generic('c', handler_async_pkt)
 
 	def step_into(self):
-		self.last_api_call = 'step_into'
+		self.reg_cache = {}
 		return self.go_generic('vCont;s', handler_async_pkt)
 
 	def step_over(self):
 		# gdb, lldb just doesn't have this, you must synthesize it yourself
-		self.last_api_call = 'step_over'
+		self.reg_cache = {}
 		raise NotImplementedError('step over')
 
 	#--------------------------------------------------------------------------
 	# helpers, NOT part of the API
 	#--------------------------------------------------------------------------
 	def general_read_registers(self):
-		reply = rsp.tx_rx(self.sock, 'g')
-
-		# map register id to bit width
-		id2width = {v['id']: v['width'] for v in self.reg_info.values()}
-		id_max = max(id2width.keys())
-
-		# build map register id -> bit offset within registers blob
-		id2offs = {}
-		offset = 0
-		for i in range(id_max):
-			if not i in id2width: # non-sequential id, can't know offset
-				break
-			id2offs[i] = offset
-			offset += id2width[i]
-
-		#
 		result = {}
-		id2name = {self.reg_info[k]['id']: k for k in self.reg_info.keys()}
-		id_max = max(id2offs.keys())
-		for i in range(id_max):
-			slice_lo = 2*(id2offs[i]//8)
-			slice_hi = 2*((id2offs[i] + id2width[i])//8)
-			# TODO: exception if bits aren't multiple of 8
-			# TODO: exception if slice not within
-			valstr = reply[slice_lo:slice_hi]
-			assert len(valstr) % 2 == 0
-			# TODO: is gdb response always little end?
-			valstr = ''.join(reversed([valstr[2*i]+valstr[2*i+1] for i in range(len(valstr)//2)]))
-			result[id2name[i]] = int(valstr, 16)
+
+		id2reg = {self.reg_info[k]['id']: k for k in self.reg_info.keys()}
+		reply = rsp.tx_rx(self.sock, 'g')
+		for id_ in range(max(id2reg.keys())):
+			reg = id2reg.get(id_)
+			if reg == None: break
+			width = self.reg_info[reg]['width']
+			nchars = 2*(width//8)
+			valstr = reply[0:nchars]
+			valstr = ''.join(reversed([valstr[i:i+2] for i in range(0,len(valstr),2)]))
+			result[reg] = int(valstr, 16)
+			reply = reply[nchars:]
+			if not reply: break
 
 		return result
+
