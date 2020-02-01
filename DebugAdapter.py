@@ -116,3 +116,6 @@ class DebugAdapter:
 	def step_over(self):
 		pass
 
+	# raw pass-thru (meaning depends on adapter)
+	def raw(self, data):
+		pass

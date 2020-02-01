@@ -123,7 +123,8 @@ if __name__ == '__main__':
 	#
 	# basic tests
 	#
-	for prog in test_progs:
+	#for prog in test_progs:
+	if False:
 		fpath = test_prog_to_fpath(prog)
 
 		data = get_file_data(fpath)
@@ -248,6 +249,16 @@ if __name__ == '__main__':
 	print('back')
 	print('checking for %d threads' % nthreads_expected)
 	assert len(adapter.thread_list()) == nthreads_expected
+	# ensure the rip's are in different locations (that the continue actually continued)
+	rips2 = []
+	for tid in tids:
+		adapter.thread_select(tid)
+		rip = adapter.reg_read('rip')
+		rips2.append(rip)
+	print('checking that at least one thread progressed')
+	print(' rips: ', rips)
+	print('rips2: ', rips2)
+	assert list(filter(lambda x: not x, [rips[i]==rips2[i] for i in range(len(rips))])) != []
 	print('done')
 	adapter.quit()
 

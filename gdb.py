@@ -106,15 +106,14 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		gdblike.DebugAdapterGdbLike.__init__(self, **kwargs)
 
 		# in gdb, do a dance so commands like qXfer will work
-		rsp.tx_rx(self.sock, 'Hgp0.0')
-		rsp.tx_rx(self.sock, 'qSupported:multiprocess+;swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;xmlRegisters=i386')
+		rsp.tx_rx(self.sock, 'Hg0')
+		# if 'multiprocess+' in list here, thread reply is like 'pX.Y' where X is core id, Y is thread id
+		rsp.tx_rx(self.sock, 'qSupported:swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;xmlRegisters=i386')
 		self.reg_info_load()
 
 	#--------------------------------------------------------------------------
 	# API
 	#--------------------------------------------------------------------------
-	def thread_list(self):
-		pass
 
 	#--------------------------------------------------------------------------
 	# helpers, NOT part of the API
@@ -229,3 +228,6 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 
 		except rsp.RspDisconnected:
 			return (DebugAdapter.BACKEND_DISCONNECTED, None)
+
+	def raw(self, data):
+		return rsp.tx_rx(self.sock, data)

@@ -67,10 +67,21 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 	# threads
 	def thread_list(self):
-		raise NotImplementedError("subclass should implement this")
+		result = []
+		reply = rsp.tx_rx(self.sock, 'qfThreadInfo')
+		while 1:
+			if reply == 'l': break
+			if not reply.startswith('m'):
+				raise DebugAdapter.GeneralError("retrieving thread list from server after qfThreadInfo packet")
+			tids = reply[1:].split(',')
+			tids = list(map(lambda x: int(x,16), tids))
+			result += tids
+			reply = rsp.tx_rx(self.sock, 'qsThreadInfo')
+
+		return result
 
 	def thread_selected(self):
-		reply = rsp.tx_rx(self.sock, '?', 'ack_then_reply')
+		reply = rsp.tx_rx(self.sock, '?')
 		context = rsp.packet_T_to_dict(reply)
 		if not 'thread' in context:
 			raise DebugAdapter.GeneralError("setting thread on server after '?' packet")
@@ -96,7 +107,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			raise DebugAdapter.BreakpointSetError("breakpoint set at 0x%X already exists" % addr)
 
 		data = 'Z0,%x,1' % addr
-		reply = rsp.tx_rx(self.sock, data, 'ack_then_reply')
+		reply = rsp.tx_rx(self.sock, data)
 		if reply != 'OK':
 			raise DebugAdapter.BreakpointSetError('rsp replied: %s' % reply)
 		self.breakpoints[addr] = True
@@ -107,7 +118,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			raise DebugAdapter.BreakpointClearError("breakpoint clear at 0x%X doesn't exist" % addr)
 
 		data = 'z0,%x,1' % addr
-		reply = rsp.tx_rx(self.sock, data, 'ack_then_reply')
+		reply = rsp.tx_rx(self.sock, data)
 		if reply != 'OK':
 			raise DebugAdapter.BreakpointClearError("rsp replied: %s" % reply)
 
@@ -123,12 +134,12 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			raise DebugAdapter.GeneralError("requested register %s doesnt exist" % name)
 
 		if name in self.reg_cache:
-			print('RETURNING CACHED VALUE! %s = 0x%X' % (name, self.reg_cache[name]))
+			#print('RETURNING CACHED VALUE! %s = 0x%X' % (name, self.reg_cache[name]))
 			return self.reg_cache[name]
 
 		# see if gdb will respond to a single register query
 		id_ = self.reg_info[name]['id']
-		reply = rsp.tx_rx(self.sock, 'p%02x' % id_, 'ack_then_reply')
+		reply = rsp.tx_rx(self.sock, 'p%02x' % id_)
 		if reply != '':
 			val = int(''.join(reversed([reply[i:i+2] for i in range(0,len(reply),2)])), 16)
 			self.reg_cache[name] = val # cache result
@@ -188,7 +199,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			chunk = min(length, 256)
 
 			data = 'm' + ("%x" % address) + ',' + ("%x" % chunk)
-			reply = rsp.tx_rx(self.sock, data, 'ack_then_reply')
+			reply = rsp.tx_rx(self.sock, data)
 			if reply.startswith('E'): # error 'E' differentiated from hex 'e' by case
 				# and len(reply)==3:
 				raise DebugAdapter.GeneralError('reading from address 0x%X' % address)
@@ -203,7 +214,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 	def mem_write(self, address, data):
 		payload = 'M%X,%X:%s' % (address, len(data), ''.join(['%02X'%b for b in data]))
-		reply = rsp.tx_rx(self.sock, payload, 'ack_then_reply')
+		reply = rsp.tx_rx(self.sock, payload)
 		if reply != 'OK':
 			raise DebugAdapter.GeneralError('writing to address 0x%X' % address)
 			return 0
@@ -223,7 +234,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		return True
 
 	def break_reason(self):
-		pkt_T = rsp.tx_rx(self.sock, '?', 'ack_then_reply')
+		pkt_T = rsp.tx_rx(self.sock, '?')
 		#print(pkt_T)
 
 	# execution control, all return:

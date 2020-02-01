@@ -187,6 +187,8 @@ if __name__ == '__main__':
 			#	reply = tx_rx(text[7:])
 			elif text == 'test':
 				adapter.test()
+			elif text.startswith('raw '):
+				print(adapter.raw(text[4:]))	
 
 			# thread list, thread switch
 			elif text in ['~', 'threads']:
