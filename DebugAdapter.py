@@ -44,6 +44,9 @@ class STOP_REASON(Enum):
 	SIGNAL_INFO = auto()
 	SIGNAL_USR1 = auto()
 	SIGNAL_USR2 = auto()
+	SIGNAL_STKFLT = auto()
+	SIGNAL_BUX = auto()
+	SIGNAL_POLL = auto()
 
 class DebugAdapter:
 	# session start/stop
