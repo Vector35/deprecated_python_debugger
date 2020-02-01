@@ -154,13 +154,19 @@ def un_rle(data):
 	if not '*' in data:
 		return data
 
-	tmp = ''
-	lookup = set([i for (i,char) in enumerate(data) if char=='*'])
+	skip = 0
+	result = ''
 	for (i,char) in enumerate(data):
-		if i in lookup or i-1 in lookup: continue
-		length = ord(data[i+2])-28 if i+1 in lookup else 1
-		tmp += char * length
-	return tmp
+		if skip:
+			skip = False
+		elif char == '*':
+			repeat = ord(data[i+1])-29
+			result = result + result[-1]*repeat
+			skip = True
+		else:
+			result += char
+
+	return result
 
 def packet_T_to_dict(data, lookup_reg={}):
 	# map the info to a context dictionary
