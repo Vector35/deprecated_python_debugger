@@ -3,6 +3,7 @@ import binaryninjaui
 from binaryninja import BinaryView, SegmentFlag
 
 from . import binjaplug
+from . import DebugAdapter
 
 """
 The debug memory BinaryView layout is in a few pieces:
@@ -17,6 +18,8 @@ class DebugProcessView(BinaryView):
 		self.local_view = parent
 		self.remote_base = 0
 		BinaryView.__init__(self, parent_view=self.memory, file_metadata=self.memory.file)
+		self.arch = parent.arch
+		self.platform = parent.platform
 
 		# TODO: Read segments from debugger
 		length = self.memory.perform_get_length()
@@ -98,6 +101,8 @@ class DebugMemoryView(BinaryView):
 	def __init__(self, parent):
 		BinaryView.__init__(self, parent_view=parent, file_metadata=parent.file)
 		self.value_cache = {}
+		self.arch = parent.arch
+		self.platform = parent.platform
 
 	def perform_get_address_size(self):
 		return self.parent_view.arch.address_size
@@ -117,9 +122,13 @@ class DebugMemoryView(BinaryView):
 		# Cache reads (will be cleared whenever view is marked dirty)
 		if addr in self.value_cache.keys():
 			return self.value_cache[addr]
-		value = adapter.mem_read(addr, length)
-		self.value_cache[addr] = value
-		return value
+		try:
+			value = adapter.mem_read(addr, length)
+			self.value_cache[addr] = value
+			return value
+		except DebugAdapter.GeneralError as e:
+			# Probably disconnected; can't read
+			return None
 	
 	def perform_write(self, addr, data):
 		adapter = binjaplug.get_state(self.parent_view).adapter
@@ -127,9 +136,13 @@ class DebugMemoryView(BinaryView):
 			return 0
 		# Assume any memory change invalidates all of memory (suboptimal, may not be necessary)
 		self.mark_dirty()
-		if adapter.mem_write(addr, data) == 0:
-			return len(data)
-		else:
+		try:
+			if adapter.mem_write(addr, data) == 0:
+				return len(data)
+			else:
+				return 0
+		except DebugAdapter.GeneralError as e:
+			# Probably disconnected
 			return 0
 	
 	def perform_is_executable(self):
