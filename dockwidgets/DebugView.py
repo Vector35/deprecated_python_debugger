@@ -6,7 +6,7 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, Q
 import binaryninja
 import binaryninjaui
 from binaryninja import BinaryView
-from binaryninjaui import View, ViewType, UIActionHandler, LinearView, DisassemblyContainer, ViewFrame
+from binaryninjaui import View, ViewType, UIAction, UIActionHandler, LinearView, DisassemblyContainer, ViewFrame
 
 from . import widget, ControlsWidget
 from .. import binjaplug
@@ -31,8 +31,17 @@ class DebugView(QWidget, View):
 		frame = ViewFrame.viewFrameForWidget(self)
 		self.memory_editor = LinearView(memory_view, frame)
 		self.binary_editor = DisassemblyContainer(frame, data, frame)
-		self.actionHandler = UIActionHandler()
-		self.actionHandler.setupActionHandler(self)
+		
+		# TODO: Handle these and change views accordingly
+		# Currently they are just disabled as the DisassemblyContainer gets confused
+		# about where to go and just shows a bad view
+		self.binary_editor.getDisassembly().actionHandler().bindAction("View in Hex Editor", UIAction())
+		self.binary_editor.getDisassembly().actionHandler().bindAction("View in Linear Disassembly", UIAction())
+		self.binary_editor.getDisassembly().actionHandler().bindAction("View in Types View", UIAction())
+		
+		self.memory_editor.actionHandler().bindAction("View in Hex Editor", UIAction())
+		self.memory_editor.actionHandler().bindAction("View in Disassembly Graph", UIAction())
+		self.memory_editor.actionHandler().bindAction("View in Types View", UIAction())
 
 		small_font = QApplication.font()
 		small_font.setPointSize(11)
