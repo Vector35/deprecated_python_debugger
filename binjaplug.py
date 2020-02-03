@@ -112,7 +112,7 @@ def context_display(bv):
 		})
 	adapter.thread_select(tid_selected)
 	threads_widget.notifyThreadsChanged(threads)
-	debug_state.debug_view.controls.setThreadList(threads)
+	debug_state.debug_view.controls.set_thread_list(threads)
 
 	#----------------------------------------------------------------------
 	# Update Stack
@@ -191,7 +191,7 @@ def context_display(bv):
 		statusText = 'STOPPED (outside view)'
 		print('address 0x%X outside of binary view, not setting cursor' % remote_rip)
 
-	state_stopped(bv, statusText)
+	debug_state.debug_view.controls.state_stopped(statusText)
 
 	#data = adapter.mem_read(rip, 16)
 	#if data:
@@ -325,86 +325,6 @@ def del_breakpoint_tags(bv, local_addresses=None):
 				func.remove_user_address_tag(local_address, tag)
 	update_highlights(bv)
 
-def buttons_xable(bv, **kwargs):
-	controls = get_state(bv).debug_view.controls
-	if controls is not None:
-		controls.setActionsEnabled(**kwargs)
-
-def buttons_set_default(bv, default):
-	controls = get_state(bv).debug_view.controls
-	if controls is not None:
-		controls.setDefaultProcessAction(default)
-
-def debug_status(bv, message):
-	controls = get_state(bv).debug_view.controls
-	if controls is not None:
-		controls.editStatus.setText(message)
-
-def state_inactive(bv, msg=None):
-	debug_state = get_state(bv)
-
-	# clear breakpoints
-	del_breakpoint_tags(bv)
-	debug_state.breakpoints = {}
-
-	debug_state.state = 'INACTIVE'
-	debug_status(bv, msg or debug_state.state)
-	buttons_xable(bv, Starting=True, Stopping=False, Stepping=False, Break=False, Resume=False, Threads=False)
-	buttons_set_default(bv, "Run")
-	if debug_state.debug_view is not None:
-		debug_state.debug_view.controls.setThreadList([])
-		debug_state.debug_view.controls.setResumeBreakAction("Break")
-
-def state_stopped(bv, msg=None):
-	debug_state = get_state(bv)
-	debug_state.state = 'STOPPED'
-	debug_status(bv, msg or debug_state.state)
-	buttons_xable(bv, Starting=False, Stopping=True, Stepping=True, Break=True, Resume=True, Threads=True)
-	buttons_set_default(bv, "Quit")
-	if debug_state.debug_view is not None:
-		debug_state.debug_view.controls.setResumeBreakAction("Resume")
-
-def state_running(bv, msg=None):
-	debug_state = get_state(bv)
-	debug_state.state = 'RUNNING'
-	debug_status(bv, msg or debug_state.state)
-	buttons_xable(bv, Starting=False, Stopping=True, Stepping=False, Break=True, Resume=False, Threads=False)
-	buttons_set_default(bv, "Quit")
-	if debug_state.debug_view is not None:
-		debug_state.debug_view.controls.setResumeBreakAction("Break")
-
-def state_busy(bv, msg=None):
-	debug_state = get_state(bv)
-	debug_state.state = 'RUNNING'
-	debug_status(bv, msg or debug_state.state)
-	buttons_xable(bv, Starting=False, Stopping=True, Stepping=False, Break=True, Resume=False, Threads=False)
-	buttons_set_default(bv, "Quit")
-	if debug_state.debug_view is not None:
-		debug_state.debug_view.controls.setResumeBreakAction("Break")
-
-def state_error(bv, msg=None):
-	debug_state = get_state(bv)
-	debug_state.state = 'ERROR'
-	debug_status(bv, msg or debug_state.state)
-	buttons_xable(bv, Run=True, Restart=True, Quit=True, Attach=True, Detach=True, Break=True, Resume=True, StepInto=True, StepOver=True, StepReturn=True, Threads=True)
-	buttons_set_default(bv, "Run")
-	if debug_state.debug_view is not None:
-		debug_state.debug_view.controls.setThreadList([])
-		debug_state.debug_view.controls.setResumeBreakAction("Resume")	
-
-def handle_stop_return(bv, reason, data):
-	if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
-		state_stopped(bv, 'stdout: '+data)
-		context_display(bv)
-	elif reason == DebugAdapter.STOP_REASON.PROCESS_EXITED:
-		debug_quit(bv)
-		state_inactive(bv, 'process exited, return code=%d' % data)
-	elif reason == DebugAdapter.STOP_REASON.BACKEND_DISCONNECTED:
-		debug_quit(bv)
-		state_inactive(bv, 'backend disconnected (process exited?)')
-	else:
-		context_display(bv)
-
 #------------------------------------------------------------------------------
 # DEBUGGER FUNCTIONS (MEDIUM LEVEL, BLOCKING)
 #------------------------------------------------------------------------------
@@ -426,16 +346,11 @@ def debug_run(bv):
 		local_entry = bv.entry_point
 		remote_entry = debug_state.memory_view.local_addr_to_remote(local_entry)
 		debug_breakpoint_set(bv, remote_entry)
-		bv.navigate(bv.file.view, local_entry)
-
-	state_stopped(bv)
-	context_display(bv)
-	memory_dirty(bv)
 
 def debug_quit(bv):
 	debug_state = get_state(bv)
 	adapter = debug_state.adapter
-	if adapter:
+	if adapter is not None:
 		try:
 			adapter.quit()
 		except BrokenPipeError:
@@ -446,8 +361,6 @@ def debug_quit(bv):
 			pass
 		finally:
 			debug_state.adapter = None
-	state_inactive(bv)
-	memory_dirty(bv)
 
 def debug_restart(bv):
 	debug_quit(bv)
@@ -457,18 +370,17 @@ def debug_restart(bv):
 def debug_detach(bv):
 	debug_state = get_state(bv)
 	adapter = debug_state.adapter
-	assert adapter
-	try:
-		adapter.detach()
-	except BrokenPipeError:
-		pass
-	except ConnectionResetError:
-		pass
-	except OSError:
-		pass
-	finally:
-		debug_state.adapter = None
-	state_inactive(bv)
+	if adapter is not None:
+		try:
+			adapter.detach()
+		except BrokenPipeError:
+			pass
+		except ConnectionResetError:
+			pass
+		except OSError:
+			pass
+		finally:
+			debug_state.adapter = None
 
 def debug_break(bv):
 	adapter = get_state(bv).adapter
