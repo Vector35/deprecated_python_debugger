@@ -57,7 +57,7 @@ def parse_image(fpath):
 						name = data[o_scn+0:o_scn+16]
 						#print('__TEXT section %d: %s' % (i, name))
 						if name == b'__text\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00':
-							entryoff2 = unpack('<I', data[o_scn+0x20:o_scn+0x24])[0]
+							entryoff2 = unpack('<I', data[o_scn+0x30:o_scn+0x34])[0]
 							break;
 						o_scn += 0x50
 
@@ -72,7 +72,7 @@ def parse_image(fpath):
 		if entryoff1 == None and entryoff2 == None:
 			raise Exception('couldn\'t locate entry_point_command in macho (where main is)' % fpath)
 
-		entryoff == entryoff1 or entryoff2
+		entryoff = entryoff1 or entryoff2
 		return (vmaddr, entryoff)
 
 	# PE
@@ -122,6 +122,38 @@ def assert_general_error(func):
 		raised = True
 	assert raised
 
+def test_prologue(prog):
+	fpath = test_prog_to_fpath(prog)
+
+	print('----------------------------------------------------------------')
+	print('ASSEMBLER test on %s' % fpath)
+	print('----------------------------------------------------------------')
+
+	(load_addr, entry_offs) = parse_image(fpath)
+	entry = load_addr + entry_offs
+	print('(file) load addr: 0x%X' % load_addr)
+	print('(file) entry offset: 0x%X' % entry_offs)
+
+	print('launching')
+	adapter = helpers.launch_get_adapter(fpath)
+
+	# learn load address, entrypoint
+	#
+	module2addr = adapter.mem_modules()
+	assert fpath in module2addr
+	if not '_pie' in prog:
+		print('non-pie module should hold file\'s specified load and entry')
+		print('load_addr: 0x%X' % load_addr)
+		print('module2addr[fpath]: 0x%X' % module2addr[fpath])
+		assert module2addr[fpath] == load_addr
+	else:
+		load_addr = module2addr[fpath]
+		print('pie module, file load 0x%X overridden with 0x%X, new entry 0x%X' %
+			(load_addr, module2addr[fpath], module2addr[fpath]+entry_offs))
+		entry = load_addr + entry_offs
+
+	return (adapter, entry)
+
 #------------------------------------------------------------------------------
 # MAIN
 #------------------------------------------------------------------------------
@@ -131,7 +163,7 @@ if __name__ == '__main__':
 
 	# one-off tests
 	if arg == 'oneoff':
-		fpath = test_prog_to_fpath('helloworld_func_pie')
+		fpath = test_prog_to_fpath('asmtest')
 		print(fpath)
 		(load_addr, entry_offs) = parse_image(fpath)
 		print('load_addr: 0x%X' % load_addr)
@@ -139,7 +171,7 @@ if __name__ == '__main__':
 		sys.exit(0)
 
 	tests = []
-	if arg in ['asm', 'assembly', 'assembler']:
+	if arg in ['asm', 'assembly', 'assembler', 'asmtest']:
 		tests = ['assembly']
 	elif arg in ['thread', 'threads', 'threading']:
 		tests = ['thread']
@@ -148,39 +180,17 @@ if __name__ == '__main__':
 	else:
 		tests = ['assembly', 'thread', 'basic']
 
+	if 'assembly' in tests:
+		(adapter, entry) = test_prologue('asmtest')
+		adapter.quit()
+
 	if 'basic' in tests:
-		for prog in ['helloworld', 'helloworld_loop', 'helloworld_thread', 'helloworld_func',
-			'helloworld_pie', 'helloworld_thread_pie', 'helloworld_loop_pie', 'helloworld_func_pie',
+		for prog in ['asmtest', 'helloworld', 'helloworld_loop', 'helloworld_thread',
+			'helloworld_func', 'helloworld_pie', 'helloworld_thread_pie',
+			'helloworld_loop_pie', 'helloworld_func_pie',
 			]:
 
-			fpath = test_prog_to_fpath(prog)
-
-			print('----------------------------------------------------------------')
-			print('BASIC test on %s' % fpath)
-			print('----------------------------------------------------------------')
-
-			(load_addr, entry_offs) = parse_image(fpath)
-			entry = load_addr + entry_offs
-			print('(file) load addr: 0x%X' % load_addr)
-			print('(file) entry offset: 0x%X' % entry_offs)
-
-			print('launching')
-			adapter = helpers.launch_get_adapter(fpath)
-
-			# learn load address, entrypoint
-			#
-			module2addr = adapter.mem_modules()
-			print(module2addr)
-			print(fpath)
-			assert fpath in module2addr
-			if not '_pie' in prog:
-				print('non-pie module should hold file\'s specified load and entry')
-				assert module2addr[fpath] == load_addr
-			else:
-				load_addr = module2addr[fpath]
-				print('pie module, file load 0x%X overridden with 0x%X, new entry 0x%X' %
-					(load_addr, module2addr[fpath], module2addr[fpath]+entry_offs))
-				entry = load_addr + entry_offs
+			(adapter, entry) = test_prologue(prog)
 
 			print('rip: 0x%X' % adapter.reg_read('rip'))
 
@@ -261,13 +271,8 @@ if __name__ == '__main__':
 			adapter = None
 
 	if 'thread' in tests:
-		fpath = test_prog_to_fpath('helloworld_thread')
+		(adapter, entry) = test_prologue('helloworld_thread')
 
-		print('----------------------------------------------------------------')
-		print('BASIC test on %s' % fpath)
-		print('----------------------------------------------------------------')
-
-		adapter = helpers.launch_get_adapter(fpath)
 		print('scheduling break in .5 seconds')
 		threading.Timer(.5, break_into, [adapter]).start()
 		print('going')
