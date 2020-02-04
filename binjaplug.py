@@ -19,20 +19,6 @@ from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, Thread
 # globals
 #------------------------------------------------------------------------------
 
-class DebuggerState:
-	def __init__(self, bv):
-		self.bv = bv
-		self.adapter = None
-		self.state = 'INACTIVE'
-		# address -> adapter id
-		self.breakpoints = {}
-		self.memory_view = ProcessView.DebugProcessView(bv)
-		self.old_symbols = []
-		self.old_dvs = set()
-		self.last_rip = 0
-
-	states = []
-
 def get_state(bv):
 	# Try to find an existing state object
 	for state in DebuggerState.states:
@@ -305,12 +291,19 @@ def update_breakpoints(bv):
 
 	bp_widget = widget.get_dockwidget(bv, "Breakpoints")
 	bp_widget.notifyBreakpointsChanged(bps)
-	
+
+def breakpoint_tag_add(bv, local_address):
+	# create tag
+	tt = bv.tag_types["Crashes"]
+	for func in bv.get_functions_containing(local_address):
+		tags = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
+		if len(tags) == 0:
+			tag = func.create_user_address_tag(local_address, tt, "breakpoint")
 
 # breakpoint TAG removal - strictly presentation
 # (doesn't remove actual breakpoints, just removes the binja tags that mark them)
 #
-def del_breakpoint_tags(bv, local_addresses=None):
+def breakpoint_tag_del(bv, local_addresses=None):
 	debug_state = get_state(bv)
 
 	if local_addresses == None:
@@ -323,281 +316,279 @@ def del_breakpoint_tags(bv, local_addresses=None):
 			delqueue = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
 			for tag in delqueue:
 				func.remove_user_address_tag(local_address, tag)
-	update_highlights(bv)
 
 #------------------------------------------------------------------------------
-# DEBUGGER FUNCTIONS (MEDIUM LEVEL, BLOCKING)
+# DEBUGGER STATE / CONTROLLER
+# 
+# Controller of the debugger for a single BinaryView
+# All functions block until completion or error
 #------------------------------------------------------------------------------
 
-def debug_run(bv):
-	fpath = bv.file.original_filename
+class DebuggerState:
+	states = []
 
-	if not os.path.exists(fpath):
-		raise Exception('cannot find debug target: ' + fpath)
+	def __init__(self, bv):
+		self.bv = bv
+		self.adapter = None
+		self.state = 'INACTIVE'
+		# address -> adapter id
+		self.breakpoints = {}
+		self.memory_view = ProcessView.DebugProcessView(bv)
+		self.old_symbols = []
+		self.old_dvs = set()
+		self.last_rip = 0
 
-	#adapter = lldb.DebugAdapterLLDB()
-	adapter = helpers.launch_get_adapter(fpath)
 
-	debug_state = get_state(bv)
-	debug_state.adapter = adapter
-	debug_state.memory_view.update_base()
+	#--------------------------------------------------------------------------
+	# DEBUGGER FUNCTIONS (MEDIUM LEVEL, BLOCKING)
+	#--------------------------------------------------------------------------
 
-	if bv and bv.entry_point:
-		local_entry = bv.entry_point
-		remote_entry = debug_state.memory_view.local_addr_to_remote(local_entry)
-		debug_breakpoint_set(bv, remote_entry)
+	def run(self):
+		fpath = self.bv.file.original_filename
 
-def debug_quit(bv):
-	debug_state = get_state(bv)
-	adapter = debug_state.adapter
-	if adapter is not None:
-		try:
-			adapter.quit()
-		except BrokenPipeError:
-			pass
-		except ConnectionResetError:
-			pass
-		except OSError:
-			pass
-		finally:
-			debug_state.adapter = None
+		if not os.path.exists(fpath):
+			raise Exception('cannot find debug target: ' + fpath)
 
-def debug_restart(bv):
-	debug_quit(bv)
-	time.sleep(1)
-	debug_run(bv) # sets state
+		#adapter = lldb.DebugAdapterLLDB()
+		adapter = helpers.launch_get_adapter(fpath)
 
-def debug_detach(bv):
-	debug_state = get_state(bv)
-	adapter = debug_state.adapter
-	if adapter is not None:
-		try:
-			adapter.detach()
-		except BrokenPipeError:
-			pass
-		except ConnectionResetError:
-			pass
-		except OSError:
-			pass
-		finally:
-			debug_state.adapter = None
+		self.adapter = adapter
+		self.memory_view.update_base()
 
-def debug_break(bv):
-	adapter = get_state(bv).adapter
-	assert adapter
-	adapter.break_into()
+		if self.bv and self.bv.entry_point:
+			local_entry = self.bv.entry_point
+			remote_entry = self.memory_view.local_addr_to_remote(local_entry)
+			self.breakpoint_set(remote_entry)
 
-def debug_go(bv):
-	debug_state = get_state(bv)
-	adapter = debug_state.adapter
-	assert adapter
+	def quit(self):
+		if self.adapter is not None:
+			try:
+				self.adapter.quit()
+			except BrokenPipeError:
+				pass
+			except ConnectionResetError:
+				pass
+			except OSError:
+				pass
+			finally:
+				self.adapter = None
 
-	remote_rip = adapter.reg_read('rip')
-	local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
-	bphere = local_rip in debug_state.breakpoints
+	def restart(self):
+		self.quit()
+		time.sleep(1)
+		self.run() # sets state
 
-	seq = []
-	if bphere:
-		seq.append((adapter.breakpoint_clear, (remote_rip,)))
-		seq.append((adapter.go, ()))
-		seq.append((adapter.breakpoint_set, (remote_rip,)))
-	else:
-		seq.append((adapter.go, ()))
+	def detach(self):
+		if self.adapter is not None:
+			try:
+				self.adapter.detach()
+			except BrokenPipeError:
+				pass
+			except ConnectionResetError:
+				pass
+			except OSError:
+				pass
+			finally:
+				self.adapter = None
 
-	return exec_adapter_sequence(adapter, seq)
+	def pause(self):
+		assert self.adapter
+		return self.adapter.break_into()
 
-def debug_step(bv):
-	debug_state = get_state(bv)
-	adapter = debug_state.adapter
-	assert adapter
+	def go(self):
+		assert self.adapter
 
-	(reason, data) = (None, None)
-
-	if bv.arch.name == 'x86_64':
-		remote_rip = adapter.reg_read('rip')
-		local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
-
-		# if currently a breakpoint at rip, temporarily clear it
-		# TODO: detect windbg adapter because dbgeng's step behavior might ignore breakpoint
-		# at current rip
+		remote_rip = self.adapter.reg_read('rip')
+		local_rip = self.memory_view.remote_addr_to_local(remote_rip)
+		bphere = local_rip in self.breakpoints
 
 		seq = []
-		if local_rip in debug_state.breakpoints:
-			seq.append((adapter.breakpoint_clear, (remote_rip,)))
-			seq.append((adapter.step_into, ()))
-			seq.append((adapter.breakpoint_set, (remote_rip,)))
+		if bphere:
+			seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
+			seq.append((self.adapter.go, ()))
+			seq.append((self.adapter.breakpoint_set, (remote_rip,)))
 		else:
-			seq.append((adapter.step_into, ()))
-		# TODO: Cancel (and raise some exception)
-		return exec_adapter_sequence(adapter, seq)
-	else:
-		raise NotImplementedError('step unimplemented for architecture %s' % bv.arch.name)
+			seq.append((self.adapter.go, ()))
 
-def debug_step_over(bv):
-	debug_state = get_state(bv)
-	adapter = debug_state.adapter
-	assert adapter
+		return self.exec_adapter_sequence(seq)
 
-	# TODO: detect windbg adapter because dbgeng has a builtin step_into() that we don't
-	# have to synthesize
-	if bv.arch.name == 'x86_64':
-		remote_rip = adapter.reg_read('rip')
-		local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
+	def step_into(self):
+		assert self.adapter
 
-		instxt = bv.get_disassembly(local_rip)
-		inslen = bv.get_instruction_length(local_rip)
-		local_ripnext = local_rip + inslen
-		remote_ripnext = remote_rip + inslen
+		(reason, data) = (None, None)
 
-		call = instxt.startswith('call ')
-		bphere = local_rip in debug_state.breakpoints
-		bpnext = local_ripnext in debug_state.breakpoints
+		if self.bv.arch.name == 'x86_64':
+			remote_rip = self.adapter.reg_read('rip')
+			local_rip = self.memory_view.remote_addr_to_local(remote_rip)
 
-		seq = []
-
-		if not call:
-			if bphere:
-				seq.append((adapter.breakpoint_clear, (remote_rip,)))
-				seq.append((adapter.step_into, ()))
-				seq.append((adapter.breakpoint_set, (remote_rip,)))
-			else:
-				seq.append((adapter.step_into, ()))
-		elif bphere and bpnext:
-			seq.append((adapter.breakpoint_clear, (remote_rip,)))
-			seq.append((adapter.go, ()))
-			seq.append((adapter.breakpoint_set, (remote_rip,)))
-		elif bphere and not bpnext:
-			seq.append((adapter.breakpoint_clear, (remote_rip,)))
-			seq.append((adapter.breakpoint_set, (remote_ripnext,)))
-			seq.append((adapter.go, ()))
-			seq.append((adapter.breakpoint_clear, (remote_ripnext,)))
-			seq.append((adapter.breakpoint_set, (remote_rip,)))
-		elif not bphere and bpnext:
-			seq.append((adapter.go, ()))
-		elif not bphere and not bpnext:
-			seq.append((adapter.breakpoint_set, (remote_ripnext,)))
-			seq.append((adapter.go, ()))
-			seq.append((adapter.breakpoint_clear, (remote_ripnext,)))
-		else:
-			raise Exception('confused by call, bphere, bpnext state')
-				# TODO: Cancel (and raise some exception)
-		return exec_adapter_sequence(adapter, seq)
-
-	else:
-		raise NotImplementedError('step over unimplemented for architecture %s' % bv.arch.name)
-
-def debug_step_return(bv):
-	debug_state = get_state(bv)
-	adapter = debug_state.adapter
-	assert adapter
-
-	if bv.arch.name == 'x86_64':
-		remote_rip = adapter.reg_read('rip')
-		local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
-		
-		# TODO: If we don't have a function loaded, walk the stack
-		funcs = bv.get_functions_containing(local_rip)
-		if len(funcs) != 0:
-			mlil = funcs[0].mlil
-			
-			bphere = local_rip in debug_state.breakpoints
-
-			# Set a bp on every ret in the function and go
-			old_bps = set()
-			new_bps = set()
-			for insn in mlil.instructions:
-				if insn.operation == binaryninja.MediumLevelILOperation.MLIL_RET or insn.operation == binaryninja.MediumLevelILOperation.MLIL_TAILCALL:
-					if insn.address in debug_state.breakpoints:
-						rets.add(debug_state.memory_view.local_addr_to_remote(insn.address))
-					else:
-						new_bps.add(debug_state.memory_view.local_addr_to_remote(insn.address))
+			# if currently a breakpoint at rip, temporarily clear it
+			# TODO: detect windbg adapter because dbgeng's step behavior might ignore breakpoint
+			# at current rip
 
 			seq = []
-			if bphere and not local_rip in new_bps and not local_rip in old_bps:
-				seq.append((adapter.breakpoint_clear, (remote_rip,)))
-			for bp in new_bps:
-				seq.append((adapter.breakpoint_set, (bp,)))
-			seq.append((adapter.go, ()))
-			for bp in new_bps:
-				seq.append((adapter.breakpoint_clear, (bp,)))
-			if bphere and not local_rip in new_bps and not local_rip in old_bps:
-				seq.append((adapter.breakpoint_set, (remote_rip,)))
-		# TODO: Cancel (and raise some exception)
-			return exec_adapter_sequence(adapter, seq)
+			if local_rip in self.breakpoints:
+				seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
+				seq.append((self.adapter.step_into, ()))
+				seq.append((self.adapter.breakpoint_set, (remote_rip,)))
+			else:
+				seq.append((self.adapter.step_into, ()))
+			# TODO: Cancel (and raise some exception)
+			return self.exec_adapter_sequence(seq)
 		else:
-			print("Can't find current function")
-			return (None, None)
+			raise NotImplementedError('step unimplemented for architecture %s' % self.bv.arch.name)
 
-	else:
-		raise NotImplementedError('step over unimplemented for architecture %s' % bv.arch.name)
+	def step_over(self):
+		assert self.adapter
 
+		# TODO: detect windbg adapter because dbgeng has a builtin step_into() that we don't
+		# have to synthesize
+		if self.bv.arch.name == 'x86_64':
+			remote_rip = self.adapter.reg_read('rip')
+			local_rip = self.memory_view.remote_addr_to_local(remote_rip)
 
-def debug_breakpoint_set(bv, remote_address):
-	debug_state = get_state(bv)
-	adapter = debug_state.adapter
-	assert adapter
+			instxt = self.bv.get_disassembly(local_rip)
+			inslen = self.bv.get_instruction_length(local_rip)
+			local_ripnext = local_rip + inslen
+			remote_ripnext = remote_rip + inslen
 
-	if adapter.breakpoint_set(remote_address) != 0:
-		print('ERROR: breakpoint set failed')
-		return None
+			call = instxt.startswith('call ')
+			bphere = local_rip in self.breakpoints
+			bpnext = local_ripnext in self.breakpoints
 
-	local_address = debug_state.memory_view.remote_addr_to_local(remote_address)
+			seq = []
 
-	# create tag
-	tt = bv.tag_types["Crashes"]
-	for func in bv.get_functions_containing(local_address):
-		tags = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
-		if len(tags) == 0:
-			tag = func.create_user_address_tag(local_address, tt, "breakpoint")
+			if not call:
+				if bphere:
+					seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
+					seq.append((self.adapter.step_into, ()))
+					seq.append((self.adapter.breakpoint_set, (remote_rip,)))
+				else:
+					seq.append((self.adapter.step_into, ()))
+			elif bphere and bpnext:
+				seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
+				seq.append((self.adapter.go, ()))
+				seq.append((self.adapter.breakpoint_set, (remote_rip,)))
+			elif bphere and not bpnext:
+				seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
+				seq.append((self.adapter.breakpoint_set, (remote_ripnext,)))
+				seq.append((self.adapter.go, ()))
+				seq.append((self.adapter.breakpoint_clear, (remote_ripnext,)))
+				seq.append((self.adapter.breakpoint_set, (remote_rip,)))
+			elif not bphere and bpnext:
+				seq.append((self.adapter.go, ()))
+			elif not bphere and not bpnext:
+				seq.append((self.adapter.breakpoint_set, (remote_ripnext,)))
+				seq.append((self.adapter.go, ()))
+				seq.append((self.adapter.breakpoint_clear, (remote_ripnext,)))
+			else:
+				raise Exception('confused by call, bphere, bpnext state')
+					# TODO: Cancel (and raise some exception)
+			return self.exec_adapter_sequence(seq)
 
-	# save it
-	debug_state.breakpoints[local_address] = True
-	print('breakpoint address=0x%X (remote=0x%X) set' % (local_address, remote_address))
-	update_highlights(bv)
-	update_breakpoints(bv)
-
-	return 0
-
-def debug_breakpoint_clear(bv, remote_address):
-	debug_state = get_state(bv)
-	adapter = debug_state.adapter
-	assert adapter
-
-	local_address = debug_state.memory_view.remote_addr_to_local(remote_address)
-
-	# find/remove address tag
-	if local_address in debug_state.breakpoints:
-		# delete from adapter
-		if adapter.breakpoint_clear(remote_address) != None:
-			print('breakpoint address=0x%X (remote=0x%X) cleared' % (local_address, remote_address))
 		else:
-			print('ERROR: clearing breakpoint')
+			raise NotImplementedError('step over unimplemented for architecture %s' % self.bv.arch.name)
 
-		# delete breakpoint tags from all functions containing this address
-		del_breakpoint_tags(bv, [local_address])
+	def step_return(self):
+		assert self.adapter
 
-		# delete from our list
-		del debug_state.breakpoints[local_address]
+		if self.bv.arch.name == 'x86_64':
+			remote_rip = self.adapter.reg_read('rip')
+			local_rip = self.memory_view.remote_addr_to_local(remote_rip)
+			
+			# TODO: If we don't have a function loaded, walk the stack
+			funcs = self.bv.get_functions_containing(local_rip)
+			if len(funcs) != 0:
+				mlil = funcs[0].mlil
+				
+				bphere = local_rip in self.breakpoints
 
-		update_breakpoints(bv)
-	else:
-		print('ERROR: breakpoint not found in list')
+				# Set a bp on every ret in the function and go
+				old_bps = set()
+				new_bps = set()
+				for insn in mlil.instructions:
+					if insn.operation == binaryninja.MediumLevelILOperation.MLIL_RET or insn.operation == binaryninja.MediumLevelILOperation.MLIL_TAILCALL:
+						if insn.address in self.breakpoints:
+							rets.add(self.memory_view.local_addr_to_remote(insn.address))
+						else:
+							new_bps.add(self.memory_view.local_addr_to_remote(insn.address))
 
-# execute a sequence of adapter commands, capturing the return of the last
-# blocking call
-def exec_adapter_sequence(adapter, seq):
-	(reason, data) = (None, None)
+				seq = []
+				if bphere and not local_rip in new_bps and not local_rip in old_bps:
+					seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
+				for bp in new_bps:
+					seq.append((self.adapter.breakpoint_set, (bp,)))
+				seq.append((self.adapter.go, ()))
+				for bp in new_bps:
+					seq.append((self.adapter.breakpoint_clear, (bp,)))
+				if bphere and not local_rip in new_bps and not local_rip in old_bps:
+					seq.append((self.adapter.breakpoint_set, (remote_rip,)))
+			# TODO: Cancel (and raise some exception)
+				return self.exec_adapter_sequence(seq)
+			else:
+				print("Can't find current function")
+				return (None, None)
 
-	for (func, args) in seq:
-		if func in [adapter.step_into, adapter.step_over, adapter.go]:
-			(reason, data) = func(*args)
-			if reason == DebugAdapter.STOP_REASON.PROCESS_EXITED or reason == DebugAdapter.STOP_REASON.BACKEND_DISCONNECTED:
-				# Process is dead, stop sequence
-				break
 		else:
-			func(*args)
+			raise NotImplementedError('step over unimplemented for architecture %s' % self.bv.arch.name)
 
-	return (reason, data)
+	def breakpoint_set(self, remote_address):
+		assert self.adapter
+
+		if self.adapter.breakpoint_set(remote_address) != 0:
+			print('ERROR: breakpoint set failed')
+			return False
+
+		local_address = self.memory_view.remote_addr_to_local(remote_address)
+
+		# save it
+		self.breakpoints[local_address] = True
+		print('breakpoint address=0x%X (remote=0x%X) set' % (local_address, remote_address))
+		update_highlights(self.bv)
+		update_breakpoints(self.bv)
+		
+		breakpoint_tag_add(self.bv, local_address)
+
+		return True
+
+	def breakpoint_clear(self, remote_address):
+		assert self.adapter
+
+		local_address = self.memory_view.remote_addr_to_local(remote_address)
+
+		# find/remove address tag
+		if local_address in self.breakpoints:
+			# delete from adapter
+			if self.adapter.breakpoint_clear(remote_address) != None:
+				print('breakpoint address=0x%X (remote=0x%X) cleared' % (local_address, remote_address))
+			else:
+				print('ERROR: clearing breakpoint')
+
+			# delete breakpoint tags from all functions containing this address
+			breakpoint_tag_del(self.bv, [local_address])
+
+			# delete from our list
+			del self.breakpoints[local_address]
+
+			update_highlights(self.bv)
+			update_breakpoints(self.bv)
+		else:
+			print('ERROR: breakpoint not found in list')
+
+	# execute a sequence of adapter commands, capturing the return of the last
+	# blocking call
+	def exec_adapter_sequence(self, seq):
+		(reason, data) = (None, None)
+
+		for (func, args) in seq:
+			if func in [self.adapter.step_into, self.adapter.step_over, self.adapter.go]:
+				(reason, data) = func(*args)
+				if reason == DebugAdapter.STOP_REASON.PROCESS_EXITED or reason == DebugAdapter.STOP_REASON.BACKEND_DISCONNECTED:
+					# Process is dead, stop sequence
+					break
+			else:
+				func(*args)
+
+		return (reason, data)
 
 #------------------------------------------------------------------------------
 # right click plugin
@@ -606,12 +597,12 @@ def exec_adapter_sequence(adapter, seq):
 def cb_bp_set(bv, local_address):
 	debug_state = get_state(bv)
 	remote_address = debug_state.memory_view.local_addr_to_remote(local_address)
-	debug_breakpoint_set(bv, remote_address)
+	debug_state.breakpoint_set(remote_address)
 
 def cb_bp_clr(bv, local_address):
 	debug_state = get_state(bv)
 	remote_address = debug_state.memory_view.local_addr_to_remote(local_address)
-	debug_breakpoint_clear(bv, remote_address)
+	debug_state.breakpoint_clear(remote_address)
 
 #------------------------------------------------------------------------------
 # "main"

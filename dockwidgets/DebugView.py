@@ -16,8 +16,9 @@ class DebugView(QWidget, View):
 		assert type(data) == binaryninja.binaryview.BinaryView
 		self.bv = data
 
-		memory_view = binjaplug.get_state(data).memory_view
-		binjaplug.get_state(data).debug_view = self
+		self.debug_state = binjaplug.get_state(data)
+		memory_view = self.debug_state.memory_view
+		self.debug_state.debug_view = self
 
 		QWidget.__init__(self, parent)
 		View.__init__(self)
@@ -76,7 +77,7 @@ class DebugView(QWidget, View):
 		# Equally sized
 		self.splitter.setSizes([0x7fffffff, 0x7fffffff])
 
-		self.controls = ControlsWidget.DebugControlsWidget(self, "Controls", data)
+		self.controls = ControlsWidget.DebugControlsWidget(self, "Controls", data, self.debug_state)
 
 		layout = QVBoxLayout()
 		layout.setContentsMargins(0, 0, 0, 0)

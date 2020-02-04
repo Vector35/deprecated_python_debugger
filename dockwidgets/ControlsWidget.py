@@ -8,9 +8,10 @@ import threading
 from .. import binjaplug, DebugAdapter
 
 class DebugControlsWidget(QToolBar):
-	def __init__(self, parent, name, data):
+	def __init__(self, parent, name, data, debug_state):
 		assert type(data) == binaryninja.binaryview.BinaryView
 		self.bv = data
+		self.debug_state = debug_state
 
 		QToolBar.__init__(self, parent)
 
@@ -32,8 +33,8 @@ class DebugControlsWidget(QToolBar):
 		self.actionDetach.triggered.connect(lambda: self.perform_detach())
 		self.actionSettings = QAction("Adapter Settings... (todo)", self)
 		self.actionSettings.triggered.connect(lambda: self.perform_settings())
-		self.actionBreak = QAction("Break", self)
-		self.actionBreak.triggered.connect(lambda: self.perform_preak())
+		self.actionPause = QAction("Pause", self)
+		self.actionPause.triggered.connect(lambda: self.perform_pause())
 		self.actionResume = QAction("Resume", self)
 		self.actionResume.triggered.connect(lambda: self.perform_resume())
 		self.actionStepInto = QAction("Step Into", self)
@@ -64,7 +65,7 @@ class DebugControlsWidget(QToolBar):
 		self.addWidget(self.btnControl)
 
 		# execution control buttons
-		self.addAction(self.actionBreak)
+		self.addAction(self.actionPause)
 		self.addAction(self.actionResume)
 		self.addAction(self.actionStepInto)
 		self.addAction(self.actionStepOver)
@@ -87,8 +88,8 @@ class DebugControlsWidget(QToolBar):
 		self.addWidget(self.editStatus)
 
 		# disable buttons
-		self.set_actions_enabled(Run=True, Restart=False, Quit=False, Attach=True, Detach=False, Break=False, Resume=False, StepInto=False, StepOver=False, StepReturn=False)
-		self.set_resume_break_action("Break")
+		self.set_actions_enabled(Run=True, Restart=False, Quit=False, Attach=True, Detach=False, Pause=False, Resume=False, StepInto=False, StepOver=False, StepReturn=False)
+		self.set_resume_pause_action("Pause")
 
 	def __del__(self):
 		# TODO: Move this elsewhere
@@ -96,18 +97,17 @@ class DebugControlsWidget(QToolBar):
 		binjaplug.delete_state(self.bv)
 
 	def perform_run(self):
-		binjaplug.debug_run(self.bv)
+		self.debug_state.run()
 		self.state_stopped()
 		binjaplug.context_display(self.bv)
-		binjaplug.memory_dirty(self.bv)
 
 	def perform_restart(self):
-		binjaplug.debug_restart(self.bv)
+		self.debug_state.restart()
 		self.state_stopped()
 		binjaplug.memory_dirty(self.bv)
 
 	def perform_quit(self):
-		binjaplug.debug_quit(self.bv)
+		self.debug_state.quit()
 		self.state_inactive()
 		binjaplug.memory_dirty(self.bv)
 
@@ -116,7 +116,7 @@ class DebugControlsWidget(QToolBar):
 		pass
 
 	def perform_detach(self):
-		binjaplug.debug_detach(self.bv)
+		self.debug_state.detach()
 		self.state_inactive()
 		binjaplug.memory_dirty(self.bv)
 
@@ -124,15 +124,15 @@ class DebugControlsWidget(QToolBar):
 		# TODO: Show settings dialog
 		pass
 
-	def perform_preak(self):
-		binjaplug.debug_break(self.bv)
+	def perform_pause(self):
+		self.debug_state.pause()
 
 	def perform_resume(self):
 
 		def perform_resume_thread():
-			(reason, data) = binjaplug.debug_go(self.bv)
+			(reason, data) = self.debug_state.go()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: binjaplug.memory_dirty(self.bv))
+			execute_on_main_thread_and_wait(lambda: binjaplug.context_display(self.bv))
 		
 		self.state_running()
 		threading.Thread(target=perform_resume_thread).start()
@@ -140,9 +140,9 @@ class DebugControlsWidget(QToolBar):
 	def perform_step_into(self):
 
 		def perform_step_into_thread():
-			(reason, data) = binjaplug.debug_step(self.bv)
+			(reason, data) = self.debug_state.step_into()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: binjaplug.memory_dirty(self.bv))
+			execute_on_main_thread_and_wait(lambda: binjaplug.context_display(self.bv))
 		
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_into_thread).start()
@@ -150,9 +150,9 @@ class DebugControlsWidget(QToolBar):
 	def perform_step_over(self):
 
 		def perform_step_over_thread():
-			(reason, data) = binjaplug.debug_step_over(self.bv)
+			(reason, data) = self.debug_state.step_over()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: binjaplug.memory_dirty(self.bv))
+			execute_on_main_thread_and_wait(lambda: binjaplug.context_display(self.bv))
 		
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_over_thread).start()
@@ -160,9 +160,9 @@ class DebugControlsWidget(QToolBar):
 	def perform_step_return(self):
 
 		def perform_step_return_thread():
-			(reason, data) = binjaplug.debug_step_return(self.bv)
+			(reason, data) = self.debug_state.step_return()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: binjaplug.memory_dirty(self.bv))
+			execute_on_main_thread_and_wait(lambda: binjaplug.context_display(self.bv))
 		
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_return_thread).start()
@@ -188,7 +188,7 @@ class DebugControlsWidget(QToolBar):
 			"Quit": lambda e: self.actionQuit.setEnabled(e),
 			"Attach": lambda e: self.actionAttach.setEnabled(e),
 			"Detach": lambda e: self.actionDetach.setEnabled(e),
-			"Break": lambda e: self.actionBreak.setEnabled(e),
+			"Pause": lambda e: self.actionPause.setEnabled(e),
 			"Resume": lambda e: self.actionResume.setEnabled(e),
 			"StepInto": lambda e: self.actionStepInto.setEnabled(e),
 			"StepOver": lambda e: self.actionStepOver.setEnabled(e),
@@ -211,9 +211,9 @@ class DebugControlsWidget(QToolBar):
 		}
 		self.btnControl.setDefaultAction(actions[action])
 
-	def set_resume_break_action(self, action):
+	def set_resume_pause_action(self, action):
 		self.actionResume.setVisible(action == "Resume")
-		self.actionBreak.setVisible(action == "Break")
+		self.actionPause.setVisible(action == "Pause")
 
 	def set_thread_list(self, threads):
 		def select_thread_fn(tid):
@@ -250,53 +250,50 @@ class DebugControlsWidget(QToolBar):
 
 		debug_state.state = 'INACTIVE'
 		self.editStatus.setText(msg or debug_state.state)
-		self.set_actions_enabled(Starting=True, Stopping=False, Stepping=False, Break=False, Resume=False, Threads=False)
+		self.set_actions_enabled(Starting=True, Stopping=False, Stepping=False, Pause=False, Resume=False, Threads=False)
 		self.set_default_process_action("Run")
 		self.set_thread_list([])
-		self.set_resume_break_action("Break")
+		self.set_resume_pause_action("Pause")
 
 	def state_stopped(self, msg=None):
 		debug_state = binjaplug.get_state(self.bv)
 		debug_state.state = 'STOPPED'
 		self.editStatus.setText(msg or debug_state.state)
-		self.set_actions_enabled(Starting=False, Stopping=True, Stepping=True, Break=True, Resume=True, Threads=True)
+		self.set_actions_enabled(Starting=False, Stopping=True, Stepping=True, Pause=True, Resume=True, Threads=True)
 		self.set_default_process_action("Quit")
-		self.set_resume_break_action("Resume")
+		self.set_resume_pause_action("Resume")
 
 	def state_running(self, msg=None):
 		debug_state = binjaplug.get_state(self.bv)
 		debug_state.state = 'RUNNING'
 		self.editStatus.setText(msg or debug_state.state)
-		self.set_actions_enabled(Starting=False, Stopping=True, Stepping=False, Break=True, Resume=False, Threads=False)
+		self.set_actions_enabled(Starting=False, Stopping=True, Stepping=False, Pause=True, Resume=False, Threads=False)
 		self.set_default_process_action("Quit")
-		self.set_resume_break_action("Break")
+		self.set_resume_pause_action("Pause")
 
 	def state_busy(self, msg=None):
 		debug_state = binjaplug.get_state(self.bv)
 		debug_state.state = 'RUNNING'
 		self.editStatus.setText(msg or debug_state.state)
-		self.set_actions_enabled(Starting=False, Stopping=True, Stepping=False, Break=True, Resume=False, Threads=False)
+		self.set_actions_enabled(Starting=False, Stopping=True, Stepping=False, Pause=True, Resume=False, Threads=False)
 		self.set_default_process_action("Quit")
-		self.set_resume_break_action("Break")
+		self.set_resume_pause_action("Pause")
 
 	def state_error(self, msg=None):
 		debug_state = binjaplug.get_state(self.bv)
 		debug_state.state = 'ERROR'
 		self.editStatus.setText(msg or debug_state.state)
-		self.set_actions_enabled(Run=True, Restart=True, Quit=True, Attach=True, Detach=True, Break=True, Resume=True, StepInto=True, StepOver=True, StepReturn=True, Threads=True)
+		self.set_actions_enabled(Run=True, Restart=True, Quit=True, Attach=True, Detach=True, Pause=True, Resume=True, StepInto=True, StepOver=True, StepReturn=True, Threads=True)
 		self.set_default_process_action("Run")
 		self.set_thread_list([])
-		self.set_resume_break_action("Resume")	
+		self.set_resume_pause_action("Resume")	
 
 	def handle_stop_return(self, reason, data):
 		if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
 			self.state_stopped('stdout: '+data)
-			binjaplug.context_display(self.bv)
 		elif reason == DebugAdapter.STOP_REASON.PROCESS_EXITED:
-			binjaplug.debug_quit(self.bv)
+			self.debug_state.quit()
 			self.state_inactive('process exited, return code=%d' % data)
 		elif reason == DebugAdapter.STOP_REASON.BACKEND_DISCONNECTED:
-			binjaplug.debug_quit(self.bv)
+			self.debug_state.quit()
 			self.state_inactive('backend disconnected (process exited?)')
-		else:
-			binjaplug.context_display(self.bv)
