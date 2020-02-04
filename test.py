@@ -37,7 +37,8 @@ def parse_image(fpath):
 		ncmds = unpack('<I', data[16:20])[0]
 		#print('ncmds: %d' % ncmds)
 		vmaddr = None
-		entryoff = 0
+		entryoff1 = None # offset given by COMMAND entry_point_command (priority)
+		entryoff2 = None # offset of __text section inside __TEXT segment
 		offs = 0x20
 		for i in range(ncmds):
 			cmd = unpack('<I', data[offs:offs+4])[0]
@@ -45,15 +46,33 @@ def parse_image(fpath):
 			if cmd == 0x19: # segment_command_64
 				if data[offs+8:offs+16] == b'\x5F\x5F\x54\x45\x58\x54\x00\x00': # __TEXT
 					vmaddr = unpack('<Q', data[offs+24:offs+32])[0]
-					#print('vmaddr: %X' % vmaddr)
+					print('vmaddr: %X' % vmaddr)
+
+					nsects = unpack('<I', data[offs+64:offs+68])[0]
+					#print('segment __TEXT nsects: %d' % nsects)
+
+					# advance past command to first section
+					o_scn = offs + 0x48
+					for i in range(nsects):
+						name = data[o_scn+0:o_scn+16]
+						#print('__TEXT section %d: %s' % (i, name))
+						if name == b'__text\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00':
+							entryoff2 = unpack('<I', data[o_scn+0x20:o_scn+0x24])[0]
+							break;
+						o_scn += 0x50
+
+					if entryoff2 == None:
+						raise Exception('couldn\'t locate section __text in segment __TEXT in %s' % fpath)
 			if cmd == 0x80000028: # entry_point_command
 				entryoff = unpack('<I', data[offs+8:offs+12])[0]
 				#print('entryoff: %X' % entryoff)
 			offs += cmdsize
 		if not vmaddr:
-			raise Exception('couldn\'t locate segment_command_64 (where __TEXT loads) in %s', fpath)
-		#if entryoff == None:
-		#	raise Exception('couldn\'t locate entry_point_command in macho (where main is)', fpath)
+			raise Exception('couldn\'t locate segment_command_64 (where __TEXT loads) in %s' % fpath)
+		if entryoff1 == None and entryoff2 == None:
+			raise Exception('couldn\'t locate entry_point_command in macho (where main is)' % fpath)
+
+		entryoff == entryoff1 or entryoff2
 		return (vmaddr, entryoff)
 
 	# PE
@@ -166,6 +185,7 @@ if __name__ == '__main__':
 			print('rip: 0x%X' % adapter.reg_read('rip'))
 
 			# breakpoint set/clear should fail at 0
+			print('breakpoint failures')
 			try:
 				adapter.breakpoint_clear(0)
 			except DebugAdapter.BreakpointClearError:
