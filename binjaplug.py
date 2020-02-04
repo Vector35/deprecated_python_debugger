@@ -200,9 +200,9 @@ def update_memory_view(bv):
 
 	assert adapter is not None
 	assert memory_view is not None
-	
+
 	memory_view.mark_dirty()
-	
+
 	addr_regs = {}
 	reg_addrs = {}
 
@@ -230,11 +230,11 @@ def update_memory_view(bv):
 	for (addr, regs) in addr_regs.items():
 		symbol_name = "@".join(regs)
 		fancy_name = ",".join(regs)
-		
+
 		memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, addr, fancy_name, raw_name=symbol_name))
 		debug_state.old_symbols.append(memory_view.get_symbol_by_raw_name(symbol_name))
 		new_dvs.add(addr)
-	
+
 	for new_dv in new_dvs:
 		memory_view.define_data_var(new_dv, Type.int(8))
 		debug_state.old_dvs.add(new_dv)
@@ -256,7 +256,7 @@ def update_memory_view(bv):
 			debug_state.old_symbols.append(memory_view.get_symbol_by_raw_name("$stack_frame"))
 			debug_state.old_dvs.add(reg_addrs['rsp'])
 
-# Highlight lines 
+# Highlight lines
 def update_highlights(bv):
 	debug_state = get_state(bv)
 	adapter = debug_state.adapter
@@ -264,7 +264,7 @@ def update_highlights(bv):
 	for bp in debug_state.breakpoints:
 		for func in bv.get_functions_containing(bp):
 			func.set_auto_instr_highlight(bp, binaryninja.HighlightStandardColor.RedHighlightColor)
-	
+
 	if adapter is not None:
 		if bv.arch.name == 'x86_64':
 			remote_rip = adapter.reg_read('rip')
@@ -319,7 +319,7 @@ def breakpoint_tag_del(bv, local_addresses=None):
 
 #------------------------------------------------------------------------------
 # DEBUGGER STATE / CONTROLLER
-# 
+#
 # Controller of the debugger for a single BinaryView
 # All functions block until completion or error
 #------------------------------------------------------------------------------
@@ -337,7 +337,6 @@ class DebuggerState:
 		self.old_symbols = []
 		self.old_dvs = set()
 		self.last_rip = 0
-
 
 	#--------------------------------------------------------------------------
 	# DEBUGGER FUNCTIONS (MEDIUM LEVEL, BLOCKING)
@@ -446,8 +445,15 @@ class DebuggerState:
 			remote_rip = self.adapter.reg_read('rip')
 			local_rip = self.memory_view.remote_addr_to_local(remote_rip)
 
-			instxt = self.bv.get_disassembly(local_rip)
-			inslen = self.bv.get_instruction_length(local_rip)
+			if self.bv.read(local_rip, 1):
+				instxt = self.bv.get_disassembly(local_rip)
+				inslen = self.bv.get_instruction_length(local_rip)
+			else:
+				data = self.adapter.mem_read(remote_rip, 16)
+				(tokens, length) = self.bv.arch.get_instruction_text(data, local_rip)
+				instxt = ''.join([x.text for x in tokens])
+				inslen = length
+
 			local_ripnext = local_rip + inslen
 			remote_ripnext = remote_rip + inslen
 
@@ -494,12 +500,12 @@ class DebuggerState:
 		if self.bv.arch.name == 'x86_64':
 			remote_rip = self.adapter.reg_read('rip')
 			local_rip = self.memory_view.remote_addr_to_local(remote_rip)
-			
+
 			# TODO: If we don't have a function loaded, walk the stack
 			funcs = self.bv.get_functions_containing(local_rip)
 			if len(funcs) != 0:
 				mlil = funcs[0].mlil
-				
+
 				bphere = local_rip in self.breakpoints
 
 				# Set a bp on every ret in the function and go
@@ -545,7 +551,7 @@ class DebuggerState:
 		print('breakpoint address=0x%X (remote=0x%X) set' % (local_address, remote_address))
 		update_highlights(self.bv)
 		update_breakpoints(self.bv)
-		
+
 		breakpoint_tag_add(self.bv, local_address)
 
 		return True
