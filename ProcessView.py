@@ -120,40 +120,31 @@ class DebugMemoryView(BinaryView):
 		if adapter is None:
 			return None
 
-		# Cache reads (will be cleared whenever view is marked dirty)
-		hit = self.value_cache.get(addr)
-		if hit and len(hit) == length:
-			return hit
+		# ProcessView implements read caching in a manner inspired by CPU cache:
+		# Reads are aligned on 256-byte boundaries and 256 bytes long
 
-		# on 1-byte reads, attempt read-ahead
-		if length == 1:
-			try:
-				batch = adapter.mem_read(addr, 256)
-				batch = {addr+offs:val.to_bytes(1,'big') for (offs,val) in enumerate(batch)}
-				self.value_cache.update(batch)
-				return self.value_cache[addr]
-			except DebugAdapter.GeneralError as e:
-				pass
+		# Cache read start: round down addr to nearest 256 byte boundary
+		cache_addr = addr & ~0xFF
+		# Cache read length: accounting for rounding down start and rounding up end
+		cache_len = (length + 0xFF) & ~0xFF
+		# List of 256-byte block addresses to read into the cache to fully cover this region
+		cache_blocks = range(cache_addr, cache_addr + cache_len, 0x100)
 
-		# on 8-byte reads, attempt read-ahead, cache 8-byte chunks
-		# wireshark shows MORE packets with this enabled, wtf?
-		#if length == 8:
-		#	try:
-		#		batch = adapter.mem_read(addr, 2048)
-		#		batch = {addr+offs:batch[offs:offs+8] for offs in range(0,2048,8)}
-		#		self.value_cache.update(batch)
-		#		return self.value_cache[addr]
-		#	except DebugAdapter.GeneralError as e:
-		#		pass
+		for block in cache_blocks:
+			if block not in self.value_cache:
+				try:
+					batch = adapter.mem_read(block, cache_len)
+					# Cache storage is addr => byte for every byte
+					# Not memory efficient but very easy to reason about
+					batch = {block+offs:val.to_bytes(1,'big') for (offs,val) in enumerate(batch)}
+					self.value_cache.update(batch)
+				except DebugAdapter.GeneralError as e:
+					# Probably disconnected; can't read
+					return None
 
-		# fall back to length parameter
-		try:
-			value = adapter.mem_read(addr, length)
-			self.value_cache[addr] = value
-			return value
-		except DebugAdapter.GeneralError as e:
-			# Probably disconnected; can't read
-			return None
+		# Now that we know we have cached every address in the region, assemble the
+		# result solely from the cache
+		return b''.join(self.value_cache[val] for val in range(addr, addr + length))
 
 	def perform_write(self, addr, data):
 		adapter = binjaplug.get_state(self.parent_view).adapter

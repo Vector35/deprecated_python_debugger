@@ -113,7 +113,7 @@ def context_display(bv):
 		for i in range(stack_range[0], stack_range[1] + 1):
 			offset = i * bv.arch.address_size
 			address = stack_pointer + offset
-			value = adapter.mem_read(address, bv.arch.address_size)
+			value = debug_state.memory_view.read(address, bv.arch.address_size)
 			value_int = value
 			if bv.arch.endianness == binaryninja.Endianness.LittleEndian:
 				value_int = value_int[::-1]
@@ -179,7 +179,7 @@ def context_display(bv):
 
 	debug_state.debug_view.controls.state_stopped(statusText)
 
-	#data = adapter.mem_read(rip, 16)
+	#data = debug_state.memory_view.read(rip, 16)
 	#if data:
 	#	(asmstr, asmlen) = disasm1(data, rip)
 	#	print('%s%016X%s: %s\t%s' % \
