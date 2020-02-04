@@ -46,7 +46,7 @@ def connect_get_adapter(host, port):
 			# allow quarter second for debugserver to start listening
 			time.sleep(.25)
 		except Exception as e:
-			print(e)
+			print('exception: ', e)
 
 # prevent child process from getting out ctrl+c signal
 # thanks: https://stackoverflow.com/questions/3791398/how-to-stop-python-from-propagating-signals-to-subprocesses

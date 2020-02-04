@@ -4,6 +4,7 @@ import re
 import socket
 from struct import pack, unpack
 from binascii import hexlify, unhexlify
+import xml.parsers.expat
 
 from . import rsp
 from . import DebugAdapter
@@ -292,4 +293,87 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		if not 'thread' in context:
 			raise DebugAdapter.GeneralError('determing thread responsible for stop')
 		self.tid = context.get('thread')
+
+	def get_xml(self, fname):
+		#print('downloading %s' % fname)
+		data = rsp.tx_rx(self.sock, 'qXfer:features:read:%s:0,fff' % fname, 'ack_then_reply')
+		if not data[0] in ['l', 'm']:
+			raise DebugAdapter.GeneralError('acquiring register description xml')
+		data = rsp.un_rle(data[1:])
+		return data
+
+	# See G.2.7 Registers for what's going on here
+	# https://sourceware.org/gdb/current/onlinedocs/gdb/Target-Description-Format.html#Target-Description-Format
+	def reg_info_load(self, force=False):
+		# if we've already sensed the registers, return
+		if not force and self.reg_info:
+			return
+
+		#
+		# collect subfiles included from target.xml
+		#
+		subfiles = []
+		def search_include(name, attrs):
+			nonlocal subfiles
+			if 'include' in name:
+				if name != 'xi:include':
+					raise Exception('unknown include tag: %s' % name)
+				if not 'href' in attrs:
+					raise Exception('include tag attributes contain no href')
+				fname = attrs['href']
+				#print('found include: %s' % fname)
+				subfiles.append(fname)
+
+		p = xml.parsers.expat.ParserCreate()
+		p.StartElementHandler = search_include
+		xmltxt = self.get_xml('target.xml')
+		#print(xmltxt)
+		p.Parse(xmltxt)
+
+		#
+		# collect registers referenced in all subfiles
+		#
+		regnum = 0
+		self.reg_info = {}
+		def search_reg(name, attrs):
+			nonlocal regnum
+			if name == 'reg':
+				regname = attrs['name']
+				if 'regnum' in attrs:
+					regnum = int(attrs['regnum'])
+					#print('-------- fast-forwarding regnum to %d' % regnum)
+				bitsize = None
+				if 'bitsize' in attrs:
+					bitsize = int(attrs['bitsize'])
+					#print('has bitsize %d' % bitsize)
+				#print('assigning reg %s num %d' % (regname, regnum))
+				self.reg_info[regname] = {'id':regnum, 'width':bitsize}
+				regnum += 1
+
+		p = xml.parsers.expat.ParserCreate()
+		p.StartElementHandler = search_reg
+		p.Parse(xmltxt)
+		for fname in subfiles:
+			#print('acquiring %s' % fname)
+			xmltxt = self.get_xml(fname)
+			p.Parse(xmltxt)
+
+		#
+		# calculate bit offset per register within a concatenated registers blob
+		#
+		id2name = {self.reg_info[k]['id']: k for k in self.reg_info.keys()}
+		id2width = {v['id']: v['width'] for v in self.reg_info.values()}
+		id_max = max(id2width.keys())
+
+		offset = 0
+		for i in range(id_max):
+			if not i in id2width: # non-sequential id, can't know offset
+				break
+
+			name = id2name[i]
+			self.reg_info[name]['offset'] = offset
+			offset += id2width[i]
+
+		#for reg in sorted(self.reg_info, key=lambda x: self.reg_info[x]['id']):
+		#	print('%s id=%d width=%d' % (reg, self.reg_info[reg]['id'], self.reg_info[reg]['width']))
 

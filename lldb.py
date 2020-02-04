@@ -6,6 +6,7 @@ from struct import pack, unpack
 from binascii import hexlify, unhexlify
 
 from . import rsp
+from . import gdblike
 from . import DebugAdapter
 
 macos_signal_to_name = {
@@ -85,18 +86,12 @@ def handler_async_pkt(pkt):
 	else:
 		print('handler_async_pkt() got unknown packet: %s' % repr(pkt))
 
-class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
+class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	def __init__(self, **kwargs):
-		host = kwargs.get('host', 'localhost')
-		port = kwargs.get('port', 31337)
-		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.sock.connect((host, port))
+		gdblike.DebugAdapterGdbLike.__init__(self, **kwargs)
 
 		# register state
-		self.reg_id_to_name = {}
-		self.reg_name_to_id = {}
-		self.reg_name_to_id = {}
-		self.register_sense()
+		self.reg_info_load()
 
 		# address -> True
 		self.breakpoints = {}
@@ -155,6 +150,9 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		if not tid in self.thread_list():
 			raise DebugAdapter.GeneralError("tid 0x%X is not in threads list" % tid)
 
+		# changing threads? new regs
+		self.reg_cache = {}
+
 		# set thread for step and continue operations
 		payload = 'Hc%x' % tid
 		reply = rsp.tx_rx(self.sock, payload, 'ack_then_ok')
@@ -191,37 +189,10 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 		return self.breakpoints
 
 	# register
-	def reg_read(self, name):
-		self.register_sense()
-		if not name in self.reg_name_to_info:
-			raise DebugAdapter.GeneralError("requested register %s doesnt exist" % name)
-		id_ = self.reg_name_to_id[name]
-		reply = rsp.tx_rx(self.sock, 'p%02x' % id_, 'ack_then_reply')
-		return int(''.join(reversed([reply[i:i+2] for i in range(0,len(reply),2)])), 16)
-
-	def reg_write(self, name, value):
-		self.register_sense()
-
-		if not name in self.reg_name_to_id:
-			raise DebugAdapter.GeneralError("requested register %s doesnt exist" % name)
-
-		id_ = self.reg_name_to_id[name]
-
-		valstr = '%016x'%value
-		valstr = [valstr[i:i+2] for i in range(0,len(valstr),2)]
-		valstr = ''.join(reversed(valstr))
-		payload = 'P %d=%s' % (id_, valstr)
-		reply = rsp.tx_rx(self.sock, payload, 'ack_then_ok')
-
-	def reg_list(self):
-		self.register_sense()
-		return self.reg_name_to_id.keys()
-
-	def reg_bits(self, name):
-		self.register_sense()
-		if not name in self.reg_name_to_info:
-			raise DebugAdapter.GeneralError("requested register %s doesnt exist" % name)
-		return int(self.reg_name_to_info[name]["bitsize"])
+	#def reg_read(self, name):
+	#def reg_write(self, name, value):
+	#def reg_list(self):
+	#def reg_bits(self, name):
 
 	# mem
 	def mem_read(self, address, length):
@@ -272,14 +243,21 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 	# execution control, all return:
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go(self):
+		self.reg_cache = {}
 		return self.go_generic('c', handler_async_pkt)
 
 	def step_into(self):
+		self.reg_cache = {}
 		return self.go_generic('vCont;s', handler_async_pkt)
 
 	def step_over(self):
 		# gdb, lldb just doesn't have this, you must synthesize it yourself
+		self.reg_cache = {}
 		raise NotImplementedError('step over')
+
+	# pass-thru
+	def raw(self, data):
+		return rsp.tx_rx(self.sock, data)
 
 	# testing
 	def test(self):
@@ -293,24 +271,6 @@ class DebugAdapterLLDB(DebugAdapter.DebugAdapter):
 	#--------------------------------------------------------------------------
 	# helpers, NOT part of the API
 	#--------------------------------------------------------------------------
-
-	def register_sense(self, force=False):
-		if not force and self.reg_id_to_name:
-			return
-
-		self.reg_id_to_name = {}
-		self.reg_name_to_id = {}
-		self.reg_name_to_info = {}
-
-		reg_array = rsp.register_scan(self.sock)
-
-		for (i, info) in enumerate(reg_array):
-			if info == None:
-				continue
-
-			self.reg_id_to_name[i] = info["name"]
-			self.reg_name_to_id[info["name"]] = i
-			self.reg_name_to_info[info["name"]] = info
 
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go_generic(self, gotype, handler_async_pkt=None):
