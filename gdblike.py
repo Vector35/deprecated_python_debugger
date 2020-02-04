@@ -145,21 +145,20 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			#print('RETURNING CACHED VALUE! %s = 0x%X' % (name, self.reg_cache[name]))
 			return self.reg_cache[name]
 
-		# see if gdb will respond to a single register query
-		id_ = self.reg_info[name]['id']
-		reply = rsp.tx_rx(self.sock, 'p%02x' % id_)
-		if reply != '':
-			val = int(''.join(reversed([reply[i:i+2] for i in range(0,len(reply),2)])), 16)
-			self.reg_cache[name] = val # cache result
-			return val
-
-		# otherwise, do a general purpose register query
+		# do a general purpose register query
 		tmp = self.general_read_registers()
 		if not name in tmp:
 			raise DebugAdapter.GeneralError("requested register %s doesnt exist" % name)
-		for (k,v) in tmp.items():
-			self.reg_cache[k] = v # cache update
+		self.reg_cache.update(tmp)
 		return self.reg_cache[name]
+
+		# see if gdb will respond to a single register query
+		#id_ = self.reg_info[name]['id']
+		#reply = rsp.tx_rx(self.sock, 'p%02x' % id_)
+		#if reply != '':
+		#	val = int(''.join(reversed([reply[i:i+2] for i in range(0,len(reply),2)])), 16)
+		#	self.reg_cache[name] = val # cache result
+		#	return val
 
 	def reg_write(self, name, value):
 		if not name in self.reg_info:
@@ -274,7 +273,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 		id2reg = {self.reg_info[k]['id']: k for k in self.reg_info.keys()}
 		reply = rsp.tx_rx(self.sock, 'g')
-		for id_ in range(max(id2reg.keys())):
+		for id_ in range(max(id2reg.keys())+1):
 			reg = id2reg.get(id_)
 			if reg == None: break
 			width = self.reg_info[reg]['width']
