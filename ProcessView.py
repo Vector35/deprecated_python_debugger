@@ -54,7 +54,7 @@ class DebugProcessView(BinaryView):
 	"""
 	Get the base address of the binary in the debugged process
 	"""
-	def get_remote_base(self):	
+	def get_remote_base(self):
 		adapter = binjaplug.get_state(self.local_view).adapter
 		modules = adapter.mem_modules()
 		assert self.local_view.file.original_filename in modules
@@ -119,9 +119,23 @@ class DebugMemoryView(BinaryView):
 		adapter = binjaplug.get_state(self.parent_view).adapter
 		if adapter is None:
 			return None
+
 		# Cache reads (will be cleared whenever view is marked dirty)
-		if addr in self.value_cache.keys():
-			return self.value_cache[addr]
+		hit = self.value_cache.get(addr)
+		if hit and len(hit) == length:
+			return hit
+
+		# on 1-byte reads, attempt read-ahead
+		if length == 1:
+			try:
+				batch = adapter.mem_read(addr, 256)
+				batch = {addr+offs:val.to_bytes(1,'big') for (offs,val) in enumerate(batch)}
+				self.value_cache.update(batch)
+				return self.value_cache[addr]
+			except DebugAdapter.GeneralError as e:
+				pass
+
+		# fall back to length parameter
 		try:
 			value = adapter.mem_read(addr, length)
 			self.value_cache[addr] = value
@@ -129,7 +143,7 @@ class DebugMemoryView(BinaryView):
 		except DebugAdapter.GeneralError as e:
 			# Probably disconnected; can't read
 			return None
-	
+
 	def perform_write(self, addr, data):
 		adapter = binjaplug.get_state(self.parent_view).adapter
 		if adapter is None:
@@ -144,7 +158,7 @@ class DebugMemoryView(BinaryView):
 		except DebugAdapter.GeneralError as e:
 			# Probably disconnected
 			return 0
-	
+
 	def perform_is_executable(self):
 		return True
 
@@ -162,7 +176,7 @@ class DebugMemoryView(BinaryView):
 	# def perform_get_entry_point(self):
 	# def perform_get_default_endianness(self):
 	# def perform_is_relocatable(self):
-		
+
 	def mark_dirty(self):
 		self.value_cache = {}
 
