@@ -195,25 +195,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	#def reg_bits(self, name):
 
 	# mem
-	def mem_read(self, address, length):
-		packed = b''
-
-		while(length):
-			chunk = min(length, 256)
-
-			data = 'm' + ("%x" % address) + ',' + ("%x" % chunk)
-			reply = rsp.tx_rx(self.sock, data, 'ack_then_reply')
-			if reply.startswith('E'): # error 'E' differentiated from hex 'e' by case
-				# and len(reply)==3:
-				raise DebugAdapter.GeneralError('reading from address 0x%X' % address)
-
-			while(reply):
-				packed += pack('B', int(reply[0:2],16))
-				reply = reply[2:]
-
-			length -= chunk
-
-		return packed
+	#def mem_read(self, address, length):
 
 	def mem_write(self, address, data):
 		payload = 'M%X,%X:%s' % (address, len(data), ''.join(['%02X'%b for b in data]))

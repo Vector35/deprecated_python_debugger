@@ -200,24 +200,15 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 	# mem
 	def mem_read(self, address, length):
-		packed = b''
-
+		result = b''
 		while(length):
-			chunk = min(length, 256)
-
-			data = 'm' + ("%x" % address) + ',' + ("%x" % chunk)
-			reply = rsp.tx_rx(self.sock, data)
-			if reply.startswith('E'): # error 'E' differentiated from hex 'e' by case
-				# and len(reply)==3:
+			sz = min(length, 1024) # safely below ethernet MTU 1024
+			reply = rsp.tx_rx(self.sock, 'm%x,%x' % (address, sz))
+			if reply.startswith('E'):
 				raise DebugAdapter.GeneralError('reading from address 0x%X' % address)
-
-			while(reply):
-				packed += pack('B', int(reply[0:2],16))
-				reply = reply[2:]
-
-			length -= chunk
-
-		return packed
+			result += bytes.fromhex(reply)
+			length -= sz
+		return result
 
 	def mem_write(self, address, data):
 		payload = 'M%X,%X:%s' % (address, len(data), ''.join(['%02X'%b for b in data]))

@@ -135,6 +135,17 @@ class DebugMemoryView(BinaryView):
 			except DebugAdapter.GeneralError as e:
 				pass
 
+		# on 8-byte reads, attempt read-ahead, cache 8-byte chunks
+		# wireshark shows MORE packets with this enabled, wtf?
+		#if length == 8:
+		#	try:
+		#		batch = adapter.mem_read(addr, 2048)
+		#		batch = {addr+offs:batch[offs:offs+8] for offs in range(0,2048,8)}
+		#		self.value_cache.update(batch)
+		#		return self.value_cache[addr]
+		#	except DebugAdapter.GeneralError as e:
+		#		pass
+
 		# fall back to length parameter
 		try:
 			value = adapter.mem_read(addr, length)
