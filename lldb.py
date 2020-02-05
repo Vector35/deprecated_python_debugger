@@ -90,6 +90,8 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	def __init__(self, **kwargs):
 		gdblike.DebugAdapterGdbLike.__init__(self, **kwargs)
 
+		self.os_sig_to_reason = macos_signal_to_debugadapter_reason
+
 		# register state
 		self.reg_info_load()
 
@@ -112,23 +114,8 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		# TODO: find/launch debugserver
 		pass
 
-	def detach(self):
-		try:
-			rsp.send_packet_data(self.sock, 'D')
-			self.sock.shutdown(socket.SHUT_RDWR)
-			self.sock.close()
-			self.sock = None
-		except rsp.RspDisconnected:
-			pass
-
-	def quit(self):
-		try:
-			rsp.send_packet_data(self.sock, 'k')
-			self.sock.shutdown(socket.SHUT_RDWR)
-			self.sock.close()
-			self.sock = None
-		except rsp.RspDisconnected:
-			pass
+	#def detach(self):
+	#def quit(self):
 
 	# threads
 	def thread_list(self):
@@ -162,31 +149,9 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		reply = rsp.tx_rx(self.sock, payload, 'ack_then_ok')
 
 	# breakpoints
-	def breakpoint_set(self, addr):
-		if addr in self.breakpoints:
-			raise DebugAdapter.BreakpointSetError("breakpoint set at 0x%X already exists" % addr)
-
-		data = 'Z0,%x,1' % addr
-		reply = rsp.tx_rx(self.sock, data, 'ack_then_reply')
-		if reply != 'OK':
-			raise DebugAdapter.BreakpointSetError('rsp replied: %s' % reply)
-		self.breakpoints[addr] = True
-		return 0
-
-	def breakpoint_clear(self, addr):
-		if not addr in self.breakpoints:
-			raise DebugAdapter.BreakpointClearError("breakpoint clear at 0x%X doesn't exist" % addr)
-
-		data = 'z0,%x,1' % addr
-		reply = rsp.tx_rx(self.sock, data, 'ack_then_reply')
-		if reply != 'OK':
-			raise DebugAdapter.BreakpointClearError("rsp replied: %s" % reply)
-
-		del self.breakpoints[addr]
-		return 0
-
-	def breakpoint_list(self):
-		return self.breakpoints
+	#def breakpoint_set(self, addr):
+	#def breakpoint_clear(self, addr):
+	#def breakpoint_list(self):
 
 	# register
 	#def reg_read(self, name):
@@ -196,13 +161,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 
 	# mem
 	#def mem_read(self, address, length):
-
-	def mem_write(self, address, data):
-		payload = 'M%X,%X:%s' % (address, len(data), ''.join(['%02X'%b for b in data]))
-		reply = rsp.tx_rx(self.sock, payload, 'ack_then_reply')
-		if reply != 'OK':
-			raise DebugAdapter.GeneralError('writing to address 0x%X' % address)
-			return 0
+	#def mem_write(self, address, data):
 
 	def mem_modules(self):
 		module2addr = {}
@@ -213,14 +172,8 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		return module2addr
 
 	# break
-	def break_into(self):
-		rsp.send_raw(self.sock, '\x03')
-		# TODO: detect error
-		return True
-
-	def break_reason(self):
-		pkt_T = rsp.tx_rx(self.sock, '?', 'ack_then_reply')
-		print(pkt_T)
+	#def break_into(self):
+	#def break_reason(self):
 
 	# execution control, all return:
 	# returns (STOP_REASON.XXX, <extra_info>)
@@ -237,48 +190,3 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		self.reg_cache = {}
 		raise NotImplementedError('step over')
 
-	# pass-thru
-	def raw(self, data):
-		return rsp.tx_rx(self.sock, data)
-
-	# testing
-	def test(self):
-		reply = rsp.tx_rx(self.sock, 'jGetLoadedDynamicLibrariesInfos:{"fetch_all_solibs":true}')
-		for (addr, path) in re.findall(r'"load_address":(\d+).*?"pathname":"([^"]+)"', reply):
-			addr = int(addr, 10)
-			print('%s: 0x%X' % (path, addr))
-
-		#self.break_reason()
-
-	#--------------------------------------------------------------------------
-	# helpers, NOT part of the API
-	#--------------------------------------------------------------------------
-
-	# returns (STOP_REASON.XXX, <extra_info>)
-	def go_generic(self, gotype, handler_async_pkt=None):
-		try:
-			reply = rsp.tx_rx(self.sock, gotype, 'mixed_output_ack_then_reply', handler_async_pkt)
-			(reason, reason_data) = (None, None)
-
-			# thread info
-			if reply[0] == 'T':
-				tdict = rsp.packet_T_to_dict(reply)
-				self.active_thread_tid = tdict['thread']
-				signum = tdict.get('signal', 0)
-				(reason, reason_data) = \
-					(macos_signal_to_debugadapter_reason.get(signum, DebugAdapter.STOP_REASON.UNKNOWN), signum)
-
-			# exit status
-			elif reply[0] == 'W':
-				exit_status = int(reply[1:], 16)
-				print('inferior exited with status: %d' % exit_status)
-				(reason, reason_data) = (DebugAdapter.STOP_REASON.PROCESS_EXITED, exit_status)
-
-			else:
-				print(reply)
-				(reason, reason_data) = (DebugAdapter.STOP_REASON.UNKNOWN, None)
-
-			return (reason, reason_data)
-
-		except rsp.RspDisconnected:
-			return (DebugAdapter.BACKEND_DISCONNECTED, None)

@@ -10,6 +10,14 @@ Binary Ninja debugger effort for IQT
 - lldb has single reg writes with 'P' packet, gdb doesn't, and registers must be written in group with 'G' packet
 - lldb can list solibs and executable image with 'jGetLoadedDynamicLibrariesInfos' packet, gdb still looks to /proc/pid/maps
 
+## design diagram
+
+```
++-------+
+|       |
++-------+
+```
+
 ## notes:
 
 tcpdump -i lo0 -A -s0 'port 31337'

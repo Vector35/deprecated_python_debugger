@@ -366,3 +366,34 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		#for reg in sorted(self.reg_info, key=lambda x: self.reg_info[x]['id']):
 		#	print('%s id=%d width=%d' % (reg, self.reg_info[reg]['id'], self.reg_info[reg]['width']))
 
+	# returns (STOP_REASON.XXX, <extra_info>)
+	def go_generic(self, gotype, handler_async_pkt=None):
+		try:
+			reply = rsp.tx_rx(self.sock, gotype, 'mixed_output_ack_then_reply', handler_async_pkt)
+			(reason, reason_data) = (None, None)
+
+			# thread info
+			if reply[0] == 'T':
+				tdict = rsp.packet_T_to_dict(reply)
+				self.active_thread_tid = tdict['thread']
+				signum = tdict.get('signal', 0)
+				(reason, reason_data) = \
+					(self.os_sig_to_reason.get(signum, DebugAdapter.STOP_REASON.UNKNOWN), signum)
+
+			# exit status
+			elif reply[0] == 'W':
+				exit_status = int(reply[1:], 16)
+				print('inferior exited with status: %d' % exit_status)
+				(reason, reason_data) = (DebugAdapter.STOP_REASON.PROCESS_EXITED, exit_status)
+
+			else:
+				print(reply)
+				(reason, reason_data) = (DebugAdapter.STOP_REASON.UNKNOWN, None)
+
+			return (reason, reason_data)
+
+		except rsp.RspDisconnected:
+			return (DebugAdapter.BACKEND_DISCONNECTED, None)
+
+	def raw(self, data):
+		return rsp.tx_rx(self.sock, data)
