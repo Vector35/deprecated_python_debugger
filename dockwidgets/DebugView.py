@@ -1,5 +1,5 @@
 from PySide2 import QtCore
-from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize
+from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize, QTimer
 from PySide2.QtGui import QPalette, QFontMetricsF
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QStyle, QSplitter, QLabel
 
@@ -86,6 +86,12 @@ class DebugView(QWidget, View):
 		layout.addWidget(self.splitter, 100)
 		self.setLayout(layout)
 
+		self.needs_update = True
+		self.update_timer = QTimer(self)
+		self.update_timer.setInterval(200)
+		self.update_timer.setSingleShot(False)
+		self.update_timer.timeout.connect(lambda: self.updateTimerEvent())
+
 		# Add debugger state to the interpreter as `dbg`
 		main_window = parent.window()
 		dock_handler = main_window.findChild(DockHandler, '__DockHandler')
@@ -109,14 +115,19 @@ class DebugView(QWidget, View):
 		return self.binary_editor.getDisassembly().navigate(addr)
 
 	def notifyMemoryChanged(self):
-		adapter = binjaplug.get_state(self.bv).adapter
+		self.needs_update = True
 
-		# Refresh the editor
-		if adapter is None:
-			self.memory_editor.navigate(0)
-			return
+	def updateTimerEvent(self):
+		if self.needs_update:
+			self.needs_update = False
+			adapter = binjaplug.get_state(self.bv).adapter
 
-		self.memory_editor.navigate(adapter.reg_read('rsp'))
+			# Refresh the editor
+			if adapter is None:
+				self.memory_editor.navigate(0)
+				return
+
+			self.memory_editor.navigate(adapter.reg_read('rsp'))
 
 	def shouldBeVisible(self, view_frame):
 		if view_frame is None:
