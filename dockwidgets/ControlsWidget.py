@@ -99,17 +99,17 @@ class DebugControlsWidget(QToolBar):
 	def perform_run(self):
 		self.debug_state.run()
 		self.state_stopped()
-		binjaplug.context_display(self.bv)
+		self.debug_state.context_display()
 
 	def perform_restart(self):
 		self.debug_state.restart()
 		self.state_stopped()
-		binjaplug.memory_dirty(self.bv)
+		self.debug_state.memory_dirty()
 
 	def perform_quit(self):
 		self.debug_state.quit()
 		self.state_inactive()
-		binjaplug.memory_dirty(self.bv)
+		self.debug_state.memory_dirty()
 
 	def perform_attach(self):
 		# TODO: Show dialog to select adapter/address/process
@@ -118,7 +118,7 @@ class DebugControlsWidget(QToolBar):
 	def perform_detach(self):
 		self.debug_state.detach()
 		self.state_inactive()
-		binjaplug.memory_dirty(self.bv)
+		self.debug_state.memory_dirty()
 
 	def perform_settings(self):
 		# TODO: Show settings dialog
@@ -132,8 +132,8 @@ class DebugControlsWidget(QToolBar):
 		def perform_resume_thread():
 			(reason, data) = self.debug_state.go()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: binjaplug.context_display(self.bv))
-		
+			execute_on_main_thread_and_wait(lambda: self.debug_state.context_display())
+
 		self.state_running()
 		threading.Thread(target=perform_resume_thread).start()
 
@@ -142,8 +142,8 @@ class DebugControlsWidget(QToolBar):
 		def perform_step_into_thread():
 			(reason, data) = self.debug_state.step_into()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: binjaplug.context_display(self.bv))
-		
+			execute_on_main_thread_and_wait(lambda: self.debug_state.context_display())
+
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_into_thread).start()
 
@@ -152,8 +152,8 @@ class DebugControlsWidget(QToolBar):
 		def perform_step_over_thread():
 			(reason, data) = self.debug_state.step_over()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: binjaplug.context_display(self.bv))
-		
+			execute_on_main_thread_and_wait(lambda: self.debug_state.context_display())
+
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_over_thread).start()
 
@@ -162,8 +162,8 @@ class DebugControlsWidget(QToolBar):
 		def perform_step_return_thread():
 			(reason, data) = self.debug_state.step_return()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: binjaplug.context_display(self.bv))
-		
+			execute_on_main_thread_and_wait(lambda: self.debug_state.context_display())
+
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_return_thread).start()
 
@@ -222,7 +222,7 @@ class DebugControlsWidget(QToolBar):
 				if stateObj.state == 'STOPPED':
 					adapter = stateObj.adapter
 					adapter.thread_select(tid)
-					binjaplug.context_display(self.bv)
+					self.debug_state.context_display()
 				else:
 					print('cannot set thread in state %s' % stateObj.state)
 
@@ -245,7 +245,7 @@ class DebugControlsWidget(QToolBar):
 		debug_state = binjaplug.get_state(self.bv)
 
 		# clear breakpoints
-		binjaplug.breakpoint_tag_del(self.bv)
+		debug_state.breakpoint_tag_del()
 		debug_state.breakpoints = {}
 
 		debug_state.state = 'INACTIVE'
@@ -286,7 +286,7 @@ class DebugControlsWidget(QToolBar):
 		self.set_actions_enabled(Run=True, Restart=True, Quit=True, Attach=True, Detach=True, Pause=True, Resume=True, StepInto=True, StepOver=True, StepReturn=True, Threads=True)
 		self.set_default_process_action("Run")
 		self.set_thread_list([])
-		self.set_resume_pause_action("Resume")	
+		self.set_resume_pause_action("Resume")
 
 	def handle_stop_return(self, reason, data):
 		if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:

@@ -32,14 +32,14 @@ class DebugView(QWidget, View):
 		frame = ViewFrame.viewFrameForWidget(self)
 		self.memory_editor = LinearView(memory_view, frame)
 		self.binary_editor = DisassemblyContainer(frame, data, frame)
-		
+
 		# TODO: Handle these and change views accordingly
 		# Currently they are just disabled as the DisassemblyContainer gets confused
 		# about where to go and just shows a bad view
 		self.binary_editor.getDisassembly().actionHandler().bindAction("View in Hex Editor", UIAction())
 		self.binary_editor.getDisassembly().actionHandler().bindAction("View in Linear Disassembly", UIAction())
 		self.binary_editor.getDisassembly().actionHandler().bindAction("View in Types View", UIAction())
-		
+
 		self.memory_editor.actionHandler().bindAction("View in Hex Editor", UIAction())
 		self.memory_editor.actionHandler().bindAction("View in Disassembly Graph", UIAction())
 		self.memory_editor.actionHandler().bindAction("View in Types View", UIAction())
@@ -50,7 +50,7 @@ class DebugView(QWidget, View):
 		left_layout = QVBoxLayout()
 		left_layout.setSpacing(0)
 		left_layout.setContentsMargins(0, 0, 0, 0)
-		
+
 		left_label = QLabel("Loaded File")
 		left_label.setFont(small_font)
 		left_layout.addWidget(left_label)
@@ -62,7 +62,7 @@ class DebugView(QWidget, View):
 		right_layout = QVBoxLayout()
 		right_layout.setSpacing(0)
 		right_layout.setContentsMargins(0, 0, 0, 0)
-		
+
 		right_label = QLabel("Debugged Process")
 		right_label.setFont(small_font)
 		right_layout.addWidget(right_label)
@@ -85,7 +85,7 @@ class DebugView(QWidget, View):
 		layout.addWidget(self.controls)
 		layout.addWidget(self.splitter, 100)
 		self.setLayout(layout)
-	
+
 	def getData(self):
 		return self.bv
 

@@ -39,289 +39,10 @@ def delete_state(bv):
 			DebuggerState.states.pop(i)
 			return
 
-#--------------------------------------------------------------------------
-# SUPPORT FUNCTIONS (HIGHER LEVEL)
-#--------------------------------------------------------------------------
-
-def context_display(bv):
-	debug_state = get_state(bv)
-	adapter = debug_state.adapter
-
-	#----------------------------------------------------------------------
-	# Update Registers
-	#----------------------------------------------------------------------
-	registers_widget = widget.get_dockwidget(bv, 'Registers')
-	regs = []
-	for register in adapter.reg_list():
-		value = adapter.reg_read(register)
-		bits = adapter.reg_bits(register)
-		regs.append({
-			'name': register,
-			'bits': bits,
-			'value': value
-		})
-	registers_widget.notifyRegistersChanged(regs)
-
-	#----------------------------------------------------------------------
-	# Update Modules
-	#----------------------------------------------------------------------
-	modules_widget = widget.get_dockwidget(bv, 'Modules')
-	mods = []
-	for (modpath, address) in adapter.mem_modules().items():
-		mods.append({
-			'address': address,
-			'modpath': modpath
-			# TODO: Length, segments, etc
-		})
-	mods.sort(key=lambda row: row['address'])
-	modules_widget.notifyModulesChanged(mods)
-
-	#----------------------------------------------------------------------
-	# Update Threads
-	#----------------------------------------------------------------------
-	threads_widget = widget.get_dockwidget(bv, 'Threads')
-
-	if bv.arch.name == 'x86_64':
-		reg_ip_name = 'rip'
-	else:
-		raise NotImplementedError('only x86_64 so far')
-
-	threads = []
-	tid_selected = adapter.thread_selected()
-	for tid in adapter.thread_list():
-		adapter.thread_select(tid)
-		reg_ip_val = adapter.reg_read(reg_ip_name)
-		threads.append({
-			'tid': tid,
-			reg_ip_name: reg_ip_val,
-			'selected': (tid == tid_selected)
-		})
-	adapter.thread_select(tid_selected)
-	threads_widget.notifyThreadsChanged(threads)
-	debug_state.debug_view.controls.set_thread_list(threads)
-
-	#----------------------------------------------------------------------
-	# Update Stack
-	#----------------------------------------------------------------------
-	stack_widget = widget.get_dockwidget(bv, 'Stack')
-
-	if bv.arch.name == 'x86_64':
-		stack_pointer = adapter.reg_read('rsp')
-		# Read up and down from rsp
-		stack_range = [-8, 60] # Inclusive
-		stack = []
-		for i in range(stack_range[0], stack_range[1] + 1):
-			offset = i * bv.arch.address_size
-			address = stack_pointer + offset
-			value = debug_state.memory_view.read(address, bv.arch.address_size)
-			value_int = value
-			if bv.arch.endianness == binaryninja.Endianness.LittleEndian:
-				value_int = value_int[::-1]
-			value_int = int(value_int.hex(), 16)
-
-			refs = []
-			for register in regs:
-				if register['value'] == address:
-					refs.append({
-						'source': 'register',
-						'dest': 'address',
-						'register': register
-					})
-				# Ignore zeroes because most registers start at zero and give false data
-				if value_int != 0 and register['value'] == value_int:
-					refs.append({
-						'source': 'register',
-						'dest': 'value',
-						'register': register
-					})
-
-			stack.append({
-				'offset': offset,
-				'value': value,
-				'address': address,
-				'refs': refs
-			})
-		stack_widget.notifyStackChanged(stack)
-	else:
-		raise NotImplementedError('only x86_64 so far')
-
-	#--------------------------------------------------------------------------
-	# Update Memory
-	#--------------------------------------------------------------------------
-	update_memory_view(bv)
-	memory_dirty(bv)
-
-	#--------------------------------------------------------------------------
-	# Update Status
-	#--------------------------------------------------------------------------
-
-	if bv.arch.name == 'x86_64':
-		remote_rip = adapter.reg_read('rip')
-		local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
-	else:
-		raise NotImplementedError('only x86_64 so far')
-
-	# Clear old highlighted rip
-	for func in bv.get_functions_containing(debug_state.last_rip):
-		func.set_auto_instr_highlight(debug_state.last_rip, binaryninja.HighlightStandardColor.NoHighlightColor)
-	update_highlights(bv)
-	debug_state.last_rip = local_rip
-
-	# select instruction currently at
-	if bv.read(local_rip, 1):
-		print('navigating to: 0x%X' % local_rip)
-		statusText = 'STOPPED'
-
-		bv.navigate(bv.file.view, local_rip)
-	else:
-		statusText = 'STOPPED (outside view)'
-		print('address 0x%X outside of binary view, not setting cursor' % remote_rip)
-
-	debug_state.debug_view.controls.state_stopped(statusText)
-
-	#data = debug_state.memory_view.read(rip, 16)
-	#if data:
-	#	(asmstr, asmlen) = disasm1(data, rip)
-	#	print('%s%016X%s: %s\t%s' % \
-	#		(GREEN, rip, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
-
-# Mark memory as dirty, will refresh memory view
-def memory_dirty(bv):
-	debug_state = get_state(bv)
-	debug_state.memory_view.mark_dirty()
-	if debug_state.debug_view is not None:
-		debug_state.debug_view.notifyMemoryChanged()
-
-# Create symbols and variables for the memory view
-def update_memory_view(bv):
-	debug_state = get_state(bv)
-	adapter = debug_state.adapter
-	memory_view = debug_state.memory_view
-
-	assert adapter is not None
-	assert memory_view is not None
-
-	memory_view.mark_dirty()
-
-	addr_regs = {}
-	reg_addrs = {}
-
-	for reg in adapter.reg_list():
-		addr = adapter.reg_read(reg)
-		reg_symbol_name = '$' + reg
-
-		if addr not in addr_regs.keys():
-			addr_regs[addr] = [reg_symbol_name]
-		else:
-			addr_regs[addr].append(reg_symbol_name)
-		reg_addrs[reg] = addr
-
-	for symbol in debug_state.old_symbols:
-		# Symbols are immutable so just destroy the old one
-		memory_view.undefine_auto_symbol(symbol)
-
-	for dv in debug_state.old_dvs:
-		memory_view.undefine_data_var(dv)
-
-	debug_state.old_symbols = []
-	debug_state.old_dvs = set()
-	new_dvs = set()
-
-	for (addr, regs) in addr_regs.items():
-		symbol_name = "@".join(regs)
-		fancy_name = ",".join(regs)
-
-		memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, addr, fancy_name, raw_name=symbol_name))
-		debug_state.old_symbols.append(memory_view.get_symbol_by_raw_name(symbol_name))
-		new_dvs.add(addr)
-
-	for new_dv in new_dvs:
-		memory_view.define_data_var(new_dv, Type.int(8))
-		debug_state.old_dvs.add(new_dv)
-
-	# Special struct for stack frame
-	if bv.arch.name == 'x86_64':
-		width = reg_addrs['rbp'] - reg_addrs['rsp']
-		if width > 0:
-			if width > 0x1000:
-				width = 0x1000
-			struct = Structure()
-			struct.type = StructureType.StructStructureType
-			struct.width = width
-			for i in range(0, width, bv.arch.address_size):
-				struct.insert(i, Type.pointer(bv.arch, Type.void()))
-			memory_view.define_data_var(reg_addrs['rsp'], Type.structure_type(struct))
-			memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, reg_addrs['rsp'], "$stack_frame", raw_name="$stack_frame"))
-
-			debug_state.old_symbols.append(memory_view.get_symbol_by_raw_name("$stack_frame"))
-			debug_state.old_dvs.add(reg_addrs['rsp'])
-
-# Highlight lines
-def update_highlights(bv):
-	debug_state = get_state(bv)
-	adapter = debug_state.adapter
-
-	for bp in debug_state.breakpoints:
-		for func in bv.get_functions_containing(bp):
-			func.set_auto_instr_highlight(bp, binaryninja.HighlightStandardColor.RedHighlightColor)
-
-	if adapter is not None:
-		if bv.arch.name == 'x86_64':
-			remote_rip = adapter.reg_read('rip')
-			local_rip = debug_state.memory_view.remote_addr_to_local(remote_rip)
-		else:
-			raise NotImplementedError('only x86_64 so far')
-
-		for func in bv.get_functions_containing(local_rip):
-			func.set_auto_instr_highlight(local_rip, binaryninja.HighlightStandardColor.BlueHighlightColor)
-
-def update_breakpoints(bv):
-	debug_state = get_state(bv)
-	adapter = debug_state.adapter
-
-	bps = []
-	if adapter is not None:
-		for remote_bp in adapter.breakpoint_list():
-			local_bp = debug_state.memory_view.remote_addr_to_local(remote_bp)
-			if local_bp in debug_state.breakpoints.keys():
-				bps.append({
-					'enabled': debug_state.breakpoints[local_bp],
-					'address': local_bp
-				})
-
-	bp_widget = widget.get_dockwidget(bv, "Breakpoints")
-	bp_widget.notifyBreakpointsChanged(bps)
-
-def breakpoint_tag_add(bv, local_address):
-	# create tag
-	tt = bv.tag_types["Crashes"]
-	for func in bv.get_functions_containing(local_address):
-		tags = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
-		if len(tags) == 0:
-			tag = func.create_user_address_tag(local_address, tt, "breakpoint")
-
-# breakpoint TAG removal - strictly presentation
-# (doesn't remove actual breakpoints, just removes the binja tags that mark them)
-#
-def breakpoint_tag_del(bv, local_addresses=None):
-	debug_state = get_state(bv)
-
-	if local_addresses == None:
-		local_addresses = [debug_state.memory_view.local_addr_to_remote(addr) for addr in debug_state.breakpoints]
-
-	for local_address in local_addresses:
-		# delete breakpoint tags from all functions containing this address
-		for func in bv.get_functions_containing(local_address):
-			func.set_auto_instr_highlight(local_address, binaryninja.HighlightStandardColor.NoHighlightColor)
-			delqueue = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
-			for tag in delqueue:
-				func.remove_user_address_tag(local_address, tag)
-
 #------------------------------------------------------------------------------
 # DEBUGGER STATE / CONTROLLER
 #
 # Controller of the debugger for a single BinaryView
-# All functions block until completion or error
 #------------------------------------------------------------------------------
 
 class DebuggerState:
@@ -337,6 +58,277 @@ class DebuggerState:
 		self.old_symbols = []
 		self.old_dvs = set()
 		self.last_rip = 0
+
+	#--------------------------------------------------------------------------
+	# SUPPORT FUNCTIONS (HIGHER LEVEL)
+	#--------------------------------------------------------------------------
+
+	def context_display(self):
+		adapter = self.adapter
+
+		#----------------------------------------------------------------------
+		# Update Registers
+		#----------------------------------------------------------------------
+		registers_widget = widget.get_dockwidget(self.bv, 'Registers')
+		regs = []
+		for register in adapter.reg_list():
+			value = adapter.reg_read(register)
+			bits = adapter.reg_bits(register)
+			regs.append({
+				'name': register,
+				'bits': bits,
+				'value': value
+			})
+		registers_widget.notifyRegistersChanged(regs)
+
+		#----------------------------------------------------------------------
+		# Update Modules
+		#----------------------------------------------------------------------
+		modules_widget = widget.get_dockwidget(self.bv, 'Modules')
+		mods = []
+		for (modpath, address) in adapter.mem_modules().items():
+			mods.append({
+				'address': address,
+				'modpath': modpath
+				# TODO: Length, segments, etc
+			})
+		mods.sort(key=lambda row: row['address'])
+		modules_widget.notifyModulesChanged(mods)
+
+		#----------------------------------------------------------------------
+		# Update Threads
+		#----------------------------------------------------------------------
+		threads_widget = widget.get_dockwidget(self.bv, 'Threads')
+
+		if self.bv.arch.name == 'x86_64':
+			reg_ip_name = 'rip'
+		else:
+			raise NotImplementedError('only x86_64 so far')
+
+		threads = []
+		tid_selected = adapter.thread_selected()
+		for tid in adapter.thread_list():
+			adapter.thread_select(tid)
+			reg_ip_val = adapter.reg_read(reg_ip_name)
+			threads.append({
+				'tid': tid,
+				reg_ip_name: reg_ip_val,
+				'selected': (tid == tid_selected)
+			})
+		adapter.thread_select(tid_selected)
+		threads_widget.notifyThreadsChanged(threads)
+		self.debug_view.controls.set_thread_list(threads)
+
+		#----------------------------------------------------------------------
+		# Update Stack
+		#----------------------------------------------------------------------
+		stack_widget = widget.get_dockwidget(self.bv, 'Stack')
+
+		if self.bv.arch.name == 'x86_64':
+			stack_pointer = adapter.reg_read('rsp')
+			# Read up and down from rsp
+			stack_range = [-8, 60] # Inclusive
+			stack = []
+			for i in range(stack_range[0], stack_range[1] + 1):
+				offset = i * self.bv.arch.address_size
+				address = stack_pointer + offset
+				value = self.memory_view.read(address, self.bv.arch.address_size)
+				value_int = value
+				if self.bv.arch.endianness == binaryninja.Endianness.LittleEndian:
+					value_int = value_int[::-1]
+				value_int = int(value_int.hex(), 16)
+
+				refs = []
+				for register in regs:
+					if register['value'] == address:
+						refs.append({
+							'source': 'register',
+							'dest': 'address',
+							'register': register
+						})
+					# Ignore zeroes because most registers start at zero and give false data
+					if value_int != 0 and register['value'] == value_int:
+						refs.append({
+							'source': 'register',
+							'dest': 'value',
+							'register': register
+						})
+
+				stack.append({
+					'offset': offset,
+					'value': value,
+					'address': address,
+					'refs': refs
+				})
+			stack_widget.notifyStackChanged(stack)
+		else:
+			raise NotImplementedError('only x86_64 so far')
+
+		#----------------------------------------------------------------------
+		# Update Memory
+		#----------------------------------------------------------------------
+		self.update_memory_view()
+		self.memory_dirty()
+
+		#----------------------------------------------------------------------
+		# Update Status
+		#----------------------------------------------------------------------
+
+		if self.bv.arch.name == 'x86_64':
+			remote_rip = adapter.reg_read('rip')
+			local_rip = self.memory_view.remote_addr_to_local(remote_rip)
+		else:
+			raise NotImplementedError('only x86_64 so far')
+
+		# Clear old highlighted rip
+		for func in self.bv.get_functions_containing(self.last_rip):
+			func.set_auto_instr_highlight(self.last_rip, binaryninja.HighlightStandardColor.NoHighlightColor)
+		self.update_highlights()
+		self.last_rip = local_rip
+
+		# select instruction currently at
+		if self.bv.read(local_rip, 1):
+			print('navigating to: 0x%X' % local_rip)
+			statusText = 'STOPPED'
+
+			self.bv.navigate(self.bv.file.view, local_rip)
+		else:
+			statusText = 'STOPPED (outside view)'
+			print('address 0x%X outside of binary view, not setting cursor' % remote_rip)
+
+		self.debug_view.controls.state_stopped(statusText)
+
+		#data = self.memory_view.read(rip, 16)
+		#if data:
+		#	(asmstr, asmlen) = disasm1(data, rip)
+		#	print('%s%016X%s: %s\t%s' % \
+		#		(GREEN, rip, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
+
+	# Mark memory as dirty, will refresh memory view
+	def memory_dirty(self):
+		self.memory_view.mark_dirty()
+		if self.debug_view is not None:
+			self.debug_view.notifyMemoryChanged()
+
+	# Create symbols and variables for the memory view
+	def update_memory_view(self):
+		adapter = self.adapter
+		memory_view = self.memory_view
+
+		assert adapter is not None
+		assert memory_view is not None
+
+		memory_view.mark_dirty()
+
+		addr_regs = {}
+		reg_addrs = {}
+
+		for reg in adapter.reg_list():
+			addr = adapter.reg_read(reg)
+			reg_symbol_name = '$' + reg
+
+			if addr not in addr_regs.keys():
+				addr_regs[addr] = [reg_symbol_name]
+			else:
+				addr_regs[addr].append(reg_symbol_name)
+			reg_addrs[reg] = addr
+
+		for symbol in self.old_symbols:
+			# Symbols are immutable so just destroy the old one
+			memory_view.undefine_auto_symbol(symbol)
+
+		for dv in self.old_dvs:
+			memory_view.undefine_data_var(dv)
+
+		self.old_symbols = []
+		self.old_dvs = set()
+		new_dvs = set()
+
+		for (addr, regs) in addr_regs.items():
+			symbol_name = "@".join(regs)
+			fancy_name = ",".join(regs)
+
+			memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, addr, fancy_name, raw_name=symbol_name))
+			self.old_symbols.append(memory_view.get_symbol_by_raw_name(symbol_name))
+			new_dvs.add(addr)
+
+		for new_dv in new_dvs:
+			memory_view.define_data_var(new_dv, Type.int(8))
+			self.old_dvs.add(new_dv)
+
+		# Special struct for stack frame
+		if self.bv.arch.name == 'x86_64':
+			width = reg_addrs['rbp'] - reg_addrs['rsp']
+			if width > 0:
+				if width > 0x1000:
+					width = 0x1000
+				struct = Structure()
+				struct.type = StructureType.StructStructureType
+				struct.width = width
+				for i in range(0, width, self.bv.arch.address_size):
+					struct.insert(i, Type.pointer(self.bv.arch, Type.void()))
+				memory_view.define_data_var(reg_addrs['rsp'], Type.structure_type(struct))
+				memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, reg_addrs['rsp'], "$stack_frame", raw_name="$stack_frame"))
+
+				self.old_symbols.append(memory_view.get_symbol_by_raw_name("$stack_frame"))
+				self.old_dvs.add(reg_addrs['rsp'])
+
+	# Highlight lines
+	def update_highlights(self):
+		adapter = self.adapter
+
+		for bp in self.breakpoints:
+			for func in self.bv.get_functions_containing(bp):
+				func.set_auto_instr_highlight(bp, binaryninja.HighlightStandardColor.RedHighlightColor)
+
+		if adapter is not None:
+			if self.bv.arch.name == 'x86_64':
+				remote_rip = adapter.reg_read('rip')
+				local_rip = self.memory_view.remote_addr_to_local(remote_rip)
+			else:
+				raise NotImplementedError('only x86_64 so far')
+
+			for func in self.bv.get_functions_containing(local_rip):
+				func.set_auto_instr_highlight(local_rip, binaryninja.HighlightStandardColor.BlueHighlightColor)
+
+	def update_breakpoints(self):
+		adapter = self.adapter
+
+		bps = []
+		if adapter is not None:
+			for remote_bp in adapter.breakpoint_list():
+				local_bp = self.memory_view.remote_addr_to_local(remote_bp)
+				if local_bp in self.breakpoints.keys():
+					bps.append({
+						'enabled': self.breakpoints[local_bp],
+						'address': local_bp
+					})
+
+		bp_widget = widget.get_dockwidget(self.bv, "Breakpoints")
+		bp_widget.notifyBreakpointsChanged(bps)
+
+	def breakpoint_tag_add(self, local_address):
+		# create tag
+		tt = self.bv.tag_types["Crashes"]
+		for func in self.bv.get_functions_containing(local_address):
+			tags = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
+			if len(tags) == 0:
+				tag = func.create_user_address_tag(local_address, tt, "breakpoint")
+
+	# breakpoint TAG removal - strictly presentation
+	# (doesn't remove actual breakpoints, just removes the binja tags that mark them)
+	#
+	def breakpoint_tag_del(self, local_addresses=None):
+		if local_addresses == None:
+			local_addresses = [self.memory_view.local_addr_to_remote(addr) for addr in self.breakpoints]
+
+		for local_address in local_addresses:
+			# delete breakpoint tags from all functions containing this address
+			for func in self.bv.get_functions_containing(local_address):
+				func.set_auto_instr_highlight(local_address, binaryninja.HighlightStandardColor.NoHighlightColor)
+				delqueue = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
+				for tag in delqueue:
+					func.remove_user_address_tag(local_address, tag)
 
 	#--------------------------------------------------------------------------
 	# DEBUGGER FUNCTIONS (MEDIUM LEVEL, BLOCKING)
@@ -549,10 +541,10 @@ class DebuggerState:
 		# save it
 		self.breakpoints[local_address] = True
 		print('breakpoint address=0x%X (remote=0x%X) set' % (local_address, remote_address))
-		update_highlights(self.bv)
-		update_breakpoints(self.bv)
+		self.update_highlights()
+		self.update_breakpoints()
 
-		breakpoint_tag_add(self.bv, local_address)
+		self.breakpoint_tag_add(local_address)
 
 		return True
 
@@ -570,13 +562,13 @@ class DebuggerState:
 				print('ERROR: clearing breakpoint')
 
 			# delete breakpoint tags from all functions containing this address
-			breakpoint_tag_del(self.bv, [local_address])
+			self.breakpoint_tag_del([local_address])
 
 			# delete from our list
 			del self.breakpoints[local_address]
 
-			update_highlights(self.bv)
-			update_breakpoints(self.bv)
+			self.update_highlights()
+			self.update_breakpoints()
 		else:
 			print('ERROR: breakpoint not found in list')
 
