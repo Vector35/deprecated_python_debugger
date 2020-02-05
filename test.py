@@ -28,6 +28,7 @@ adapter = None
 #--------------------------------------------------------------------------
 
 def parse_image(fpath):
+	print('finding entrypoint for %s' % fpath)
 	with open(fpath, 'rb') as fp:
 		data = fp.read()
 
@@ -87,11 +88,30 @@ def parse_image(fpath):
 	if data[0:4] == b'\x7FELF':
 		assert data[4] == 2 # EI_CLASS 64-bit
 		assert data[5] == 1 # EI_DATA little endian
-		assert data[0x10:0x12] == b'\x02\x00' # e_type ET_EXEC
+
+		assert data[0x10:0x12] in [b'\x02\x00', b'\x03\x00'] # e_type ET_EXEC or ET_DYN (pie)
 		assert data[0x12:0x14] == b'\x3E\x00' # e_machine EM_X86_64
-		# TODO: separate ELF load address and offset
 		e_entry = unpack('<Q', data[0x18:0x20])[0]
-		p_vaddr = unpack('<Q', data[0x50:0x58])[0]
+		e_phoff = unpack('<Q', data[0x20:0x28])[0]
+		e_phentsize = unpack('<H', data[0x36:0x38])[0]
+		e_phnum = unpack('<H', data[0x38:0x3a])[0]
+		print('e_entry:0x%X e_phoff:0x%X e_phentsize:0x%X e_phnum:0x%X' %
+			(e_entry, e_phoff, e_phentsize, e_phnum))
+
+		# find first PT_LOAD
+		p_vaddr = None
+		offs = e_phoff
+		for i in range(e_phnum):
+			p_type = unpack('<I', data[offs:offs+4])[0]
+			#print('at offset 0x%X p_type:0x%X' % (offs, p_type))
+			if p_type == 1:
+				p_vaddr = unpack('<Q', data[offs+16:offs+24])[0]
+				break
+			offs += e_phentsize
+
+		if p_vaddr == None:
+			raise Exception('couldnt locate a single PT_LOAD program header')
+
 		return (p_vaddr, e_entry-p_vaddr)
 
 	raise Exception('unrecognized file type')
@@ -145,16 +165,17 @@ def test_prologue(prog, testtype):
 	print(module2addr)
 	print(fpath)
 	assert fpath in module2addr
-	if not '_pie' in prog:
-		print('non-pie module should hold file\'s specified load and entry')
-		print('load_addr: 0x%X' % load_addr)
-		print('module2addr[fpath]: 0x%X' % module2addr[fpath])
-		assert module2addr[fpath] == load_addr
-	else:
+
+	if '_pie' in prog:
 		load_addr = module2addr[fpath]
 		print('pie module, file load 0x%X overridden with 0x%X, new entry 0x%X' %
 			(load_addr, module2addr[fpath], module2addr[fpath]+entry_offs))
 		entry = load_addr + entry_offs
+	else:
+		print('non-pie module should hold file\'s specified load and entry')
+		print('load_addr: 0x%X' % load_addr)
+		print('module2addr[fpath]: 0x%X' % module2addr[fpath])
+		assert module2addr[fpath] == load_addr
 
 	return (adapter, entry)
 
@@ -189,18 +210,30 @@ if __name__ == '__main__':
 	if 'assembly' in tests:
 		(adapter, entry) = test_prologue('asmtest', 'ASSEMBLY')
 
+		loader = adapter.reg_read('rip') != entry
+		if loader:
+			print('entrypoint is the program, no library or loader')
+		else:
+			print('loader detected, gonna step a few times for fun')
+
 		# a few steps in the loader
-		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		if loader:
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+
 		# set bp entry
+		print('setting entry breakpoint at 0x%X' % entry)
 		adapter.breakpoint_set(entry)
+
 		# few more steps
-		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		if loader:
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+
 		# go to entry
 		adapter.go()
 		assert adapter.reg_read('rip') == entry

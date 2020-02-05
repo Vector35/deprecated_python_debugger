@@ -8,6 +8,8 @@ Binary Ninja debugger effort for IQT
 - lldb can have its registers polled with 'qRegisterInfo' packet, but gdb uses XML target description
 - lldb has space in 'P' packet, like 'P 0=DEADBEEF' while gdb has 'P0=DEADBEEF'
 - lldb has single reg writes with 'P' packet, gdb doesn't, and registers must be written in group with 'G' packet
+- lldb can list solibs and executable image with 'jGetLoadedDynamicLibrariesInfos' packet, gdb still looks to /proc/pid/maps
+
 ## notes:
 
 tcpdump -i lo0 -A -s0 'port 31337'
@@ -28,4 +30,6 @@ do
 done
 ```
 
-debugserver localhost:31337 ./testbins/asmtest
+`$ debugserver localhost:31337 ./testbins/asmtest`
+
+`$ gdbserver --once --no-startup-with-shell localhost:31337 ./testbins/asmtest`

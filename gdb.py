@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import re
 import socket
 from struct import pack, unpack
@@ -110,9 +111,30 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		rsp.tx_rx(self.sock, 'qSupported:swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;xmlRegisters=i386')
 		self.reg_info_load()
 
+		# acquire pid as first tid
+		reply = rsp.tx_rx(self.sock, '?')
+		tdict = rsp.packet_T_to_dict(reply)
+		self.pid = tdict['thread']
+
 	#--------------------------------------------------------------------------
 	# API
 	#--------------------------------------------------------------------------
+	def mem_modules(self):
+		module2addr = {}
+
+		with open('/proc/%d/maps' % self.pid, 'r') as fp:
+			lines = fp.readlines()
+
+		for line in lines:
+			line = line.strip()
+			m = re.match(r'^([0-9a-f]+)-[0-9a-f]+ [rwxp-]{4} .* (/.*)$', line)
+			if not m: continue
+			(addr, module) = m.group(1,2)
+			if module in module2addr: continue
+			if os.path.exists(module):
+				module2addr[module] = int(addr, 16)
+
+		return module2addr
 
 	#--------------------------------------------------------------------------
 	# helpers, NOT part of the API

@@ -218,12 +218,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			return 0
 
 	def mem_modules(self):
-		module2addr = {}
-		reply = rsp.tx_rx(self.sock, 'jGetLoadedDynamicLibrariesInfos:{"fetch_all_solibs":true}')
-		for (addr, path) in re.findall(r'"load_address":(\d+).*?"pathname":"([^"]+)"', reply):
-			addr = int(addr, 10)
-			module2addr[path] = addr
-		return module2addr
+		raise NotImplementedError('mem_modules()')
 
 	# break
 	def break_into(self):
