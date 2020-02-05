@@ -230,11 +230,10 @@ class DebugControlsWidget(QToolBar):
 
 		self.threadMenu.clear()
 		if len(threads) > 0:
-			selected = binjaplug.get_state(self.bv).adapter.thread_selected()
 			for thread in threads:
 				item_name = "Thread {} at {}".format(thread['tid'], hex(thread['rip']))
 				action = self.threadMenu.addAction(item_name, select_thread_fn(thread['tid']))
-				if thread['tid'] == selected:
+				if thread['selected']:
 					self.btnThreads.setDefaultAction(action)
 		else:
 			defaultThreadAction = self.threadMenu.addAction("Thread List")

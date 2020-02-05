@@ -107,15 +107,19 @@ class DebuggerState:
 
 		threads = []
 		tid_selected = adapter.thread_selected()
+		last_thread = tid_selected
 		for tid in adapter.thread_list():
-			adapter.thread_select(tid)
+			if last_thread != tid:
+				adapter.thread_select(tid)
+				last_thread = tid
 			reg_ip_val = adapter.reg_read(reg_ip_name)
 			threads.append({
 				'tid': tid,
 				reg_ip_name: reg_ip_val,
 				'selected': (tid == tid_selected)
 			})
-		adapter.thread_select(tid_selected)
+		if last_thread != tid_selected:
+			adapter.thread_select(tid_selected)
 		threads_widget.notifyThreadsChanged(threads)
 		self.debug_view.controls.set_thread_list(threads)
 
