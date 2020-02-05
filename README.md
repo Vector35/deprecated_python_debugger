@@ -11,9 +11,13 @@ Binary Ninja debugger effort for IQT
 ## notes:
 
 tcpdump -i lo0 -A -s0 'port 31337'
+
 typical GDB RSP files
+
 https://sourceware.org/gdb/onlinedocs/gdb/Packets.html
+
 lldb-gdb-remote.txt
+
 gcc -o helloworld helloworld.c -Wl,-no_pie
 
 ```bash
@@ -23,5 +27,5 @@ do
 	echo "Press Ctrl-C to quit." && sleep .1
 done
 ```
-  weak xml reply: $l<target><architecture>i386:x86-64</architecture><osabi>GNU/Linux</osabi></target>#ef
-strong xml reply: $l<?xml version="1.0"?><!DOCTYPE target SYSTEM "gdb-target.dtd"><target><architecture>i386:x86-64</architecture>
+
+debugserver localhost:31337 ./testbins/asmtest

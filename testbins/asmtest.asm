@@ -9,25 +9,21 @@ global start
 section .text
 start:
 	nop
+	call bounce
 	nop
+	call bounce
 	nop
+	call bounce
 	nop
+	call bounce
 	nop
+	call bounce
 	nop
+	call bounce
 	nop
+	call bounce
 	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
+	call bounce
 
 	; print welcome message
 	mov		rsi, msg1
@@ -60,6 +56,9 @@ puts:
 	mov		rax, 0x2000004 ; write
 	mov		rdi, 1 ; stdout
 	syscall
+	retn
+
+bounce:
 	retn
 
 section .data

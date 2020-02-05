@@ -122,11 +122,11 @@ def assert_general_error(func):
 		raised = True
 	assert raised
 
-def test_prologue(prog):
+def test_prologue(prog, testtype):
 	fpath = test_prog_to_fpath(prog)
 
 	print('----------------------------------------------------------------')
-	print('ASSEMBLER test on %s' % fpath)
+	print('%s test on %s' % (testtype.upper(), fpath))
 	print('----------------------------------------------------------------')
 
 	(load_addr, entry_offs) = parse_image(fpath)
@@ -163,6 +163,8 @@ if __name__ == '__main__':
 
 	# one-off tests
 	if arg == 'oneoff':
+		(asmtxt, length) = helpers.disasm1(b'\x90', 0)
+		print(asmtxt)
 		fpath = test_prog_to_fpath('asmtest')
 		print(fpath)
 		(load_addr, entry_offs) = parse_image(fpath)
@@ -181,7 +183,39 @@ if __name__ == '__main__':
 		tests = ['assembly', 'thread', 'basic']
 
 	if 'assembly' in tests:
-		(adapter, entry) = test_prologue('asmtest')
+		(adapter, entry) = test_prologue('asmtest', 'ASSEMBLY')
+
+		# a few steps in the loader
+		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		# set bp entry
+		adapter.breakpoint_set(entry)
+		# few more steps
+		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		# go to entry
+		adapter.go()
+		assert adapter.reg_read('rip') == entry
+		adapter.breakpoint_clear(entry)
+		# step into nop
+		adapter.step_into()
+		assert adapter.reg_read('rip') == entry+1
+		# step into call, return
+		adapter.step_into()
+		adapter.step_into()
+		# back
+		assert adapter.reg_read('rip') == entry+6
+		adapter.step_into()
+		# step into call, return
+		adapter.step_into()
+		adapter.step_into()
+		# back
+		assert adapter.reg_read('rip') == entry+12
+
 		adapter.quit()
 
 	if 'basic' in tests:
@@ -190,7 +224,7 @@ if __name__ == '__main__':
 			'helloworld_loop_pie', 'helloworld_func_pie',
 			]:
 
-			(adapter, entry) = test_prologue(prog)
+			(adapter, entry) = test_prologue(prog, 'BASIC')
 
 			print('rip: 0x%X' % adapter.reg_read('rip'))
 
@@ -271,7 +305,7 @@ if __name__ == '__main__':
 			adapter = None
 
 	if 'thread' in tests:
-		(adapter, entry) = test_prologue('helloworld_thread')
+		(adapter, entry) = test_prologue('helloworld_thread', 'THREAD')
 
 		print('scheduling break in .5 seconds')
 		threading.Timer(.5, break_into, [adapter]).start()
