@@ -6,7 +6,7 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, Q
 import binaryninja
 import binaryninjaui
 from binaryninja import BinaryView
-from binaryninjaui import View, ViewType, UIAction, UIActionHandler, LinearView, DisassemblyContainer, ViewFrame
+from binaryninjaui import View, ViewType, UIAction, UIActionHandler, LinearView, DisassemblyContainer, ViewFrame, DockHandler
 
 from . import widget, ControlsWidget
 from .. import binjaplug
@@ -85,6 +85,16 @@ class DebugView(QWidget, View):
 		layout.addWidget(self.controls)
 		layout.addWidget(self.splitter, 100)
 		self.setLayout(layout)
+
+		# Add debugger state to the interpreter as `dbg`
+		main_window = parent.window()
+		dock_handler = main_window.findChild(DockHandler, '__DockHandler')
+		if dock_handler:
+			console = dock_handler.getDockWidget('Python Console')
+			if console:
+				# Hack: Currently no way to access the scripting provider directly
+				# So just run the commands through the ui
+				console.widget().addInput("import debugger\ndbg = debugger.get(bv)")
 
 	def getData(self):
 		return self.bv

@@ -6,6 +6,9 @@
 try:
 	from . import binjaplug
 	binjaplug.initialize()
+
+	def get(bv):
+		return binjaplug.get_state(bv)
 except (ModuleNotFoundError, ImportError):
 	print('binjaplug not found, assuming this is cli mode')
 
