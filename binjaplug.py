@@ -64,16 +64,14 @@ class DebuggerState:
 	#--------------------------------------------------------------------------
 
 	def context_display(self):
-		adapter = self.adapter
-
 		#----------------------------------------------------------------------
 		# Update Registers
 		#----------------------------------------------------------------------
 		registers_widget = widget.get_dockwidget(self.bv, 'Registers')
 		regs = []
-		for register in adapter.reg_list():
-			value = adapter.reg_read(register)
-			bits = adapter.reg_bits(register)
+		for register in self.adapter.reg_list():
+			value = self.adapter.reg_read(register)
+			bits = self.adapter.reg_bits(register)
 			regs.append({
 				'name': register,
 				'bits': bits,
@@ -86,7 +84,7 @@ class DebuggerState:
 		#----------------------------------------------------------------------
 		modules_widget = widget.get_dockwidget(self.bv, 'Modules')
 		mods = []
-		for (modpath, address) in adapter.mem_modules().items():
+		for (modpath, address) in self.adapter.mem_modules().items():
 			mods.append({
 				'address': address,
 				'modpath': modpath
@@ -106,20 +104,20 @@ class DebuggerState:
 			raise NotImplementedError('only x86_64 so far')
 
 		threads = []
-		tid_selected = adapter.thread_selected()
+		tid_selected = self.adapter.thread_selected()
 		last_thread = tid_selected
-		for tid in adapter.thread_list():
+		for tid in self.adapter.thread_list():
 			if last_thread != tid:
-				adapter.thread_select(tid)
+				self.adapter.thread_select(tid)
 				last_thread = tid
-			reg_ip_val = adapter.reg_read(reg_ip_name)
+			reg_ip_val = self.adapter.reg_read(reg_ip_name)
 			threads.append({
 				'tid': tid,
 				reg_ip_name: reg_ip_val,
 				'selected': (tid == tid_selected)
 			})
 		if last_thread != tid_selected:
-			adapter.thread_select(tid_selected)
+			self.adapter.thread_select(tid_selected)
 		threads_widget.notifyThreadsChanged(threads)
 		self.debug_view.controls.set_thread_list(threads)
 
@@ -129,7 +127,7 @@ class DebuggerState:
 		stack_widget = widget.get_dockwidget(self.bv, 'Stack')
 
 		if self.bv.arch.name == 'x86_64':
-			stack_pointer = adapter.reg_read('rsp')
+			stack_pointer = self.adapter.reg_read('rsp')
 			# Read up and down from rsp
 			stack_range = [-8, 60] # Inclusive
 			stack = []
@@ -172,14 +170,13 @@ class DebuggerState:
 		# Update Memory
 		#----------------------------------------------------------------------
 		self.update_memory_view()
-		self.memory_dirty()
 
 		#----------------------------------------------------------------------
 		# Update Status
 		#----------------------------------------------------------------------
 
 		if self.bv.arch.name == 'x86_64':
-			remote_rip = adapter.reg_read('rip')
+			remote_rip = self.adapter.reg_read('rip')
 			local_rip = self.memory_view.remote_addr_to_local(remote_rip)
 		else:
 			raise NotImplementedError('only x86_64 so far')
@@ -216,19 +213,14 @@ class DebuggerState:
 
 	# Create symbols and variables for the memory view
 	def update_memory_view(self):
-		adapter = self.adapter
-		memory_view = self.memory_view
-
-		assert adapter is not None
-		assert memory_view is not None
-
-		memory_view.mark_dirty()
+		assert self.adapter is not None
+		assert self.memory_view is not None
 
 		addr_regs = {}
 		reg_addrs = {}
 
-		for reg in adapter.reg_list():
-			addr = adapter.reg_read(reg)
+		for reg in self.adapter.reg_list():
+			addr = self.adapter.reg_read(reg)
 			reg_symbol_name = '$' + reg
 
 			if addr not in addr_regs.keys():
@@ -239,10 +231,10 @@ class DebuggerState:
 
 		for symbol in self.old_symbols:
 			# Symbols are immutable so just destroy the old one
-			memory_view.undefine_auto_symbol(symbol)
+			self.memory_view.undefine_auto_symbol(symbol)
 
 		for dv in self.old_dvs:
-			memory_view.undefine_data_var(dv)
+			self.memory_view.undefine_data_var(dv)
 
 		self.old_symbols = []
 		self.old_dvs = set()
@@ -252,12 +244,12 @@ class DebuggerState:
 			symbol_name = "@".join(regs)
 			fancy_name = ",".join(regs)
 
-			memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, addr, fancy_name, raw_name=symbol_name))
-			self.old_symbols.append(memory_view.get_symbol_by_raw_name(symbol_name))
+			self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, addr, fancy_name, raw_name=symbol_name))
+			self.old_symbols.append(self.memory_view.get_symbol_by_raw_name(symbol_name))
 			new_dvs.add(addr)
 
 		for new_dv in new_dvs:
-			memory_view.define_data_var(new_dv, Type.int(8))
+			self.memory_view.define_data_var(new_dv, Type.int(8))
 			self.old_dvs.add(new_dv)
 
 		# Special struct for stack frame
@@ -271,23 +263,21 @@ class DebuggerState:
 				struct.width = width
 				for i in range(0, width, self.bv.arch.address_size):
 					struct.insert(i, Type.pointer(self.bv.arch, Type.void()))
-				memory_view.define_data_var(reg_addrs['rsp'], Type.structure_type(struct))
-				memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, reg_addrs['rsp'], "$stack_frame", raw_name="$stack_frame"))
+				self.memory_view.define_data_var(reg_addrs['rsp'], Type.structure_type(struct))
+				self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, reg_addrs['rsp'], "$stack_frame", raw_name="$stack_frame"))
 
-				self.old_symbols.append(memory_view.get_symbol_by_raw_name("$stack_frame"))
+				self.old_symbols.append(self.memory_view.get_symbol_by_raw_name("$stack_frame"))
 				self.old_dvs.add(reg_addrs['rsp'])
 
 	# Highlight lines
 	def update_highlights(self):
-		adapter = self.adapter
-
 		for bp in self.breakpoints:
 			for func in self.bv.get_functions_containing(bp):
 				func.set_auto_instr_highlight(bp, binaryninja.HighlightStandardColor.RedHighlightColor)
 
-		if adapter is not None:
+		if self.adapter is not None:
 			if self.bv.arch.name == 'x86_64':
-				remote_rip = adapter.reg_read('rip')
+				remote_rip = self.adapter.reg_read('rip')
 				local_rip = self.memory_view.remote_addr_to_local(remote_rip)
 			else:
 				raise NotImplementedError('only x86_64 so far')
@@ -296,11 +286,9 @@ class DebuggerState:
 				func.set_auto_instr_highlight(local_rip, binaryninja.HighlightStandardColor.BlueHighlightColor)
 
 	def update_breakpoints(self):
-		adapter = self.adapter
-
 		bps = []
-		if adapter is not None:
-			for remote_bp in adapter.breakpoint_list():
+		if self.adapter is not None:
+			for remote_bp in self.adapter.breakpoint_list():
 				local_bp = self.memory_view.remote_addr_to_local(remote_bp)
 				if local_bp in self.breakpoints.keys():
 					bps.append({
@@ -344,16 +332,15 @@ class DebuggerState:
 		if not os.path.exists(fpath):
 			raise Exception('cannot find debug target: ' + fpath)
 
-		#adapter = lldb.DebugAdapterLLDB()
-		adapter = helpers.launch_get_adapter(fpath)
-
-		self.adapter = adapter
+		#self.adapter = lldb.DebugAdapterLLDB()
+		self.adapter = helpers.launch_get_adapter(fpath)
 		self.memory_view.update_base()
 
 		if self.bv and self.bv.entry_point:
 			local_entry = self.bv.entry_point
 			remote_entry = self.memory_view.local_addr_to_remote(local_entry)
 			self.breakpoint_set(remote_entry)
+		self.memory_dirty()
 
 	def quit(self):
 		if self.adapter is not None:
@@ -367,6 +354,7 @@ class DebuggerState:
 				pass
 			finally:
 				self.adapter = None
+		self.memory_dirty()
 
 	def restart(self):
 		self.quit()
@@ -385,10 +373,13 @@ class DebuggerState:
 				pass
 			finally:
 				self.adapter = None
+		self.memory_dirty()
 
 	def pause(self):
 		assert self.adapter
-		return self.adapter.break_into()
+		result = self.adapter.break_into()
+		self.memory_dirty()
+		return result
 
 	def go(self):
 		assert self.adapter
@@ -405,7 +396,9 @@ class DebuggerState:
 		else:
 			seq.append((self.adapter.go, ()))
 
-		return self.exec_adapter_sequence(seq)
+		result = self.exec_adapter_sequence(seq)
+		self.memory_dirty()
+		return result
 
 	def step_into(self):
 		assert self.adapter
@@ -428,7 +421,9 @@ class DebuggerState:
 			else:
 				seq.append((self.adapter.step_into, ()))
 			# TODO: Cancel (and raise some exception)
-			return self.exec_adapter_sequence(seq)
+			result = self.exec_adapter_sequence(seq)
+			self.memory_dirty()
+			return result
 		else:
 			raise NotImplementedError('step unimplemented for architecture %s' % self.bv.arch.name)
 
@@ -484,8 +479,10 @@ class DebuggerState:
 				seq.append((self.adapter.breakpoint_clear, (remote_ripnext,)))
 			else:
 				raise Exception('confused by call, bphere, bpnext state')
-					# TODO: Cancel (and raise some exception)
-			return self.exec_adapter_sequence(seq)
+			# TODO: Cancel (and raise some exception)
+			result = self.exec_adapter_sequence(seq)
+			self.memory_dirty()
+			return result
 
 		else:
 			raise NotImplementedError('step over unimplemented for architecture %s' % self.bv.arch.name)
@@ -524,8 +521,10 @@ class DebuggerState:
 					seq.append((self.adapter.breakpoint_clear, (bp,)))
 				if bphere and not local_rip in new_bps and not local_rip in old_bps:
 					seq.append((self.adapter.breakpoint_set, (remote_rip,)))
-			# TODO: Cancel (and raise some exception)
-				return self.exec_adapter_sequence(seq)
+				# TODO: Cancel (and raise some exception)
+				result = self.exec_adapter_sequence(seq)
+				self.memory_dirty()
+				return result
 			else:
 				print("Can't find current function")
 				return (None, None)

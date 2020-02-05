@@ -104,12 +104,10 @@ class DebugControlsWidget(QToolBar):
 	def perform_restart(self):
 		self.debug_state.restart()
 		self.state_stopped()
-		self.debug_state.memory_dirty()
 
 	def perform_quit(self):
 		self.debug_state.quit()
 		self.state_inactive()
-		self.debug_state.memory_dirty()
 
 	def perform_attach(self):
 		# TODO: Show dialog to select adapter/address/process
@@ -118,7 +116,6 @@ class DebugControlsWidget(QToolBar):
 	def perform_detach(self):
 		self.debug_state.detach()
 		self.state_inactive()
-		self.debug_state.memory_dirty()
 
 	def perform_settings(self):
 		# TODO: Show settings dialog
