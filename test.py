@@ -90,7 +90,9 @@ def parse_image(fpath):
 		assert data[0x10:0x12] == b'\x02\x00' # e_type ET_EXEC
 		assert data[0x12:0x14] == b'\x3E\x00' # e_machine EM_X86_64
 		# TODO: separate ELF load address and offset
-		return unpack('<Q', data[0x18:0x20])[0]
+		e_entry = unpack('<Q', data[0x18:0x20])[0]
+		p_vaddr = unpack('<Q', data[0x50:0x58])[0]
+		return (p_vaddr, e_entry-p_vaddr)
 
 	raise Exception('unrecognized file type')
 
@@ -140,6 +142,8 @@ def test_prologue(prog, testtype):
 	# learn load address, entrypoint
 	#
 	module2addr = adapter.mem_modules()
+	print(module2addr)
+	print(fpath)
 	assert fpath in module2addr
 	if not '_pie' in prog:
 		print('non-pie module should hold file\'s specified load and entry')

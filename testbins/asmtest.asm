@@ -1,13 +1,22 @@
-; nasm -f macho64 challenge.asm -o challenge.o
-; ld -macosx_version_min 10.7.0 -lSystem challenge.o -o challenge
-; otool -t -v -j ./asmtest
+; MAC:
+;   nasm -f macho64 challenge.asm -o challenge.o
+;   ld -macosx_version_min 10.7.0 -lSystem challenge.o -o challenge
+;   otool -t -v -j ./asmtest
 
 default rel
 
-global start
+%ifdef OS_IS_LINUX
+	global _start
+	section .text
+	_start:
+%endif
 
-section .text
-start:
+%ifdef OS_IS_MACOS
+	global start
+	section .text
+	start:
+%endif
+
 	nop
 	call bounce
 	nop
@@ -25,53 +34,31 @@ start:
 	nop
 	call bounce
 
-	; print welcome message
-	mov		rsi, msg1
-	mov		rdx, msg1.len
-	call	puts
+	mov		rsi, msg
+	mov		rdx, msg.len
+	mov		rdi, 1 ; stdout
 
-	; read name
-	;mov		rax, 0x2000003 ; read
-	;mov		rdi, 0 ; stdin
-	;mov		rsi, buf
-	;mov		rdx, 32
-	;syscall	
+%ifdef OS_IS_LINUX
+	mov		rax, 1 ; write
+	syscall
+	mov		rdi, 0 ; arg0: status
+	mov		rax, 60 ; __NR_exit
+	syscall
+%endif
 
-	; print hello
-	mov		rsi, msg2
-	mov		rdx, msg2.len
-	call	puts
-
-	; print hello
-	mov		rsi, buf
-	mov		rdx, 32
-	call	puts	
-
-exit:
+%ifdef OS_IS_MACOS
+	mov		rax, 0x2000004 ; write
+	syscall
 	mov		rax, 0x2000001 ; exit
 	mov		rdi, 0
 	syscall
-
-puts:
-	mov		rax, 0x2000004 ; write
-	mov		rdi, 1 ; stdout
-	syscall
-	retn
+%endif
 
 bounce:
 	retn
 
 section .data
-buf:
-	db		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-	db		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-	db		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-	db		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-msg1:
-	db		"What is your name?", 0x0a
-	.len:   equ	$ - msg1
-msg2:
-	db		"Hello, "
-	.len:   equ	$ - msg2
-
+msg:
+	db		"Hello, world!", 0x0a
+	.len:   equ	$ - msg
 

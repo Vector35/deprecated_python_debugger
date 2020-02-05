@@ -343,9 +343,13 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		p = xml.parsers.expat.ParserCreate()
 		p.StartElementHandler = search_reg
 		p.Parse(xmltxt)
+
 		for fname in subfiles:
 			#print('acquiring %s' % fname)
 			xmltxt = self.get_xml(fname)
+			#print(xmltxt)
+			p = xml.parsers.expat.ParserCreate()
+			p.StartElementHandler = search_reg
 			p.Parse(xmltxt)
 
 		#

@@ -1,5 +1,5 @@
 # make -f Makefile-linux
-all: helloworld helloworld_loop helloworld_thread helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie
+all: helloworld helloworld_loop helloworld_thread helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie asmtest
 
 helloworld: helloworld.c
 	gcc -W -no-pie helloworld.c -o helloworld
@@ -25,5 +25,9 @@ helloworld_loop_pie: helloworld_loop.c
 helloworld_func_pie: helloworld_func.c
 	gcc -W -pie helloworld_func.c -o helloworld_func_pie
 
+asmtest: asmtest.asm
+	nasm asmtest.asm -f elf64 -DOS_IS_LINUX -o asmtest.o
+	ld -m elf_x86_64 asmtest.o -o asmtest
+
 clean:
-	rm -rf helloworld helloworld_thread helloworld_loop helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie
+	rm -rf helloworld helloworld_thread helloworld_loop helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie asmtest
