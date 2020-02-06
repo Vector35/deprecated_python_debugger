@@ -6,7 +6,7 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, Q
 import binaryninja
 import binaryninjaui
 from binaryninja import BinaryView
-from binaryninjaui import View, ViewType, UIAction, UIActionHandler, LinearView, DisassemblyContainer, ViewFrame, DockHandler
+from binaryninjaui import View, ViewType, UIAction, UIActionHandler, LinearView, DisassemblyContainer, ViewFrame, DockHandler, TokenizedTextView
 
 from . import widget, ControlsWidget
 from .. import binjaplug
@@ -33,6 +33,9 @@ class DebugView(QWidget, View):
 		self.memory_editor = LinearView(memory_view, frame)
 		self.binary_editor = DisassemblyContainer(frame, data, frame)
 
+		self.binary_text = TokenizedTextView(self, self.bv)
+		self.is_raw_disassembly = False
+
 		# TODO: Handle these and change views accordingly
 		# Currently they are just disabled as the DisassemblyContainer gets confused
 		# about where to go and just shows a bad view
@@ -47,32 +50,44 @@ class DebugView(QWidget, View):
 		small_font = QApplication.font()
 		small_font.setPointSize(11)
 
-		left_layout = QVBoxLayout()
-		left_layout.setSpacing(0)
-		left_layout.setContentsMargins(0, 0, 0, 0)
+		bv_layout = QVBoxLayout()
+		bv_layout.setSpacing(0)
+		bv_layout.setContentsMargins(0, 0, 0, 0)
 
-		left_label = QLabel("Loaded File")
-		left_label.setFont(small_font)
-		left_layout.addWidget(left_label)
-		left_layout.addWidget(self.binary_editor)
+		bv_label = QLabel("Loaded File")
+		bv_label.setFont(small_font)
+		bv_layout.addWidget(bv_label)
+		bv_layout.addWidget(self.binary_editor)
 
-		left_widget = QWidget()
-		left_widget.setLayout(left_layout)
+		self.bv_widget = QWidget()
+		self.bv_widget.setLayout(bv_layout)
 
-		right_layout = QVBoxLayout()
-		right_layout.setSpacing(0)
-		right_layout.setContentsMargins(0, 0, 0, 0)
+		disasm_layout = QVBoxLayout()
+		disasm_layout.setSpacing(0)
+		disasm_layout.setContentsMargins(0, 0, 0, 0)
 
-		right_label = QLabel("Debugged Process")
-		right_label.setFont(small_font)
-		right_layout.addWidget(right_label)
-		right_layout.addWidget(self.memory_editor)
+		disasm_label = QLabel("Raw Disassembly at PC")
+		disasm_label.setFont(small_font)
+		disasm_layout.addWidget(disasm_label)
+		disasm_layout.addWidget(self.binary_text)
 
-		right_widget = QWidget()
-		right_widget.setLayout(right_layout)
+		self.disasm_widget = QWidget()
+		self.disasm_widget.setLayout(disasm_layout)
 
-		self.splitter.addWidget(left_widget)
-		self.splitter.addWidget(right_widget)
+		memory_layout = QVBoxLayout()
+		memory_layout.setSpacing(0)
+		memory_layout.setContentsMargins(0, 0, 0, 0)
+
+		memory_label = QLabel("Debugged Process")
+		memory_label.setFont(small_font)
+		memory_layout.addWidget(memory_label)
+		memory_layout.addWidget(self.memory_editor)
+
+		self.memory_widget = QWidget()
+		self.memory_widget.setLayout(memory_layout)
+
+		self.splitter.addWidget(self.bv_widget)
+		self.splitter.addWidget(self.memory_widget)
 
 		# Equally sized
 		self.splitter.setSizes([0x7fffffff, 0x7fffffff])
@@ -134,6 +149,13 @@ class DebugView(QWidget, View):
 			return False
 		else:
 			return True
+
+	def setRawDisassembly(self, raw=False, lines=[]):
+		if raw != self.is_raw_disassembly:
+			self.splitter.replaceWidget(0, self.disasm_widget if raw else self.bv_widget)
+			self.is_raw_disassembly = raw
+
+		self.binary_text.setLines(lines)
 
 class DebugViewType(ViewType):
 	def __init__(self):

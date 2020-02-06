@@ -3,7 +3,7 @@ import re
 import time
 
 import binaryninja
-from binaryninja import Symbol, SymbolType, Type, Structure, StructureType
+from binaryninja import Symbol, SymbolType, Type, Structure, StructureType, LinearDisassemblyLine, LinearDisassemblyLineType, DisassemblyTextLine, InstructionTextToken, InstructionTextTokenType
 from binaryninja.plugin import PluginCommand
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
 from PySide2 import QtCore
@@ -190,10 +190,12 @@ class DebuggerState:
 			print('navigating to: 0x%X' % local_rip)
 			statusText = 'STOPPED'
 
+			self.debug_view.setRawDisassembly(False)
 			self.bv.navigate(self.bv.file.view, local_rip)
 		else:
 			statusText = 'STOPPED (outside view)'
 			print('address 0x%X outside of binary view, not setting cursor' % remote_rip)
+			self.update_raw_disassembly()
 
 		self.debug_view.controls.state_stopped(statusText)
 
@@ -260,6 +262,49 @@ class DebuggerState:
 
 				self.old_symbols.append(self.memory_view.get_symbol_by_raw_name("$stack_frame"))
 				self.old_dvs.add(reg_addrs['rsp'])
+		else:
+			raise NotImplementedError('only x86_64 so far')
+
+	def update_raw_disassembly(self):
+		# Read a few instructions from rip and disassemble them
+		inst_count = 50
+		if self.bv.arch.name == 'x86_64':
+			rip = self.adapter.reg_read('rip')
+			# Assume the worst, just in case
+			read_length = self.bv.arch.max_instr_length * inst_count
+			data = self.memory_view.read(rip, read_length)
+
+			lines = []
+
+			# Append header line
+			tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "(Code not backed by loaded file, showing only raw disassembly)")]
+			contents = DisassemblyTextLine(tokens, rip)
+			line = LinearDisassemblyLine(LinearDisassemblyLineType.BasicLineType, None, None, 0, contents)
+			lines.append(line)
+
+			total_read = 0
+			for i in range(inst_count):
+				(tokens, length) = self.bv.arch.get_instruction_text(data[total_read:], rip + total_read)
+
+				# Prepend address
+				if i == 0:
+					tokens.insert(0, InstructionTextToken(InstructionTextTokenType.TextToken, "==>  "))
+				else:
+					tokens.insert(0, InstructionTextToken(InstructionTextTokenType.TextToken, "     "))
+				tokens.insert(1, InstructionTextToken(InstructionTextTokenType.AddressDisplayToken, hex(rip + total_read)[2:], rip + total_read))
+				tokens.insert(2, InstructionTextToken(InstructionTextTokenType.TextToken, "  "))
+
+				# Convert to linear disassembly line
+				contents = DisassemblyTextLine(tokens, rip + total_read)
+				line = LinearDisassemblyLine(LinearDisassemblyLineType.CodeDisassemblyLineType, None, None, 0, contents)
+				lines.append(line)
+
+				total_read += length
+
+			self.debug_view.setRawDisassembly(True, lines)
+
+		else:
+			raise NotImplementedError('only x86_64 so far')
 
 	# Highlight lines
 	def update_highlights(self):
