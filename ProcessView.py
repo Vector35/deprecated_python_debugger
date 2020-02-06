@@ -124,11 +124,13 @@ class DebugMemoryView(BinaryView):
 		# Reads are aligned on 256-byte boundaries and 256 bytes long
 
 		# Cache read start: round down addr to nearest 256 byte boundary
-		cache_addr = addr & ~0xFF
+		cache_start = addr & ~0xFF
+		# Cache read end: round up addr+length to nearest 256 byte boundary
+		cache_end = (addr + length + 0xFF) & ~0xFF
 		# Cache read length: accounting for rounding down start and rounding up end
-		cache_len = (length + 0xFF) & ~0xFF
+		cache_len = cache_end - cache_start
 		# List of 256-byte block addresses to read into the cache to fully cover this region
-		cache_blocks = range(cache_addr, cache_addr + cache_len, 0x100)
+		cache_blocks = range(cache_start, cache_start + cache_len, 0x100)
 
 		for block in cache_blocks:
 			if block not in self.value_cache:
