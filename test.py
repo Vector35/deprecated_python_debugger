@@ -256,7 +256,7 @@ if __name__ == '__main__':
 		adapter.quit()
 
 	if 'basic' in tests:
-		for prog in ['asmtest', 'helloworld', 'helloworld_loop', 'helloworld_thread',
+		for prog in ['helloworld', 'helloworld_loop', 'helloworld_thread',
 			'helloworld_func', 'helloworld_pie', 'helloworld_thread_pie',
 			'helloworld_loop_pie', 'helloworld_func_pie',
 			]:

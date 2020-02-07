@@ -76,8 +76,8 @@ map<string, uint64_t> image2addr;
 void status_to_str(ULONG status, char *str);
 
 #include <stdio.h>
-//#define printf_debug(x, ...) printf(x, __VA_ARGS__)
-#define printf_debug(x, ...) while(0);
+#define printf_debug(x, ...) printf(x, __VA_ARGS__)
+//#define printf_debug(x, ...) while(0);
 
 
 /*****************************************************************************/
@@ -893,8 +893,10 @@ int mem_read(uint64_t addr, uint32_t length, uint8_t *result)
 	int rc = ERROR_UNSPECIFIED;
 	ULONG bytes_read;
 
-	if(g_Data->ReadVirtual(addr, result, length, &bytes_read) != S_OK) {
-		printf_debug("ERROR: ReadVirtual()\n");
+	HRESULT hr = g_Data->ReadVirtual(addr, result, length, &bytes_read);
+	if(hr != S_OK) {
+		printf_debug("ERROR: ReadVirtual(0x%I64X, 0x%x) returned 0x%X\n",
+			addr, length, hr);
 		goto cleanup;
 	}
 

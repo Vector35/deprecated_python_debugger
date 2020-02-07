@@ -4,6 +4,7 @@ import shutil
 import socket
 import platform
 import subprocess
+from binascii import hexlify
 
 import binaryninja
 
@@ -118,7 +119,7 @@ def disasm1(data, addr, arch='x86_64'):
 	arch = binaryninja.Architecture[arch]
 	toksAndLen = arch.get_instruction_text(data, addr)
 	if not toksAndLen or toksAndLen[1]==0:
-		return None
+		return (None, 0)
 	toks = toksAndLen[0]
 	strs = ''.join(list(map(lambda x: x.text, toks)))
 	return [strs, toksAndLen[1]]
@@ -129,11 +130,10 @@ def disasm(data, addr, arch='x86_64'):
 	lines = []
 	offs = 0
 	while offs < len(data):
-		addrstr = '%s%016X%s' % (GREEN, i.address, NORMAL)
-		(asmstr, length) = disasm1(data, addr+offs, arch)
+		addrstr = '%016X' % addr
+		(asmstr, length) = disasm1(data[offs:], addr+offs, arch)
+		if length == 0: break
 		bytestr = hexlify(data[offs:offs+length]).decode('utf-8').ljust(16)
-		asmstr = i.mnemonic + ' ' + i.op_str
-		line = '%s: %s %s' % (addrstr, bytestr, asmstr)
-		lines.append(line)
-		offs += i.size
+		lines.append('%s: %s %s' % (addrstr, bytestr, asmstr))
+		offs += length
 	return '\n'.join(lines)

@@ -67,11 +67,15 @@ def context_display(pkt_T=None):
 	print("%sr14%s=%016X %sr15%s=%016X" % \
 		(BROWN, NORMAL, r14, BROWN, NORMAL, r15))
 
-	data = adapter.mem_read(rip, 16)
-	if data:
-		(asmstr, asmlen) = helpers.disasm1(data, rip)
-		print('%s%016X%s: %s\t%s' % \
-			(GREEN, rip, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
+	try:
+		data = adapter.mem_read(rip, 16)
+		if data:
+			(asmstr, asmlen) = helpers.disasm1(data, rip)
+			print('%s%016X%s: %s\t%s' % \
+				(GREEN, rip, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
+	except DebugAdapter.GeneralError as e:
+		print('%s%016X%s: couldn\'t read mem' % \
+			(GREEN, rip, NORMAL))
 
 def thread_display():
 	tid_selected = adapter.thread_selected()
