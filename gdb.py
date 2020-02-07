@@ -4,9 +4,11 @@ import os
 import re
 import shutil
 import socket
+import subprocess
 from struct import pack, unpack
 
 from . import rsp
+from . import utils
 from . import gdblike
 from . import DebugAdapter
 
@@ -122,10 +124,10 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 			raise Exception('no available ports')
 
 		# invoke gdbserver
-		args = [path_gdbserver, '--once', '--no-startup-with-shell', 'localhost:%d'%port, fpath_target]
+		args = [path_gdbserver, '--once', '--no-startup-with-shell', 'localhost:%d'%port, path]
 		print(' '.join(args))
 		try:
-			subprocess.Popen(args, stdin=None, stdout=None, stderr=None, preexec_fn=preexec)
+			subprocess.Popen(args, stdin=None, stdout=None, stderr=None, preexec_fn=gdblike.preexec)
 		except Exception:
 			raise Exception('invoking gdbserver (used path: %s)' % path_gdbserver)
 
@@ -141,7 +143,8 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		# acquire pid as first tid
 		reply = rsp.tx_rx(self.sock, '?')
 		tdict = rsp.packet_T_to_dict(reply)
-		self.pid = tdict['thread']
+		self.tid = tdict['thread']
+		self.pid = self.tid
 
 	def mem_modules(self):
 		module2addr = {}

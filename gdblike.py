@@ -114,7 +114,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 	def thread_selected(self):
 		if self.tid == None:
-			return None
+			raise DebugAdapter.GeneralError('no tid set by last stop or thread switch')
 
 		if rsp.tx_rx(self.sock, 'T%X'%self.tid) != 'OK':
 			self.tid == None
