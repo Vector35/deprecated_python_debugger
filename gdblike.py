@@ -1,13 +1,50 @@
 #!/usr/bin/env python3
 
+import os
 import re
+import sys
+import time
 import socket
-from struct import pack, unpack
-from binascii import hexlify, unhexlify
 import xml.parsers.expat
 
 from . import rsp
 from . import DebugAdapter
+
+#--------------------------------------------------------------------------
+# UTILITIES FOR GDB-LIKE ADAPTERS
+#--------------------------------------------------------------------------
+
+def get_available_port():
+	for port in range(31337, 31337 + 256):
+		ok = True
+		sock = None
+		try:
+			#print('trying port %d' % port)
+			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			sock.bind(('localhost', port))
+		except Exception as e:
+			print(e)
+			ok = False
+		if sock:
+			sock.close()
+		if ok:
+			#print('returning port: %d' % port)
+			return port
+
+def connect(host, port):
+	sock = None
+
+	for tries in range(4):
+		try:
+			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+			sock.connect(('localhost', port))
+			return sock
+
+		except ConnectionRefusedError:
+			# allow quarter second for debugserver to start listening
+			time.sleep(.25)
+
+	raise ConnectionRefusedError
 
 # asynchronously called when inside a "go" to inform us of stdout (and
 # possibly other stuff)
@@ -18,13 +55,15 @@ def handler_async_pkt(pkt):
 	else:
 		print('handler_async_pkt() got unknown packet: %s' % repr(pkt))
 
+def preexec():
+    os.setpgrp()
+
+#--------------------------------------------------------------------------
+# CLASS FOR GDB-LIKE ADAPTERS
+#--------------------------------------------------------------------------
+
 class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	def __init__(self, **kwargs):
-		host = kwargs.get('host', 'localhost')
-		port = kwargs.get('port', 31337)
-		self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-		self.sock.connect((host, port))
-
 		# register info
 		self.reg_info = {} # eg: 'rip' -> {'id':8, 'width':64}
 		self.reg_cache = {} # eg: 'rip' -> 0x400400
@@ -40,14 +79,6 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	#--------------------------------------------------------------------------
 
 	# session start/stop
-	def exec(self, path):
-		# TODO: find/launch gdb/debugserver
-		pass
-
-	def attach(self, pid):
-		# TODO: find/launch gdb/debugserver
-		pass
-
 	def detach(self):
 		try:
 			rsp.send_packet_data(self.sock, 'D')

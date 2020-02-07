@@ -11,14 +11,9 @@ import threading
 from struct import unpack
 
 sys.path.append('..')
-import debugger.helpers as helpers
 import debugger.lldb as lldb
 import debugger.DebugAdapter as DebugAdapter
-
-RED = '\x1B[31m'
-GREEN = '\x1B[32m'
-BROWN = '\x1B[33m'
-NORMAL = '\x1B[0m'
+import debugger.utils as utils
 
 # globals
 adapter = None
@@ -116,10 +111,6 @@ def parse_image(fpath):
 
 	raise Exception('unrecognized file type')
 
-#------------------------------------------------------------------------------
-# UTILITIES
-#------------------------------------------------------------------------------
-
 # 'helloworld' -> '.\testbins\helloworld.exe'
 # or
 # 'helloworld' -> './testbins/helloworld
@@ -157,7 +148,8 @@ def test_prologue(prog, testtype):
 	print('(file) entry offset: 0x%X' % entry_offs)
 
 	print('launching')
-	adapter = helpers.launch_get_adapter(fpath)
+	adapter = DebugAdapter.get_adapter_for_current_system()
+	adapter.exec(fpath)
 
 	# learn load address, entrypoint
 	#
@@ -189,8 +181,6 @@ if __name__ == '__main__':
 
 	# one-off tests
 	if arg == 'oneoff':
-		(asmtxt, length) = helpers.disasm1(b'\x90', 0)
-		print(asmtxt)
 		fpath = test_prog_to_fpath('asmtest')
 		print(fpath)
 		(load_addr, entry_offs) = parse_image(fpath)
@@ -297,7 +287,7 @@ if __name__ == '__main__':
 			# single step
 			data = adapter.mem_read(rip, 15)
 			assert len(data) == 15
-			(asmstr, asmlen) = helpers.disasm1(data, 0)
+			(asmstr, asmlen) = utils.disasm1(data, 0)
 			adapter.breakpoint_clear(entry)
 			(reason, info) = adapter.step_into()
 			assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP

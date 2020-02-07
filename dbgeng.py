@@ -3,7 +3,6 @@
 import re
 import socket
 from struct import pack, unpack
-from binascii import hexlify, unhexlify
 from ctypes import *
 from enum import Enum, auto, unique
 from . import DebugAdapter

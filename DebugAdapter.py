@@ -1,3 +1,4 @@
+import platform
 from enum import Enum, auto, unique
 
 class GeneralError(Exception):
@@ -6,6 +7,20 @@ class BreakpointClearError(Exception):
 	pass
 class BreakpointSetError(Exception):
 	pass
+
+def get_adapter_for_current_system():
+	from . import dbgeng, gdb, lldb
+
+	system = platform.system()
+
+	if system == 'Windows':
+		return dbgeng.DebugAdapterDbgeng()
+	elif system == 'Linux':
+		return gdb.DebugAdapterGdb()
+	elif system == 'Darwin':
+		return lldb.DebugAdapterLLDB()
+	else:
+		raise Exception('unsupported system: %s' % system)
 
 @unique
 class STOP_REASON(Enum):
@@ -51,15 +66,15 @@ class STOP_REASON(Enum):
 class DebugAdapter:
 	# session start/stop
 	def exec(self, path):
-		pass
+		raise NotImplementedError('')
 	def attach(self, pid):
-		pass
+		raise NotImplementedError('')
 	def detach(self):
 		''' quit debug session, debuggee left running '''
-		pass
+		raise NotImplementedError('')
 	def quit(self):
 		''' quit debug session, debuggee terminated '''
-		pass
+		raise NotImplementedError('')
 
 	# threads
 	# 'index' is our abstracted thread identifier [0, 1, ..., n-1]
@@ -68,54 +83,55 @@ class DebugAdapter:
 	# 'active' thread means the latest execution-halting action (threw exception, hit breakpoint) occurred in this thread
 	def thread_list(self):
 		''' return a list of thread information '''
-		pass
+		raise NotImplementedError('')
 	def thread_get_active(self):
 		''' return thread id that is active '''
-		pass
+		raise NotImplementedError('')
 	def thread_select(self, tidx):
 		''' make a given thread id active '''
-		pass
+		raise NotImplementedError('')
 
 	# breakpoints
 	def breakpoint_set(self, address):
 		''' set software breakpoint at address '''
-		pass
+		raise NotImplementedError('')
 	def breakpoint_clear(self, address):
 		''' delete breakpoint by address '''
-		pass
+		raise NotImplementedError('')
 	def breakpoint_list(self):
 		''' return list of addresses '''
+		raise NotImplementedError('')
 
 	# register
 	def reg_read(self, reg):
-		pass
+		raise NotImplementedError('')
 	def reg_write(self, reg):
-		pass
+		raise NotImplementedError('')
 	def reg_list(self):
-		pass
+		raise NotImplementedError('')
 	def reg_bits(self, reg):
-		pass
+		raise NotImplementedError('')
 
 	# mem
 	def mem_read(self, address, length):
-		pass
+		raise NotImplementedError('')
 	def mem_write(self, address, data):
-		pass
+		raise NotImplementedError('')
 	def mem_modules(self):
-		pass
+		raise NotImplementedError('')
 
 	# break
 	def break_into(self):
-		pass
+		raise NotImplementedError('')
 
 	# execution control
 	def go():
-		pass
+		raise NotImplementedError('')
 	def step_into(self):
-		pass
+		raise NotImplementedError('')
 	def step_over(self):
-		pass
+		raise NotImplementedError('')
 
 	# raw pass-thru (meaning depends on adapter)
 	def raw(self, data):
-		pass
+		raise NotImplementedError('')

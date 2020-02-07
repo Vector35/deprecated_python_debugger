@@ -14,13 +14,10 @@ from binascii import hexlify, unhexlify
 import colorama
 
 sys.path.append('..')
-import debugger.helpers as helpers
+import debugger.utils as utils
 import debugger.DebugAdapter as DebugAdapter
 
-RED = '\x1B[31m'
-GREEN = '\x1B[32m'
-BROWN = '\x1B[33m'
-NORMAL = '\x1B[0m'
+(RED, GREEN, BROWN, NORMAL) = (utils.RED, utils.GREEN, utils.BROWN, utils.NORMAL)
 
 # globals
 adapter = None
@@ -71,7 +68,7 @@ def context_display(pkt_T=None):
 	try:
 		data = adapter.mem_read(rip, 16)
 		if data:
-			(asmstr, asmlen) = helpers.disasm1(data, rip)
+			(asmstr, asmlen) = utils.disasm1(data, rip)
 			print('%s%016X%s: %s\t%s' % \
 				(GREEN, rip, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
 	except DebugAdapter.GeneralError as e:
@@ -91,60 +88,6 @@ def thread_display():
 
 def debug_status():
 	return
-
-#--------------------------------------------------------------------------
-# UTILITIES
-#--------------------------------------------------------------------------
-
-def hex_dump(data, addr=0, grouping=1, endian='little'):
-	result = ''
-
-	while(data):
-		ascii = ''
-		buff16 = data[0:16]
-		data = data[16:]
-		result += "%s%016X%s: " % (GREEN, addr, NORMAL)
-
-		i = 0
-		while i < 16:
-			if(i < len(buff16)):
-				f0 = { \
-					'big':	{1:'>B', 2:'>H', 4:'>I', 8:'>Q'}, \
-					'little': {1:'<B', 2:'<H', 4:'<I', 8:'<Q'} \
-				}
-
-				f1 = { \
-					1:'%02X ', 2:'%04X ', 4:'%08X ', 8:'%016X ' \
-				}
-
-				temp = unpack(f0[endian][grouping], buff16[i:i+grouping])[0]
-
-				result += f1[grouping] % temp
-
-				for j in range(grouping):
-					u8 = buff16[i+j]
-
-					if(u8 >= ord(' ') and u8 <= ord('~')):
-						ascii += chr(u8)
-					else:
-						ascii += '.'
-			else:
-				if grouping == 1:
-					result += ' '*3
-				elif grouping == 2:
-					result += ' '*5
-				elif grouping == 4:
-					result += ' '*9
-				elif grouping == 8:
-					result += ' '*17
-
-			i += grouping
-
-		result += ' %s\n' % ascii
-
-		addr += 16
-
-	return result
 
 #--------------------------------------------------------------------------
 # MAIN
@@ -190,17 +133,17 @@ if __name__ == '__main__':
 	arg1 = sys.argv[1]
 	if ':' in arg1:
 		(host, port) = arg1.split(':')
-		adapter = helpers.connect_get_adapter(host, int(port))
+		adapter = connect_get_adapter(host, int(port))
 	else:
 		if '~' in arg1:
 			arg1 = os.expanduser(arg1)
 		arg1 = os.path.abspath(arg1)
 		if not os.path.exists(arg1):
 			raise Exception('file not found: %s' % arg1)
-		adapter = helpers.launch_get_adapter(arg1)
 
-	if not adapter:
-		raise Exception('couldn\'t acquire adapter')
+		adapter = DebugAdapter.get_adapter_for_current_system()
+
+	adapter.exec(arg1)
 
 	user_goal = 'debug'
 	while user_goal == 'debug':
@@ -245,6 +188,9 @@ if __name__ == '__main__':
 			# context, read regs, write regs
 			elif text in ['r']:
 				context_display()
+			elif re.match(r'r \w+=.*$', text):
+				(reg, val) = text[2:].split('=')
+				adapter.reg_write(reg, int(val, 16))
 			elif re.match(r'r \w+ .*$', text):
 				(_, reg, val) = text.split(' ')
 				adapter.reg_write(reg, int(val, 16))
@@ -257,7 +203,7 @@ if __name__ == '__main__':
 			elif text.startswith('db '):
 				addr = int(text[3:], 16)
 				data = adapter.mem_read(addr, 128)
-				print(hex_dump(data, addr))
+				print(utils.hex_dump(data, addr))
 			elif text.startswith('eb '):
 				m = re.match(r'^eb (\w+) (.*)$', text)
 				addr = int(m.group(1), 16)
@@ -266,7 +212,7 @@ if __name__ == '__main__':
 			elif text.startswith('u '):
 				addr = int(text[2:],16)
 				data = adapter.mem_read(addr, 32)
-				print(helpers.disasm(data, addr))
+				print(utils.disasm(data, addr))
 			elif text == 'lm':
 				module2addr = adapter.mem_modules()
 				for module in sorted(module2addr, key=lambda m: module2addr[m]):

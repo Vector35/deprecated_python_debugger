@@ -2,9 +2,9 @@
 
 import os
 import re
+import shutil
 import socket
 from struct import pack, unpack
-from binascii import hexlify, unhexlify
 
 from . import rsp
 from . import gdblike
@@ -104,10 +104,35 @@ def handler_async_pkt(pkt):
 class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 	def __init__(self, **kwargs):
 		gdblike.DebugAdapterGdbLike.__init__(self, **kwargs)
-
 		self.os_sig_to_reason = linux_signal_to_debugadapter_reason
 
-		# in gdb, do a dance so commands like qXfer will work
+	#--------------------------------------------------------------------------
+	# API
+	#--------------------------------------------------------------------------
+
+	def exec(self, path):
+		# resolve path to gdbserver
+		path_gdbserver = shutil.which('gdbserver')
+		if not os.path.exists(path_gdbserver):
+			raise Exception('cannot locate gdbserver')
+
+		# get available port
+		port = gdblike.get_available_port()
+		if port == None:
+			raise Exception('no available ports')
+
+		# invoke gdbserver
+		args = [path_gdbserver, '--once', '--no-startup-with-shell', 'localhost:%d'%port, fpath_target]
+		print(' '.join(args))
+		try:
+			subprocess.Popen(args, stdin=None, stdout=None, stderr=None, preexec_fn=preexec)
+		except Exception:
+			raise Exception('invoking gdbserver (used path: %s)' % path_gdbserver)
+
+		# connect to gdbserver
+		self.sock = gdblike.connect('localhost', port)
+
+		# initial commands
 		rsp.tx_rx(self.sock, 'Hg0')
 		# if 'multiprocess+' in list here, thread reply is like 'pX.Y' where X is core id, Y is thread id
 		rsp.tx_rx(self.sock, 'qSupported:swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;xmlRegisters=i386')
@@ -118,9 +143,6 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		tdict = rsp.packet_T_to_dict(reply)
 		self.pid = tdict['thread']
 
-	#--------------------------------------------------------------------------
-	# API
-	#--------------------------------------------------------------------------
 	def mem_modules(self):
 		module2addr = {}
 

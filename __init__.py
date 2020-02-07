@@ -9,6 +9,8 @@ try:
 
 	def get(bv):
 		return binjaplug.get_state(bv)
-except (ModuleNotFoundError, ImportError):
-	print('binjaplug not found, assuming this is cli mode')
+
+except (ModuleNotFoundError, ImportError) as e:
+	print(e)
+	print('IF THIS IS CLI MODE, IT\'S OK!')
 

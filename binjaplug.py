@@ -10,9 +10,7 @@ from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
 
-from . import helpers
 from . import DebugAdapter, ProcessView
-from . import lldb
 from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, ConsoleWidget, ModulesWidget, widget
 
 #------------------------------------------------------------------------------
@@ -199,12 +197,6 @@ class DebuggerState:
 
 		self.debug_view.controls.state_stopped(statusText)
 
-		#data = self.memory_view.read(rip, 16)
-		#if data:
-		#	(asmstr, asmlen) = disasm1(data, rip)
-		#	print('%s%016X%s: %s\t%s' % \
-		#		(GREEN, rip, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
-
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):
 		self.memory_view.mark_dirty()
@@ -332,8 +324,9 @@ class DebuggerState:
 		if not os.path.exists(fpath):
 			raise Exception('cannot find debug target: ' + fpath)
 
-		#self.adapter = lldb.DebugAdapterLLDB()
-		self.adapter = helpers.launch_get_adapter(fpath)
+		self.adapter = DebugAdapter.get_adapter_for_current_system()
+		self.adapter.exec(fpath)
+
 		self.memory_view.update_base()
 
 		if self.bv and self.bv.entry_point:

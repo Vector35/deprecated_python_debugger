@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
+import os
 import re
+import shutil
 import socket
-from struct import pack, unpack
-from binascii import hexlify, unhexlify
+import subprocess
 
 from . import rsp
 from . import gdblike
@@ -93,7 +94,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		self.os_sig_to_reason = macos_signal_to_debugadapter_reason
 
 		# register state
-		self.reg_info_load()
+		self.reg_info = {}
 
 		# address -> True
 		self.breakpoints = {}
@@ -107,15 +108,32 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 
 	# session start/stop
 	def exec(self, path):
-		# TODO: find/launch debugserver
-		pass
+		# resolve path to debugserver
+		path_debugserver = shutil.which('debugserver')
+		if not path_debugserver:
+			path_debugserver = '/Library/Developer/CommandLineTools/Library/' + \
+			'PrivateFrameworks/LLDB.framework/Versions/A/Resources/debugserver'
+		if not os.path.exists(path_debugserver):
+			raise Exception('cannot locate debugserver')
 
-	def attach(self, pid):
-		# TODO: find/launch debugserver
-		pass
+		# get available port
+		port = gdblike.get_available_port()
+		if port == None:
+			raise Exception('no available ports')
 
-	#def detach(self):
-	#def quit(self):
+		# invoke debugserver
+		args = [path_debugserver, 'localhost:%d'%port, path]
+		print('args are: ', ' '.join(args))
+		try:
+			subprocess.Popen(args, stdin=None, stdout=None, stderr=None, preexec_fn=gdblike.preexec)
+		except Exception:
+			raise Exception('invoking debugserver (used path: %s)' % path_debugserver)
+
+		# connect to it
+		self.sock = gdblike.connect('localhost', port)
+
+		# learn initial registers
+		self.reg_info_load()
 
 	# threads
 	def thread_list(self):
