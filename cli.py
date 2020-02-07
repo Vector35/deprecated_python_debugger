@@ -7,9 +7,10 @@ import signal
 import platform
 if platform.system() != 'Windows':
 	import readline
+else:
+	import ctypes
 from struct import pack, unpack
 from binascii import hexlify, unhexlify
-
 import colorama
 
 sys.path.append('..')
@@ -149,17 +150,39 @@ def hex_dump(data, addr=0, grouping=1, endian='little'):
 # MAIN
 #--------------------------------------------------------------------------
 
-# TODO: parse command line to select windbg/dbgeng adapter
-
 def handler_sigint(signal, frame):
 	global adapter
 	print('sending "break into" signal')
 	adapter.break_into()
 
+def adjust_ctrl_c():
+	print('adjusting ctrl+c handler')
+	STD_INPUT_HANDLE = 0
+	ENABLE_PROCESSED_INPUT = 1
+	kernel32 = ctypes.windll.kernel32
+	bRet = kernel32.SetConsoleCtrlHandler(0, 1)
+	print("SetConsoleCtrlHandler(0, 1) returns %d\n", bRet)
+
+	#handle = kernel32.GetStdHandle(STD_INPUT_HANDLE)
+	#print("GetStdHandle(STD_INPUT_HANDLE) returns %d\n" % handle)
+	#mode = c_uint()
+	#pfunc = kernel32.GetConsoleMode
+	#pfunc.restype = c_int
+	#pfunc.argtypes = [POINTER(c_ulong)]
+	#bRet = pfunc(byref(mode))
+	#mode = mode.value
+	#print("GetConsoleMode(%d) returns %08X\n" % (handle, mode))
+	#mode |= ENABLE_PROCESSED_INPUT
+	#bRet = kernel32.SetConsoleMode(handle, ENABLE_PROCESSED_INPUT)
+	#print("SetConsoleMode(%d, %08X) returns %d\n" % (handle, mode, bRet))
+
 if __name__ == '__main__':
 	colorama.init()
 
+	# set up ctrl+c for break-into
 	signal.signal(signal.SIGINT, handler_sigint)
+	if platform.system() == 'Windows':
+		adjust_ctrl_c()
 
 	adapter = None
 	if not sys.argv[1:]:

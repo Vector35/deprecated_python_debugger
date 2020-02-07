@@ -76,8 +76,8 @@ map<string, uint64_t> image2addr;
 void status_to_str(ULONG status, char *str);
 
 #include <stdio.h>
-#define printf_debug(x, ...) printf(x, __VA_ARGS__)
-//#define printf_debug(x, ...) while(0);
+//#define printf_debug(x, ...) printf(x, __VA_ARGS__)
+#define printf_debug(x, ...) while(0);
 
 
 /*****************************************************************************/
