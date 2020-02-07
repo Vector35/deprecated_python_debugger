@@ -156,12 +156,12 @@ def handler_sigint(signal, frame):
 	adapter.break_into()
 
 def adjust_ctrl_c():
-	print('adjusting ctrl+c handler')
+	#print('adjusting ctrl+c handler')
 	STD_INPUT_HANDLE = 0
 	ENABLE_PROCESSED_INPUT = 1
 	kernel32 = ctypes.windll.kernel32
-	bRet = kernel32.SetConsoleCtrlHandler(0, 1)
-	print("SetConsoleCtrlHandler(0, 1) returns %d\n", bRet)
+	bRet = kernel32.SetConsoleCtrlHandler(STD_INPUT_HANDLE, ENABLE_PROCESSED_INPUT)
+	#print("SetConsoleCtrlHandler(0, 1) returns %d\n", bRet)
 
 	#handle = kernel32.GetStdHandle(STD_INPUT_HANDLE)
 	#print("GetStdHandle(STD_INPUT_HANDLE) returns %d\n" % handle)

@@ -70,13 +70,12 @@ bool b_PROCESS_CREATED;
 bool b_PROCESS_EXITED;
 ULONG process_exit_code;
 ULONG64 image_base;
-map<string, uint64_t> image2addr;
 
 /* forward declarations */
 void status_to_str(ULONG status, char *str);
 
 #include <stdio.h>
-//#define printf_debug(x, ...) printf(x, __VA_ARGS__)
+#define printf_debug(x, ...) printf(x, __VA_ARGS__)
 #define printf_debug(x, ...) while(0);
 
 
@@ -268,7 +267,12 @@ STDMETHOD(CreateProcess)(
 		IN ULONG64 StartOffset
 		)
 {
-	printf_debug("EventCallbacks::CreateProcess(BaseOffset=0x%016I64X)\n", BaseOffset);
+	printf_debug("EventCallbacks::CreateProcess()\n");
+	printf_debug("  ImageFileHandle=0x%016I64\n", ImageFileHandle);
+	printf_debug("           Handle=0x%016I64\n", Handle);
+	printf_debug("       BaseOffset=0x%016I64X\n", BaseOffset);
+	printf_debug("       ModuleName=\"%s\"\n", ModuleName);
+	printf_debug("        ImageName=\"%s\"\n", ImageName);
 
 	image_base = BaseOffset;
 	b_PROCESS_CREATED = true;
@@ -285,8 +289,8 @@ STDMETHOD(CreateProcess)(
 
 	HRESULT hResult;
 
-	return DEBUG_STATUS_BREAK;
-	//return DEBUG_STATUS_GO;
+	//return DEBUG_STATUS_BREAK;
+	return DEBUG_STATUS_GO;
 }
 
 STDMETHOD(ExitProcess)(
@@ -322,12 +326,9 @@ STDMETHOD(LoadModule)(
 	HRESULT hRes;
 
 	printf_debug("EventCallbacks::LoadModule()\n");
-	printf_debug("EventCallbacks::LoadModule()\n");
 	printf_debug("loaded module:%s (image:%s) to address %I64x\n", ModuleName, ImageName, BaseOffset);
 
-	image2addr[ImageName] = BaseOffset;
-
-	return DEBUG_STATUS_GO;
+	return DEBUG_STATUS_NO_CHANGE;
 }
 
 STDMETHOD(UnloadModule)(
@@ -341,18 +342,6 @@ STDMETHOD(UnloadModule)(
 	printf_debug("EventCallbacks::UnloadModule()\n");
 	printf_debug("loaded image:%s to address %I64x\n", ImageBaseName, BaseOffset);
 
-	/* collect image(s) that load to the given address */
-	for(auto i=image2addr.begin(); i != image2addr.end(); i++) {
-		if(i->second == BaseOffset) {
-			kill_list.push_back(i->first);
-		}
-	}
-
-	/* delete from map those collected image(s) */
-	for(auto i=kill_list.begin(); i != kill_list.end(); i++) {
-		image2addr.erase(*i);
-	}
-
 	return DEBUG_STATUS_NO_CHANGE;
 }
 
@@ -362,7 +351,7 @@ STDMETHOD(SystemError)(
         _In_ ULONG Level
         )
 {
-	printf_debug("EventCallbacks::UnloadModule()\n");
+	printf_debug("EventCallbacks::SystemError()\n");
 	return DEBUG_STATUS_NO_CHANGE;
 }
 
@@ -923,20 +912,54 @@ int mem_write(uint64_t addr, uint8_t *data, uint32_t len)
 EASY_CTYPES_SPEC
 int module_num(int *result)
 {
-	*result = image2addr.size();
+	ULONG n_loaded, n_unloaded;
+	if(g_Symbols->GetNumberModules(&n_loaded, &n_unloaded) != S_OK) {
+		printf_debug("ERROR: GetNumberModules()\n");
+		return ERROR_UNSPECIFIED;
+	}
+
+	*result = n_loaded;
 	return 0;
 }
 
 EASY_CTYPES_SPEC
 int module_get(int index, char *image, uint64_t *addr)
 {
-	if(index < 0 || index >= image2addr.size())
+	int n_loaded;
+	if(module_num(&n_loaded) != S_OK)
 		return ERROR_UNSPECIFIED;
 
-	auto i = image2addr.begin();
-	for(int j=0; j<index; ++j) i++; // doesn't work: i+=1 or i+=index
-	strcpy(image, (i->first).c_str());
-	*addr = i->second;
+	if(index < 0 || index >= n_loaded) {
+		printf_debug("ERROR: module_get(), index %d is negative or >= %d\n", index, n_loaded);
+		return ERROR_UNSPECIFIED;
+	}
+
+	ULONG64 base;
+	if(g_Symbols->GetModuleByIndex(index, &base) != S_OK) {
+		printf_debug("ERROR: GetModuleByIndex()\n");
+		return ERROR_UNSPECIFIED;
+	}
+	printf_debug("index: %d of %d\n", index, n_loaded);
+	printf_debug("base: 0x%016I64X\n", base);
+
+	char image_name[1024]; // full path, when available, like "C:\WINDOWS\System32\KERNEL32.DLL"
+	char module_name[1024]; // path and extension stripped, like "KERNEL32"
+	char loaded_image_name[1024]; // '\0' in my experience :/
+	if(g_Symbols->GetModuleNames(index, 0,
+		image_name, 1024, NULL,
+		module_name, 1024, NULL,
+		loaded_image_name, 1024, NULL) != S_OK) {
+			printf_debug("ERROR: GetModuleNames()\n");
+			return ERROR_UNSPECIFIED;
+		}
+	printf_debug("image_name: %s\n", image_name);
+	printf_debug("module_name: %s\n", module_name);
+	printf_debug("loaded_image_name: %s\n", loaded_image_name);
+
+	if(image)
+		strcpy(image, image_name);
+	if(addr)
+		*addr = base;
 	return 0;
 }
 
@@ -1080,12 +1103,6 @@ int get_exit_code(unsigned long *code)
 
 	*code = process_exit_code;
 	return 0;
-}
-
-EASY_CTYPES_SPEC
-uint64_t get_image_base(void)
-{
-	return image_base;
 }
 
 EASY_CTYPES_SPEC
