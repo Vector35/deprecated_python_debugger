@@ -162,9 +162,10 @@ def test_prologue(prog, testtype):
 	# learn load address, entrypoint
 	#
 	module2addr = adapter.mem_modules()
-	print(module2addr)
-	print(fpath)
-	assert fpath in module2addr
+	if not fpath in module2addr:
+		print('module2addr: ', module2addr)
+		print('fpath: ', fpath)
+		assert fpath in module2addr
 
 	if '_pie' in prog:
 		load_addr = module2addr[fpath]
