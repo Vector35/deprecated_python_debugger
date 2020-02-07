@@ -75,9 +75,8 @@ ULONG64 image_base;
 void status_to_str(ULONG status, char *str);
 
 #include <stdio.h>
-#define printf_debug(x, ...) printf(x, __VA_ARGS__)
+//#define printf_debug(x, ...) printf(x, __VA_ARGS__)
 #define printf_debug(x, ...) while(0);
-
 
 /*****************************************************************************/
 /* EVENT CALLBACKS */
@@ -466,17 +465,12 @@ STDMETHOD(ChangeEngineState)(
 	if(Flags & DEBUG_CES_EFFECTIVE_PROCESSOR)
 		printf_debug("\tDEBUG_CES_EFFECTIVE_PROCESSOR\n");
 	if(Flags & DEBUG_CES_BREAKPOINTS)
-		printf_debug("\tDEBUG_CES_BREAKPOINTS\n");
+		printf_debug("\tDEBUG_CES_BREAKPOINTS \"One or more breakpoints have changed.\"\n");
 	if(Flags & DEBUG_CES_CODE_LEVEL)
 		printf_debug("\tDEBUG_CES_CODE_LEVEL\n");
 	if(Flags & DEBUG_CES_EXECUTION_STATUS) {
 		status_to_str(Argument, buf);
 		printf_debug("\tDEBUG_CES_EXECUTION_STATUS (%s)\n", buf);
-
-		//if(Argument == DEBUG_STATUS_GO) {
-		//	printf_debug("\treinforcing the GO\n");
-		//	return DEBUG_STATUS_GO;
-		//}
 	}
 	if(Flags & DEBUG_CES_SYSTEMS)
 		printf_debug("\tDEBUG_CES_SYSTEMS\n");
@@ -499,7 +493,9 @@ STDMETHOD(ChangeEngineState)(
 	if(Flags & DEBUG_CES_TEXT_REPLACEMENTS)
 		printf_debug("\tDEBUG_CES_TEXT_REPLACEMENTS\n");
 
-	return DEBUG_STATUS_NO_CHANGE;
+	// The return value is ignored by the engine unless it indicates a remote procedure call error;
+	// in this case the client, with which this IDebugEventCallbacks object is registered, is disabled.
+	return 0;
 }
 
 // Symbol state has changed.
@@ -689,6 +685,11 @@ int process_start(char *path)
 
 	if(!g_Client) {
 		printf_debug("ERROR: interfaces not initialized\n");
+		goto cleanup;
+	}
+
+	if(g_Control->SetEngineOptions(DEBUG_ENGOPT_INITIAL_BREAK) != S_OK) {
+		printf_debug("ERROR: SetEngineOptions()\n");
 		goto cleanup;
 	}
 
