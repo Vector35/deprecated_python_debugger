@@ -642,6 +642,10 @@ def cb_bp_clr(bv, local_address):
 	remote_address = debug_state.memory_view.local_addr_to_remote(local_address)
 	debug_state.breakpoint_clear(remote_address)
 
+def require_adapter(bv, local_address):
+	debug_state = get_state(bv)
+	return debug_state.adapter is not None
+
 #------------------------------------------------------------------------------
 # "main"
 #------------------------------------------------------------------------------
@@ -655,6 +659,6 @@ def initialize():
 	# TODO: Needs adapter support
 	# widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 
-	PluginCommand.register_for_address("Set Breakpoint", "sets breakpoint at right-clicked address", cb_bp_set)
-	PluginCommand.register_for_address("Clear Breakpoint", "clears breakpoint at right-clicked address", cb_bp_clr)
+	PluginCommand.register_for_address("Set Breakpoint", "sets breakpoint at right-clicked address", cb_bp_set, is_valid=require_adapter)
+	PluginCommand.register_for_address("Clear Breakpoint", "clears breakpoint at right-clicked address", cb_bp_clr, is_valid=require_adapter)
 	ViewType.registerViewType(DebugView.DebugViewType())
