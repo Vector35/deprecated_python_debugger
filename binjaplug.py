@@ -187,16 +187,12 @@ class DebuggerState:
 
 		# select instruction currently at
 		if self.bv.read(local_rip, 1):
-			#print('navigating to: 0x%X' % local_rip)
-			statusText = 'STOPPED'
 			self.debug_view.setRawDisassembly(False)
 			self.bv.navigate(self.bv.file.view, local_rip)
+			self.debug_view.controls.state_stopped()
 		else:
-			statusText = 'STOPPED (outside view)'
-			#print('address 0x%X outside of binary view, not setting cursor' % remote_rip)
 			self.update_raw_disassembly()
-
-		self.debug_view.controls.state_stopped(statusText)
+			self.debug_view.controls.state_stopped_extern()
 
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):

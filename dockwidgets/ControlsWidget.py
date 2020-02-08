@@ -261,6 +261,14 @@ class DebugControlsWidget(QToolBar):
 		self.set_default_process_action("Quit")
 		self.set_resume_pause_action("Resume")
 
+	def state_stopped_extern(self, msg=None):
+		debug_state = binjaplug.get_state(self.bv)
+		debug_state.state = 'STOPPED (outside view)'
+		self.editStatus.setText(msg or debug_state.state)
+		self.set_actions_enabled(Starting=False, Stopping=True, Stepping=True, StepReturn=False, Pause=True, Resume=True, Threads=True)
+		self.set_default_process_action("Quit")
+		self.set_resume_pause_action("Resume")
+
 	def state_running(self, msg=None):
 		debug_state = binjaplug.get_state(self.bv)
 		debug_state.state = 'RUNNING'
