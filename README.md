@@ -1,43 +1,48 @@
-# debugger
+# Debugger Plugin (v1.0-alpha)
 
-Binary Ninja debugger effort for IQT
+Author: **Vector35 Inc**
+_Debugger plugin allows Windows, Linux, and Mac binaries to be debugged from within Binary Ninja.
 
-## gdb vs. lldb servers
+## Description
 
-- lldb has single reg reads with 'p' packet, gdb doesn't, and registers must be read in group with 'g' packet
-- lldb can have its registers polled with 'qRegisterInfo' packet, but gdb uses XML target description
-- lldb has space in 'P' packet, like 'P 0=DEADBEEF' while gdb has 'P0=DEADBEEF'
-- lldb has single reg writes with 'P' packet, gdb doesn't, and registers must be written in group with 'G' packet
-- lldb can list solibs and executable image with 'jGetLoadedDynamicLibrariesInfos' packet, gdb still looks to /proc/pid/maps
+This plugin adds a new Debugger binary view which gives the user options to execute and debug the current target.
 
-## design diagram
+## Installation Instructions
 
-```
-+-------+
-|       |
-+-------+
-```
+To install this manually, please see the "Using Plugins" section of the [Getting Started Guide](https://docs.binary.ninja/getting-started.html#using-plugins). Or use Binary Ninja's built in plugin manager.
 
-## notes:
+### Windows
 
-tcpdump -i lo0 -A -s0 'port 31337'
+(none)
 
-typical GDB RSP files
+### Linux
 
-https://sourceware.org/gdb/onlinedocs/gdb/Packets.html
+(none)
 
-lldb-gdb-remote.txt
+### Darwin
 
-gcc -o helloworld helloworld.c -Wl,-no_pie
+(none)
 
-```bash
-while True;
-do
-	debugserver localhost:31337 ~/fdumps/workspace/helloworld_thread || echo "App crashed... restarting..." >&2
-	echo "Press Ctrl-C to quit." && sleep .1
-done
-```
+## Minimum Version
 
-`$ debugserver localhost:31337 ./testbins/asmtest`
+This plugin requires the following minimum version of Binary Ninja:
 
-`$ gdbserver --once --no-startup-with-shell localhost:31337 ./testbins/asmtest`
+* 2015
+
+## Required Dependencies
+
+* Windows debugging relies on the dbgeng dll's which should be present in default installations.
+* Linux needs gdbserver in path.
+* MacOS needs debugserver in path or in its default Xcode location: `/Library/Developer/CommandLineTools/Library/PrivateFrameworks/LLDB.framework/Versions/A/Resources/`
+
+## License
+
+This plugin is released under a MIT license.
+
+## Metadata Version
+
+2
+
+## Developers
+
+See [DEVNOTES.md](./DEVNOTES.md).
