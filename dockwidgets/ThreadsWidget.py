@@ -161,7 +161,9 @@ class DebugThreadsItemDelegate(QItemDelegate):
 
 class DebugThreadsWidget(QWidget, DockContextHandler):
 	def __init__(self, parent, name, data):
-		assert type(data) == binaryninja.binaryview.BinaryView
+		if not type(data) == binaryninja.binaryview.BinaryView:
+			raise Exception('expected widget data to be a BinaryView')
+
 		self.bv = data
 
 		QWidget.__init__(self, parent)

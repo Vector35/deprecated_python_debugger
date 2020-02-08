@@ -187,14 +187,13 @@ class DebuggerState:
 
 		# select instruction currently at
 		if self.bv.read(local_rip, 1):
-			print('navigating to: 0x%X' % local_rip)
+			#print('navigating to: 0x%X' % local_rip)
 			statusText = 'STOPPED'
-
 			self.debug_view.setRawDisassembly(False)
 			self.bv.navigate(self.bv.file.view, local_rip)
 		else:
 			statusText = 'STOPPED (outside view)'
-			print('address 0x%X outside of binary view, not setting cursor' % remote_rip)
+			#print('address 0x%X outside of binary view, not setting cursor' % remote_rip)
 			self.update_raw_disassembly()
 
 		self.debug_view.controls.state_stopped(statusText)
@@ -207,8 +206,10 @@ class DebuggerState:
 
 	# Create symbols and variables for the memory view
 	def update_memory_view(self):
-		assert self.adapter is not None
-		assert self.memory_view is not None
+		if self.adapter == None:
+			raise Exception('missing adapter')
+		if self.memory_view == None:
+			raise Exception('missing memory_view')
 
 		addr_regs = {}
 		reg_addrs = {}
@@ -414,13 +415,15 @@ class DebuggerState:
 		self.memory_dirty()
 
 	def pause(self):
-		assert self.adapter
+		if not self.adapter:
+			raise Exception('missing adapter')
 		result = self.adapter.break_into()
 		self.memory_dirty()
 		return result
 
 	def go(self):
-		assert self.adapter
+		if not self.adapter:
+			raise Exception('missing adapter')
 
 		remote_rip = self.adapter.reg_read('rip')
 		local_rip = self.memory_view.remote_addr_to_local(remote_rip)
@@ -439,7 +442,8 @@ class DebuggerState:
 		return result
 
 	def step_into(self):
-		assert self.adapter
+		if not self.adapter:
+			raise Exception('missing adapter')
 
 		(reason, data) = (None, None)
 
@@ -466,7 +470,8 @@ class DebuggerState:
 			raise NotImplementedError('step unimplemented for architecture %s' % self.bv.arch.name)
 
 	def step_over(self):
-		assert self.adapter
+		if not self.adapter:
+			raise Exception('missing adapter')
 
 		try:
 			self.adapter.step_over()
@@ -530,7 +535,8 @@ class DebuggerState:
 			raise NotImplementedError('step over unimplemented for architecture %s' % self.bv.arch.name)
 
 	def step_return(self):
-		assert self.adapter
+		if not self.adapter:
+			raise Exception('missing adapter')
 
 		if self.bv.arch.name == 'x86_64':
 			remote_rip = self.adapter.reg_read('rip')
@@ -575,7 +581,8 @@ class DebuggerState:
 			raise NotImplementedError('step over unimplemented for architecture %s' % self.bv.arch.name)
 
 	def breakpoint_set(self, remote_address):
-		assert self.adapter
+		if not self.adapter:
+			raise Exception('missing adapter')
 
 		if self.adapter.breakpoint_set(remote_address) != 0:
 			print('ERROR: breakpoint set failed')
@@ -585,7 +592,7 @@ class DebuggerState:
 
 		# save it
 		self.breakpoints[local_address] = True
-		print('breakpoint address=0x%X (remote=0x%X) set' % (local_address, remote_address))
+		#print('breakpoint address=0x%X (remote=0x%X) set' % (local_address, remote_address))
 		self.update_highlights()
 		self.update_breakpoints()
 
@@ -594,7 +601,8 @@ class DebuggerState:
 		return True
 
 	def breakpoint_clear(self, remote_address):
-		assert self.adapter
+		if not self.adapter:
+			raise Exception('missing adapter')
 
 		local_address = self.memory_view.remote_addr_to_local(remote_address)
 

@@ -13,7 +13,9 @@ from .. import binjaplug
 
 class DebugView(QWidget, View):
 	def __init__(self, parent, data):
-		assert type(data) == binaryninja.binaryview.BinaryView
+		if not type(data) == binaryninja.binaryview.BinaryView:
+			raise Exception('expected widget data to be a BinaryView')
+
 		self.bv = data
 
 		self.debug_state = binjaplug.get_state(data)

@@ -33,7 +33,8 @@ ERROR_UNSPECIFIED = -1
 class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	def __init__(self, **kwargs):
 		self.dll = CDLL(".\windows\dbgengadapt.dll")
-		assert self.dll
+		if not self.dll:
+			raise DebugAdapter.GeneralError("loading dbgengadapt.dll")
 
 		# keep mapping between addresses (DbgAdapter namespace) and breakpoint
 		# id's (dbgeng namespace)

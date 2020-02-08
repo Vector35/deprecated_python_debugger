@@ -57,7 +57,8 @@ class DebugProcessView(BinaryView):
 	def get_remote_base(self):
 		adapter = binjaplug.get_state(self.local_view).adapter
 		modules = adapter.mem_modules()
-		assert self.local_view.file.original_filename in modules
+		if not self.local_view.file.original_filename in modules:
+			raise Exception('expected %s to be in %s' % (self.local_view.file.original_filename, modules))
 		return modules[self.local_view.file.original_filename]
 
 	"""

@@ -230,8 +230,6 @@ if __name__ == '__main__':
 						(reason, data) = adapter.step_into()
 					elif text == 'p':
 						(reason, data) = adapter.step_over()
-					else:
-						assert 0
 
 					if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
 						print('stdout: ', data)

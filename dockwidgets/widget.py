@@ -11,7 +11,10 @@ def create_widget(widget_class, name, parent, data, *args):
 	# So in the event of an error or a nothing, return an empty widget that at least stops the crash
 	try:
 		widget = widget_class(parent, name, data, *args)
-		assert widget is not None
+
+		if not widget:
+			raise Exception('expected widget, got None')
+
 		global debug_dockwidgets
 
 		found = False

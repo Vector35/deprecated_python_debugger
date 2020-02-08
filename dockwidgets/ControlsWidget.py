@@ -9,7 +9,9 @@ from .. import binjaplug, DebugAdapter
 
 class DebugControlsWidget(QToolBar):
 	def __init__(self, parent, name, data, debug_state):
-		assert type(data) == binaryninja.binaryview.BinaryView
+		if not type(data) == binaryninja.binaryview.BinaryView:
+			raise Exception('expected widget data to be a BinaryView')
+
 		self.bv = data
 		self.debug_state = debug_state
 

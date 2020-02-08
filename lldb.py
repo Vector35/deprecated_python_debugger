@@ -123,7 +123,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 
 		# invoke debugserver
 		args = [path_debugserver, 'localhost:%d'%port, path]
-		print('args are: ', ' '.join(args))
+		#print('args are: ', ' '.join(args))
 		try:
 			subprocess.Popen(args, stdin=None, stdout=None, stderr=None, preexec_fn=gdblike.preexec)
 		except Exception:
