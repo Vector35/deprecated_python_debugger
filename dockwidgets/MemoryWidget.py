@@ -48,5 +48,5 @@ class DebugMemoryWidget(QWidget, DockContextHandler):
 		if view_frame is None:
 			return False
 		else:
-			return True
+			return view_frame.getCurrentView().startswith("Debugger:")
 

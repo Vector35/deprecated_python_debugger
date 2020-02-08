@@ -31,7 +31,8 @@ class DebugView(QWidget, View):
 			"Registers",
 			"Threads",
 			"Stack",
-			"Debugger Console"
+			"Modules",
+			# "Debugger Console"
 		]
 
 		self.current_offset = 0

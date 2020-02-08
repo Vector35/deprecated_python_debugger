@@ -23,7 +23,7 @@ class DebugConsoleWidget(QWidget, DockContextHandler):
 
 		inputLayout = QHBoxLayout()
 		inputLayout.setContentsMargins(4, 4, 4, 4)
-		
+
 		promptLayout = QVBoxLayout()
 		promptLayout.setContentsMargins(0, 5, 0, 5)
 
@@ -63,4 +63,4 @@ class DebugConsoleWidget(QWidget, DockContextHandler):
 		if view_frame is None:
 			return False
 		else:
-			return True
+			return view_frame.getCurrentView().startswith("Debugger:")

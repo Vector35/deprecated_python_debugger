@@ -43,21 +43,21 @@ class DebugRegistersListModel(QAbstractItemModel):
 		if parent.isValid() or column > len(self.columns) or row >= len(self.rows):
 			return QModelIndex()
 		return self.createIndex(row, column)
-	
+
 	def parent(self, child):
 		return QModelIndex()
 
 	def hasChildren(self, parent):
 		return False
-	
+
 	def rowCount(self, parent):
 		if parent.isValid():
 			return 0
 		return len(self.rows)
-	
+
 	def columnCount(self, parent):
 		return len(self.columns)
-	
+
 	def flags(self, index):
 		f = super().flags(index)
 		if index.column() == 1:
@@ -76,7 +76,7 @@ class DebugRegistersListModel(QAbstractItemModel):
 			return None
 		if index.row() < 0 or index.row() >= len(self.rows):
 			return None
-		
+
 		conts = self.rows[index.row()][index.column()]
 		info = self.row_info[index.row()]
 
@@ -92,12 +92,12 @@ class DebugRegistersListModel(QAbstractItemModel):
 			return info['state']
 
 		return None
-	
+
 	def setData(self, index, value, role):
 		# Verify that we can edit this value
 		if (self.flags(index) & Qt.EditRole) != Qt.EditRole:
 			return False
-		
+
 		info = self.row_info[index.row()]
 		old_val = self.rows[index.row()][1]
 		new_val = int(value, 16)
@@ -121,7 +121,7 @@ class DebugRegistersListModel(QAbstractItemModel):
 class DebugRegistersItemDelegate(QItemDelegate):
 	def __init__(self, parent):
 		QItemDelegate.__init__(self, parent)
-		
+
 		self.font = binaryninjaui.getMonospaceFont(parent)
 		self.font.setKerning(False)
 		self.baseline = QFontMetricsF(self.font).ascent()
@@ -130,7 +130,7 @@ class DebugRegistersItemDelegate(QItemDelegate):
 		self.char_offset = binaryninjaui.getFontVerticalOffset()
 
 		self.expected_char_widths = [10, 32]
-	
+
 	def sizeHint(self, option, idx):
 		width = self.expected_char_widths[idx.column()]
 		data = idx.data()
@@ -160,7 +160,7 @@ class DebugRegistersItemDelegate(QItemDelegate):
 		else:
 			painter.setPen(option.palette.color(QPalette.WindowText).rgba())
 		painter.drawText(2 + option.rect.left(), self.char_offset + self.baseline + option.rect.top(), str(text))
-		
+
 	def setEditorData(self, editor, idx):
 		if idx.column() == 1:
 			data = idx.data()
@@ -171,7 +171,7 @@ class DebugRegistersWidget(QWidget, DockContextHandler):
 	def __init__(self, parent, name, data):
 		assert type(data) == binaryninja.binaryview.BinaryView
 		self.bv = data
-		
+
 		QWidget.__init__(self, parent)
 		DockContextHandler.__init__(self, self, name)
 		self.actionHandler = UIActionHandler()
@@ -220,7 +220,7 @@ class DebugRegistersWidget(QWidget, DockContextHandler):
 		if view_frame is None:
 			return False
 		else:
-			return True
+			return view_frame.getCurrentView().startswith("Debugger:")
 
 	def sizeHint(self):
 		return QSize(200, 600)

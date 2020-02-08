@@ -231,7 +231,7 @@ class DebugThreadsWidget(QWidget, DockContextHandler):
 		if view_frame is None:
 			return False
 		else:
-			return True
+			return view_frame.getCurrentView().startswith("Debugger:")
 
 	def sizeHint(self):
 		return QSize(300, 100)

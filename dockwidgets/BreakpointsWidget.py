@@ -53,21 +53,21 @@ class DebugBreakpointsListModel(QAbstractItemModel):
 		if parent.isValid() or column > len(self.columns) or row >= len(self.rows):
 			return QModelIndex()
 		return self.createIndex(row, column)
-	
+
 	def parent(self, child):
 		return QModelIndex()
 
 	def hasChildren(self, parent):
 		return False
-	
+
 	def rowCount(self, parent):
 		if parent.isValid():
 			return 0
 		return len(self.rows)
-	
+
 	def columnCount(self, parent):
 		return len(self.columns)
-	
+
 	def headerData(self, section, orientation, role):
 		if role != Qt.DisplayRole:
 			return None
@@ -96,7 +96,7 @@ class DebugBreakpointsListModel(QAbstractItemModel):
 class DebugBreakpointsItemDelegate(QItemDelegate):
 	def __init__(self, parent):
 		QItemDelegate.__init__(self, parent)
-		
+
 		self.font = binaryninjaui.getMonospaceFont(parent)
 		self.font.setKerning(False)
 		self.baseline = QFontMetricsF(self.font).ascent()
@@ -105,7 +105,7 @@ class DebugBreakpointsItemDelegate(QItemDelegate):
 		self.char_offset = binaryninjaui.getFontVerticalOffset()
 
 		self.expected_char_widths = [10, 20]
-	
+
 	"""
 	virtual QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& idx) const override;
 	"""
@@ -136,7 +136,7 @@ class DebugBreakpointsWidget(QWidget, DockContextHandler):
 	def __init__(self, parent, name, data):
 		assert type(data) == binaryninja.binaryview.BinaryView
 		self.bv = data
-		
+
 		QWidget.__init__(self, parent)
 		DockContextHandler.__init__(self, self, name)
 		self.actionHandler = UIActionHandler()
@@ -185,7 +185,7 @@ class DebugBreakpointsWidget(QWidget, DockContextHandler):
 		if view_frame is None:
 			return False
 		else:
-			return True
+			return view_frame.getCurrentView().startswith("Debugger:")
 
 	def sizeHint(self):
 		return QSize(300, 100)

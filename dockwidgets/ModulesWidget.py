@@ -24,28 +24,28 @@ class DebugModulesListModel(QAbstractItemModel):
 			self.rows = []
 		else:
 			self.rows = new_rows
-		
+
 		self.endResetModel()
 
 	def index(self, row, column, parent):
 		if parent.isValid() or column > len(self.columns) or row >= len(self.rows):
 			return QModelIndex()
 		return self.createIndex(row, column)
-	
+
 	def parent(self, child):
 		return QModelIndex()
 
 	def hasChildren(self, parent):
 		return False
-	
+
 	def rowCount(self, parent):
 		if parent.isValid():
 			return 0
 		return len(self.rows)
-	
+
 	def columnCount(self, parent):
 		return len(self.columns)
-	
+
 	def headerData(self, section, orientation, role):
 		if role != Qt.DisplayRole:
 			return None
@@ -58,7 +58,7 @@ class DebugModulesListModel(QAbstractItemModel):
 			return None
 		if index.row() < 0 or index.row() >= len(self.rows):
 			return None
-		
+
 		info = self.rows[index.row()]
 
 		if role == Qt.DisplayRole:
@@ -80,7 +80,7 @@ class DebugModulesListModel(QAbstractItemModel):
 class DebugModulesItemDelegate(QItemDelegate):
 	def __init__(self, parent):
 		QItemDelegate.__init__(self, parent)
-		
+
 		self.font = binaryninjaui.getMonospaceFont(parent)
 		self.font.setKerning(False)
 		self.baseline = QFontMetricsF(self.font).ascent()
@@ -89,7 +89,7 @@ class DebugModulesItemDelegate(QItemDelegate):
 		self.char_offset = binaryninjaui.getFontVerticalOffset()
 
 		self.expected_char_widths = [20, 20, 30]
-	
+
 	def sizeHint(self, option, idx):
 		width = self.expected_char_widths[idx.column()]
 		data = idx.data()
@@ -111,13 +111,13 @@ class DebugModulesItemDelegate(QItemDelegate):
 		painter.setFont(self.font)
 		painter.setPen(option.palette.color(QPalette.WindowText).rgba())
 		painter.drawText(2 + option.rect.left(), self.char_offset + self.baseline + option.rect.top(), str(text))
-		
+
 
 class DebugModulesWidget(QWidget, DockContextHandler):
 	def __init__(self, parent, name, data):
 		assert type(data) == binaryninja.binaryview.BinaryView
 		self.bv = data
-		
+
 		QWidget.__init__(self, parent)
 		DockContextHandler.__init__(self, self, name)
 		self.actionHandler = UIActionHandler()
@@ -166,5 +166,5 @@ class DebugModulesWidget(QWidget, DockContextHandler):
 		if view_frame is None:
 			return False
 		else:
-			return True
+			return view_frame.getCurrentView().startswith("Debugger:")
 
