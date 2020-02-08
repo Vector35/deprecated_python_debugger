@@ -424,7 +424,7 @@ class DebuggerState:
 		assert self.adapter
 
 		try:
-			adapter.step_over()
+			self.adapter.step_over()
 			return
 		except NotImplementedError:
 			pass
