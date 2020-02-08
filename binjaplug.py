@@ -179,9 +179,6 @@ class DebuggerState:
 		else:
 			raise NotImplementedError('only x86_64 so far')
 
-		# Clear old highlighted rip
-		for func in self.bv.get_functions_containing(self.last_rip):
-			func.set_auto_instr_highlight(self.last_rip, binaryninja.HighlightStandardColor.NoHighlightColor)
 		self.update_highlights()
 		self.last_rip = local_rip
 
@@ -289,11 +286,11 @@ class DebuggerState:
 				if i == 0:
 					if (rip + total_read) in self.breakpoints:
 						# Breakpoint & pc
-						tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.bv.tag_types["Crashes"].icon + "> ", width=5))
+						tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.bv.tag_types["Crashes"].icon + ">", width=5))
 						color = binaryninja.HighlightStandardColor.RedHighlightColor
 					else:
-						# Show pc
-						tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "==>  "))
+						# PC
+						tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, " ==> "))
 						color = binaryninja.HighlightStandardColor.BlueHighlightColor
 				else:
 					if (rip + total_read) in self.breakpoints:
@@ -322,6 +319,10 @@ class DebuggerState:
 
 	# Highlight lines
 	def update_highlights(self):
+		# Clear old highlighted rip
+		for func in self.bv.get_functions_containing(self.last_rip):
+			func.set_auto_instr_highlight(self.last_rip, binaryninja.HighlightStandardColor.NoHighlightColor)
+
 		for bp in self.breakpoints:
 			for func in self.bv.get_functions_containing(bp):
 				func.set_auto_instr_highlight(bp, binaryninja.HighlightStandardColor.RedHighlightColor)
