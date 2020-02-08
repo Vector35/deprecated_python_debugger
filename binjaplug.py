@@ -279,18 +279,35 @@ class DebuggerState:
 
 			total_read = 0
 			for i in range(inst_count):
-				(tokens, length) = self.bv.arch.get_instruction_text(data[total_read:], rip + total_read)
+				line_addr = rip + total_read
+				(insn_tokens, length) = self.bv.arch.get_instruction_text(data[total_read:], line_addr)
 
-				# Prepend address
+				tokens = []
+				color = binaryninja.HighlightStandardColor.NoHighlightColor
 				if i == 0:
-					tokens.insert(0, InstructionTextToken(InstructionTextTokenType.TextToken, "==>  "))
+					if (rip + total_read) in self.breakpoints:
+						# Breakpoint & pc
+						tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.bv.tag_types["Crashes"].icon + "> ", width=5))
+						color = binaryninja.HighlightStandardColor.RedHighlightColor
+					else:
+						# Show pc
+						tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "==>  "))
+						color = binaryninja.HighlightStandardColor.BlueHighlightColor
 				else:
-					tokens.insert(0, InstructionTextToken(InstructionTextTokenType.TextToken, "     "))
-				tokens.insert(1, InstructionTextToken(InstructionTextTokenType.AddressDisplayToken, hex(rip + total_read)[2:], rip + total_read))
-				tokens.insert(2, InstructionTextToken(InstructionTextTokenType.TextToken, "  "))
+					if (rip + total_read) in self.breakpoints:
+						# Breakpoint
+						tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.bv.tag_types["Crashes"].icon, width=5))
+						color = binaryninja.HighlightStandardColor.RedHighlightColor
+					else:
+						# Regular line
+						tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "     "))
+				# Address
+				tokens.append(InstructionTextToken(InstructionTextTokenType.AddressDisplayToken, hex(line_addr)[2:], line_addr))
+				tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "  "))
+				tokens.extend(insn_tokens)
 
 				# Convert to linear disassembly line
-				contents = DisassemblyTextLine(tokens, rip + total_read)
+				contents = DisassemblyTextLine(tokens, line_addr, color=color)
 				line = LinearDisassemblyLine(LinearDisassemblyLineType.CodeDisassemblyLineType, None, None, 0, contents)
 				lines.append(line)
 
@@ -636,11 +653,13 @@ def cb_bp_set(bv, local_address):
 	debug_state = get_state(bv)
 	remote_address = debug_state.memory_view.local_addr_to_remote(local_address)
 	debug_state.breakpoint_set(remote_address)
+	debug_state.context_display()
 
 def cb_bp_clr(bv, local_address):
 	debug_state = get_state(bv)
 	remote_address = debug_state.memory_view.local_addr_to_remote(local_address)
 	debug_state.breakpoint_clear(remote_address)
+	debug_state.context_display()
 
 def require_adapter(bv, local_address):
 	debug_state = get_state(bv)
