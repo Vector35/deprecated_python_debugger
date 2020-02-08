@@ -423,8 +423,12 @@ class DebuggerState:
 	def step_over(self):
 		assert self.adapter
 
-		# TODO: detect windbg adapter because dbgeng has a builtin step_into() that we don't
-		# have to synthesize
+		try:
+			adapter.step_over()
+			return
+		except NotImplementedError:
+			pass
+
 		if self.bv.arch.name == 'x86_64':
 			remote_rip = self.adapter.reg_read('rip')
 			local_rip = self.memory_view.remote_addr_to_local(remote_rip)

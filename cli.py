@@ -239,7 +239,7 @@ if __name__ == '__main__':
 						print('process exited, return code=%d' % data)
 						break
 					else:
-						print('stopped, reason: ', reason.name)
+						print('stopped, reason: %s' % reason.name)
 						context_display()
 						break
 
