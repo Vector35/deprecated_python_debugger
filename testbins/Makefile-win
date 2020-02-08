@@ -1,6 +1,6 @@
 # nmake -f Makefile-win
 
-all: helloworld.exe helloworld_loop.exe helloworld_thread.exe helloworld_func.exe helloworld_pie.exe helloworld_loop_pie.exe helloworld_thread_pie.exe helloworld_func_pie.exe
+all: helloworld.exe helloworld_loop.exe helloworld_thread.exe helloworld_func.exe helloworld_pie.exe helloworld_loop_pie.exe helloworld_thread_pie.exe helloworld_func_pie.exe asmtest.exe
 
 helloworld.exe: helloworld.c
 	cl helloworld.c /Fe:helloworld.exe /link /DYNAMICBASE:NO
@@ -26,5 +26,11 @@ helloworld_loop_pie.exe: helloworld_loop.c
 helloworld_func_pie.exe: helloworld_func.c
 	cl helloworld_func.c /Fe:helloworld_func_pie.exe /link
 
+asmtest.exe: asmtest.obj
+	link asmtest.obj /ENTRY:WinMain /SUBSYSTEM:CONSOLE /LARGEADDRESSAWARE:NO /DYNAMICBASE:NO /OUT:asmtest.exe kernel32.lib
+
+asmtest.obj: asmtest.asm
+	nasm -f win64 -DOS_IS_WINDOWS asmtest.asm -o asmtest.obj
+
 clean:
-	del /Q helloworld.exe helloworld_thread.exe helloworld_loop.exe helloworld_func.exe helloworld_pie.exe helloworld_thread_pie.exe helloworld_loop_pie.exe helloworld_func_pie.exe
+	del /Q helloworld.exe helloworld_thread.exe helloworld_loop.exe helloworld_func.exe helloworld_pie.exe helloworld_thread_pie.exe helloworld_loop_pie.exe helloworld_func_pie.exe asmtest.exe asmtest.obj

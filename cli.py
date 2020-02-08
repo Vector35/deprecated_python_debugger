@@ -99,11 +99,10 @@ def handler_sigint(signal, frame):
 	adapter.break_into()
 
 def adjust_ctrl_c():
-	#print('adjusting ctrl+c handler')
-	STD_INPUT_HANDLE = 0
-	ENABLE_PROCESSED_INPUT = 1
 	kernel32 = ctypes.windll.kernel32
-	bRet = kernel32.SetConsoleCtrlHandler(STD_INPUT_HANDLE, ENABLE_PROCESSED_INPUT)
+	# If the HandlerRoutine parameter is NULL,
+	# a TRUE value causes the calling process to ignore CTRL+C input
+	bRet = kernel32.SetConsoleCtrlHandler(0, True)
 	#print("SetConsoleCtrlHandler(0, 1) returns %d\n", bRet)
 
 	#handle = kernel32.GetStdHandle(STD_INPUT_HANDLE)

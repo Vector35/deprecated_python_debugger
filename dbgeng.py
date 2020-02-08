@@ -48,7 +48,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		if self.dll.get_exec_status(byref(status)) != 0:
 			raise DebugAdapter.GeneralError("retrieving execution status")
 		status = DEBUG_STATUS(status.value)
-		print('execution status = ', status)
+		#print('execution status = ', status)
 
 		if status == DEBUG_STATUS.BREAK:
 			return (DebugAdapter.STOP_REASON.SIGNAL_TRAP, b'')

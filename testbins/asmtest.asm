@@ -2,8 +2,21 @@
 ;   nasm -f macho64 challenge.asm -o challenge.o
 ;   ld -macosx_version_min 10.7.0 -lSystem challenge.o -o challenge
 ;   otool -t -v -j ./asmtest
+; WIN:
+;   nasm -f win64 asmtest.asm -o asmtest.obj
 
 default rel
+
+%ifdef OS_IS_WINDOWS
+	global WinMain
+	extern ExitProcess, GetStdHandle, WriteConsoleA
+
+	section .bss
+	numCharsWritten               resd 1
+
+	section .text
+	WinMain:
+%endif
 
 %ifdef OS_IS_LINUX
 	global _start
@@ -34,9 +47,26 @@ default rel
 	nop
 	call bounce
 
+%ifdef OS_IS_WINDOWS
+    mov		ecx, -11				; STD_OUTPUT_HANDLE
+    call    GetStdHandle
+
+    push    0
+    mov		r9, numCharsWritten
+    mov		r8, msg.len
+    mov		rdx, msg
+    mov		rcx, rax
+    call    WriteConsoleA
+    add		rsp, 0x8
+
+    mov		rcx, 0
+    call    ExitProcess
+
+%else
 	mov		rsi, msg
 	mov		rdx, msg.len
 	mov		rdi, 1 ; stdout
+%endif
 
 %ifdef OS_IS_LINUX
 	mov		rax, 1 ; write
@@ -61,4 +91,3 @@ section .data
 msg:
 	db		"Hello, world!", 0x0a
 	.len:   equ	$ - msg
-
