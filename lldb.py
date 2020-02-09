@@ -78,15 +78,6 @@ macos_signal_to_debugadapter_reason = {
 	31: DebugAdapter.STOP_REASON.SIGNAL_USR2,
 }
 
-# asynchronously called when inside a "go" to inform us of stdout (and
-# possibly other stuff)
-def handler_async_pkt(pkt):
-	if pkt.startswith('O'):
-		msg = pkt[1:]
-		print(''.join([chr(int(msg[2*x:2*x+2], 16)) for x in range(int(len(msg)/2))]), end='')
-	else:
-		print('handler_async_pkt() got unknown packet: %s' % repr(pkt))
-
 class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	def __init__(self, **kwargs):
 		gdblike.DebugAdapterGdbLike.__init__(self, **kwargs)
@@ -198,14 +189,26 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go(self):
 		self.reg_cache = {}
-		return self.go_generic('c', handler_async_pkt)
+		return self.go_generic('c', self.handler_async_pkt)
 
 	def step_into(self):
 		self.reg_cache = {}
-		return self.go_generic('vCont;s', handler_async_pkt)
+		return self.go_generic('vCont;s', self.handler_async_pkt)
 
 	def step_over(self):
 		# gdb, lldb just doesn't have this, you must synthesize it yourself
 		self.reg_cache = {}
 		raise NotImplementedError('step over')
 
+	# asynchronously called when inside a "go" to inform us of stdout (and
+	# possibly other stuff)
+	def handler_async_pkt(self, pkt):
+		if pkt.startswith('O'):
+			msg = pkt[1:]
+			data = ''.join([chr(int(msg[2*x:2*x+2], 16)) for x in range(int(len(msg)/2))])
+			if self.cb_stdout is not None:
+				self.cb_stdout(data)
+			else:
+				print(data, end='')
+		else:
+			print('handler_async_pkt() got unknown packet: %s' % repr(pkt))

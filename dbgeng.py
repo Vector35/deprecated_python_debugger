@@ -32,6 +32,8 @@ ERROR_UNSPECIFIED = -1
 
 class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	def __init__(self, **kwargs):
+		DebugAdapter.DebugAdapter.__init__(self, **kwargs)
+
 		self.dll = CDLL(".\dbgengadapt\dbgengadapt.dll")
 		if not self.dll:
 			raise DebugAdapter.GeneralError("loading dbgengadapt.dll")
@@ -217,6 +219,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	# execution control, all return:
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go(self):
+		# TODO: Handle output
 		self.dll.go()
 		return self.thunk_stop_reason()
 

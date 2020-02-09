@@ -376,6 +376,10 @@ class DebuggerState:
 				for tag in delqueue:
 					func.remove_user_address_tag(local_address, tag)
 
+	def on_stdout(self, output):
+		# TODO: Send to debugger console when stdin is working
+		print(output)
+
 	#--------------------------------------------------------------------------
 	# DEBUGGER FUNCTIONS (MEDIUM LEVEL, BLOCKING)
 	#--------------------------------------------------------------------------
@@ -386,7 +390,7 @@ class DebuggerState:
 		if not os.path.exists(fpath):
 			raise Exception('cannot find debug target: ' + fpath)
 
-		self.adapter = DebugAdapter.get_adapter_for_current_system()
+		self.adapter = DebugAdapter.get_adapter_for_current_system(stdout=self.on_stdout)
 		self.adapter.exec(fpath, self.command_line_args)
 
 		self.memory_view.update_base()

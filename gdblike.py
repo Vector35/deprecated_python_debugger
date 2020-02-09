@@ -46,15 +46,6 @@ def connect(host, port):
 
 	raise ConnectionRefusedError
 
-# asynchronously called when inside a "go" to inform us of stdout (and
-# possibly other stuff)
-def handler_async_pkt(pkt):
-	if pkt.startswith('O'):
-		msg = pkt[1:]
-		print(''.join([chr(int(msg[2*x:2*x+2], 16)) for x in range(int(len(msg)/2))]), end='')
-	else:
-		print('handler_async_pkt() got unknown packet: %s' % repr(pkt))
-
 def preexec():
     os.setpgrp()
 
@@ -64,6 +55,8 @@ def preexec():
 
 class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	def __init__(self, **kwargs):
+		DebugAdapter.DebugAdapter.__init__(self, **kwargs)
+
 		# register info
 		self.reg_info = {} # eg: 'rip' -> {'id':8, 'width':64}
 		self.reg_cache = {} # eg: 'rip' -> 0x400400
@@ -265,14 +258,14 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go(self):
 		self.reg_cache = {}
-		#return self.go_generic('c', handler_async_pkt)
-		rc = self.go_generic('vCont;c:-1', handler_async_pkt)
+		#return self.go_generic('c', self.handler_async_pkt)
+		rc = self.go_generic('vCont;c:-1', self.handler_async_pkt)
 		self.set_thread_after_stop()
 		return rc
 
 	def step_into(self):
 		self.reg_cache = {}
-		rc = self.go_generic('vCont;s', handler_async_pkt)
+		rc = self.go_generic('vCont;s', self.handler_async_pkt)
 		self.set_thread_after_stop()
 		return rc
 
@@ -400,6 +393,8 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go_generic(self, gotype, handler_async_pkt=None):
 		try:
+			if handler_async_pkt is None:
+				handler_async_pkt = self.handler_async_pkt
 			reply = rsp.tx_rx(self.sock, gotype, 'mixed_output_ack_then_reply', handler_async_pkt)
 			(reason, reason_data) = (None, None)
 
@@ -428,3 +423,16 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 	def raw(self, data):
 		return rsp.tx_rx(self.sock, data)
+
+	# asynchronously called when inside a "go" to inform us of stdout (and
+	# possibly other stuff)
+	def handler_async_pkt(self, pkt):
+		if pkt.startswith('O'):
+			msg = pkt[1:]
+			data = ''.join([chr(int(msg[2*x:2*x+2], 16)) for x in range(int(len(msg)/2))])
+			if self.cb_stdout is not None:
+				self.cb_stdout(data)
+			else:
+				print(data, end='')
+		else:
+			print('handler_async_pkt() got unknown packet: %s' % repr(pkt))
