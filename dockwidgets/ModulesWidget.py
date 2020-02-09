@@ -1,7 +1,7 @@
 from PySide2 import QtCore
 from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize
 from PySide2.QtGui import QPalette, QFontMetricsF
-from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QTableView, QItemDelegate, QStyle, QHeaderView, QAbstractItemView
+from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QTableView, QItemDelegate, QStyle, QHeaderView, QAbstractItemView, QLabel, QPushButton
 
 import binaryninja
 import binaryninjaui
@@ -24,28 +24,28 @@ class DebugModulesListModel(QAbstractItemModel):
 			self.rows = []
 		else:
 			self.rows = new_rows
-		
+
 		self.endResetModel()
 
 	def index(self, row, column, parent):
 		if parent.isValid() or column > len(self.columns) or row >= len(self.rows):
 			return QModelIndex()
 		return self.createIndex(row, column)
-	
+
 	def parent(self, child):
 		return QModelIndex()
 
 	def hasChildren(self, parent):
 		return False
-	
+
 	def rowCount(self, parent):
 		if parent.isValid():
 			return 0
 		return len(self.rows)
-	
+
 	def columnCount(self, parent):
 		return len(self.columns)
-	
+
 	def headerData(self, section, orientation, role):
 		if role != Qt.DisplayRole:
 			return None
@@ -58,7 +58,7 @@ class DebugModulesListModel(QAbstractItemModel):
 			return None
 		if index.row() < 0 or index.row() >= len(self.rows):
 			return None
-		
+
 		info = self.rows[index.row()]
 
 		if role == Qt.DisplayRole:
@@ -80,7 +80,7 @@ class DebugModulesListModel(QAbstractItemModel):
 class DebugModulesItemDelegate(QItemDelegate):
 	def __init__(self, parent):
 		QItemDelegate.__init__(self, parent)
-		
+
 		self.font = binaryninjaui.getMonospaceFont(parent)
 		self.font.setKerning(False)
 		self.baseline = QFontMetricsF(self.font).ascent()
@@ -89,7 +89,7 @@ class DebugModulesItemDelegate(QItemDelegate):
 		self.char_offset = binaryninjaui.getFontVerticalOffset()
 
 		self.expected_char_widths = [20, 20, 30]
-	
+
 	def sizeHint(self, option, idx):
 		width = self.expected_char_widths[idx.column()]
 		data = idx.data()
@@ -111,7 +111,7 @@ class DebugModulesItemDelegate(QItemDelegate):
 		painter.setFont(self.font)
 		painter.setPen(option.palette.color(QPalette.WindowText).rgba())
 		painter.drawText(2 + option.rect.left(), self.char_offset + self.baseline + option.rect.top(), str(text))
-		
+
 
 class DebugModulesWidget(QWidget, DockContextHandler):
 	def __init__(self, parent, name, data):
@@ -119,7 +119,7 @@ class DebugModulesWidget(QWidget, DockContextHandler):
 			raise Exception('expected widget data to be a BinaryView')
 
 		self.bv = data
-		
+
 		QWidget.__init__(self, parent)
 		DockContextHandler.__init__(self, self, name)
 		self.actionHandler = UIActionHandler()
@@ -148,18 +148,42 @@ class DebugModulesWidget(QWidget, DockContextHandler):
 		for i in range(len(self.model.columns)):
 			self.table.setColumnWidth(i, self.item_delegate.sizeHint(self.table.viewOptions(), self.model.index(-1, i, QModelIndex())).width())
 
-		layout = QVBoxLayout()
-		layout.setContentsMargins(0, 0, 0, 0)
-		layout.setSpacing(0)
-		layout.addWidget(self.table)
-		self.setLayout(layout)
+		update_layout = QHBoxLayout()
+		update_layout.setContentsMargins(0, 0, 0, 0)
+
+		update_label = QLabel("Data is Stale")
+		update_button = QPushButton("Refresh")
+		update_button.clicked.connect(lambda: self.refresh())
+
+		update_layout.addWidget(update_label)
+		update_layout.addStretch(1)
+		update_layout.addWidget(update_button)
+
+		self.update_box = QWidget()
+		self.update_box.setLayout(update_layout)
+
+		self.layout = QVBoxLayout()
+		self.layout.setContentsMargins(0, 0, 0, 0)
+		self.layout.setSpacing(0)
+		self.layout.addWidget(self.table)
+		self.setLayout(self.layout)
 
 	def notifyOffsetChanged(self, offset):
 		pass
 
+	def refresh(self):
+		debug_state = binjaplug.get_state(self.bv)
+		debug_state.update_modules()
+
 	def notifyModulesChanged(self, new_modules):
 		self.model.update_rows(new_modules)
 		self.table.resizeColumnsToContents()
+		self.layout.removeWidget(self.update_box)
+		self.update_box.setVisible(False)
+
+	def mark_dirty(self):
+		self.layout.addWidget(self.update_box)
+		self.update_box.setVisible(True)
 
 	def contextMenuEvent(self, event):
 		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)

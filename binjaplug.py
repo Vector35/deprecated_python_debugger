@@ -95,15 +95,10 @@ class DebuggerState:
 		#----------------------------------------------------------------------
 		# Update Modules
 		#----------------------------------------------------------------------
-		mods = []
-		for (modpath, address) in self.adapter.mem_modules().items():
-			mods.append({
-				'address': address,
-				'modpath': modpath
-				# TODO: Length, segments, etc
-			})
-		mods.sort(key=lambda row: row['address'])
-		modules_widget.notifyModulesChanged(mods)
+
+		# Updating this widget is slow, so just show "Data is Stale" and the user
+		# can refresh later if they desire
+		modules_widget.mark_dirty()
 
 		#----------------------------------------------------------------------
 		# Update Threads
@@ -202,6 +197,18 @@ class DebuggerState:
 		else:
 			self.update_raw_disassembly()
 			self.debug_view.controls.state_stopped_extern()
+
+	def update_modules(self):
+		mods = []
+		for (modpath, address) in self.adapter.mem_modules().items():
+			mods.append({
+				'address': address,
+				'modpath': modpath
+				# TODO: Length, segments, etc
+			})
+		mods.sort(key=lambda row: row['address'])
+		modules_widget = widget.get_dockwidget(self.bv, 'Modules')
+		modules_widget.notifyModulesChanged(mods)
 
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):
