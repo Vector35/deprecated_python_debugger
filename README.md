@@ -7,6 +7,12 @@ _Debugger plugin allows Windows, Linux, and Mac binaries to be debugged from wit
 
 This plugin adds a new Debugger binary view which gives the user options to execute and debug the current target.
 
+## Screenshots
+
+![](./media/gui.png)
+
+![](./media/cli.png)
+
 ## Installation Instructions
 
 To install this manually, please see the "Using Plugins" section of the [Getting Started Guide](https://docs.binary.ninja/getting-started.html#using-plugins). Or use Binary Ninja's built in plugin manager.
