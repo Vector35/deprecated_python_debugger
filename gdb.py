@@ -112,7 +112,7 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 	# API
 	#--------------------------------------------------------------------------
 
-	def exec(self, path):
+	def exec(self, path, args):
 		# resolve path to gdbserver
 		path_gdbserver = shutil.which('gdbserver')
 		if not os.path.exists(path_gdbserver):
@@ -124,10 +124,11 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 			raise Exception('no available ports')
 
 		# invoke gdbserver
-		args = [path_gdbserver, '--once', '--no-startup-with-shell', 'localhost:%d'%port, path]
-		print(' '.join(args))
+		dbg_args = [path_gdbserver, '--once', '--no-startup-with-shell', 'localhost:%d'%port, path, '--']
+		dbg_args.extend(args)
+		print(' '.join(dbg_args))
 		try:
-			subprocess.Popen(args, stdin=None, stdout=None, stderr=None, preexec_fn=gdblike.preexec)
+			subprocess.Popen(dbg_args, stdin=None, stdout=None, stderr=None, preexec_fn=gdblike.preexec)
 		except Exception:
 			raise Exception('invoking gdbserver (used path: %s)' % path_gdbserver)
 

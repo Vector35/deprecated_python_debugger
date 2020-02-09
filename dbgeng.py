@@ -68,7 +68,8 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	#--------------------------------------------------------------------------
 
 	# session start/stop
-	def exec(self, fpath):
+	def exec(self, fpath, args):
+		# TODO: Handle args
 		tmp = create_string_buffer(fpath.encode('utf-8'))
 		if self.dll.process_start(tmp):
 			raise Exception('unable to launch %s' % fpath)

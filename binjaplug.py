@@ -56,6 +56,7 @@ class DebuggerState:
 		self.old_symbols = []
 		self.old_dvs = set()
 		self.last_rip = 0
+		self.command_line_args = [""]
 
 	#--------------------------------------------------------------------------
 	# SUPPORT FUNCTIONS (HIGHER LEVEL)
@@ -385,7 +386,7 @@ class DebuggerState:
 			raise Exception('cannot find debug target: ' + fpath)
 
 		self.adapter = DebugAdapter.get_adapter_for_current_system()
-		self.adapter.exec(fpath)
+		self.adapter.exec(fpath, self.command_line_args)
 
 		self.memory_view.update_base()
 

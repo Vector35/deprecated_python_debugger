@@ -65,7 +65,7 @@ class STOP_REASON(Enum):
 
 class DebugAdapter:
 	# session start/stop
-	def exec(self, path):
+	def exec(self, path, args):
 		raise NotImplementedError('')
 	def attach(self, pid):
 		raise NotImplementedError('')

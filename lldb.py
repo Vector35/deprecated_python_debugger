@@ -107,7 +107,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	#--------------------------------------------------------------------------
 
 	# session start/stop
-	def exec(self, path):
+	def exec(self, path, args):
 		# resolve path to debugserver
 		path_debugserver = shutil.which('debugserver')
 		if not path_debugserver:
@@ -122,10 +122,11 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 			raise Exception('no available ports')
 
 		# invoke debugserver
-		args = [path_debugserver, 'localhost:%d'%port, path]
-		#print('args are: ', ' '.join(args))
+		dbg_args = [path_debugserver, 'localhost:%d'%port, path, '--']
+		dbg_args.extend(args)
+		#print('args are: ', ' '.join(dbg_args))
 		try:
-			subprocess.Popen(args, stdin=None, stdout=None, stderr=None, preexec_fn=gdblike.preexec)
+			subprocess.Popen(dbg_args, stdin=None, stdout=None, stderr=None, preexec_fn=gdblike.preexec)
 		except Exception:
 			raise Exception('invoking debugserver (used path: %s)' % path_debugserver)
 
