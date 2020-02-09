@@ -1,5 +1,5 @@
 # make -f Makefile-macos
-all: helloworld helloworld_loop helloworld_thread helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie asmtest nopspeed
+all: helloworld helloworld_loop helloworld_thread helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie asmtest nopspeed  cat commandline_test
 
 helloworld: helloworld.c
 	gcc -Wl,-no_pie helloworld.c -o helloworld
@@ -33,5 +33,11 @@ asmtest: asmtest.asm
 nopspeed: nopspeed.c
 	gcc -Wl,-pie -O3 nopspeed.c -o nopspeed
 
+cat: cat.c
+	gcc -Wl,-pie -O3 cat.c -o cat
+
+commandline_test: commandline_test.c
+	gcc -Wl,-pie -O3 commandline_test.c -o commandline_test
+
 clean:
-	rm -rf helloworld helloworld_thread helloworld_loop helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie asmtest nopspeed
+	rm -rf helloworld helloworld_thread helloworld_loop helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie asmtest nopspeed cat commandline_test
