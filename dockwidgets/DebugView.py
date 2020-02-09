@@ -137,7 +137,7 @@ class DebugView(QWidget, View):
 	def updateTimerEvent(self):
 		if self.needs_update:
 			self.needs_update = False
-			adapter = binjaplug.get_state(self.bv).adapter
+			adapter = self.debug_state.adapter
 
 			# Refresh the editor
 			if adapter is None:
@@ -145,6 +145,14 @@ class DebugView(QWidget, View):
 				return
 
 			self.memory_editor.navigate(adapter.reg_read('rsp'))
+
+	def showEvent(self, event):
+		if not event.spontaneous():
+			self.update_timer.start()
+
+	def hideEvent(self, event):
+		if not event.spontaneous():
+			self.update_timer.stop()
 
 	def shouldBeVisible(self, view_frame):
 		if view_frame is None:
