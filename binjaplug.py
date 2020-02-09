@@ -63,10 +63,24 @@ class DebuggerState:
 	#--------------------------------------------------------------------------
 
 	def context_display(self):
+		registers_widget = widget.get_dockwidget(self.bv, 'Registers')
+		modules_widget = widget.get_dockwidget(self.bv, 'Modules')
+		threads_widget = widget.get_dockwidget(self.bv, 'Threads')
+		stack_widget = widget.get_dockwidget(self.bv, 'Stack')
+
+		if self.adapter is None:
+			# Disconnected
+			registers_widget.notifyRegistersChanged([])
+			modules_widget.notifyModulesChanged([])
+			threads_widget.notifyThreadsChanged([])
+			self.debug_view.controls.set_thread_list([])
+			stack_widget.notifyStackChanged([])
+			self.memory_dirty()
+			return
+
 		#----------------------------------------------------------------------
 		# Update Registers
 		#----------------------------------------------------------------------
-		registers_widget = widget.get_dockwidget(self.bv, 'Registers')
 		regs = []
 		for register in self.adapter.reg_list():
 			value = self.adapter.reg_read(register)
@@ -81,7 +95,6 @@ class DebuggerState:
 		#----------------------------------------------------------------------
 		# Update Modules
 		#----------------------------------------------------------------------
-		modules_widget = widget.get_dockwidget(self.bv, 'Modules')
 		mods = []
 		for (modpath, address) in self.adapter.mem_modules().items():
 			mods.append({
@@ -95,7 +108,6 @@ class DebuggerState:
 		#----------------------------------------------------------------------
 		# Update Threads
 		#----------------------------------------------------------------------
-		threads_widget = widget.get_dockwidget(self.bv, 'Threads')
 
 		if self.bv.arch.name == 'x86_64':
 			reg_ip_name = 'rip'
@@ -123,7 +135,6 @@ class DebuggerState:
 		#----------------------------------------------------------------------
 		# Update Stack
 		#----------------------------------------------------------------------
-		stack_widget = widget.get_dockwidget(self.bv, 'Stack')
 
 		if self.bv.arch.name == 'x86_64':
 			stack_pointer = self.adapter.reg_read('rsp')
