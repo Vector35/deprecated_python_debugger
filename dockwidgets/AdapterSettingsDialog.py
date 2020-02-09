@@ -42,10 +42,14 @@ class AdapterSettingsDialog(QDialog):
 		buttonLayout = QHBoxLayout()
 		buttonLayout.setContentsMargins(0, 0, 0, 0)
 
-		closeButton = QPushButton("Close")
-		closeButton.clicked.connect(lambda: self.reject())
+		self.cancelButton = QPushButton("Cancel")
+		self.cancelButton.clicked.connect(lambda: self.reject())
+		self.acceptButton = QPushButton("Accept")
+		self.acceptButton.clicked.connect(lambda: self.accept())
+		self.acceptButton.setDefault(True)
 		buttonLayout.addStretch(1)
-		buttonLayout.addWidget(closeButton)
+		buttonLayout.addWidget(self.cancelButton)
+		buttonLayout.addWidget(self.acceptButton)
 
 		layout.addLayout(titleLayout)
 		layout.addSpacing(10)
@@ -68,9 +72,10 @@ class AdapterSettingsDialog(QDialog):
 		# self.addressEntry.textEdited.connect(lambda: self.updateSettings())
 		# self.portEntry.textEdited.connect(lambda: self.updateSettings())
 
-		self.argumentsEntry.setText(' '.join(debug_state.command_line_args))
-
+		self.argumentsEntry.setText(' ' .join(shlex.quote(arg) for arg in debug_state.command_line_args))
 		self.argumentsEntry.textEdited.connect(lambda: self.updateArguments())
+
+		self.accepted.connect(lambda: self.apply())
 
 	# def updateSettings(self):
 	# 	settings = Settings()
@@ -79,8 +84,15 @@ class AdapterSettingsDialog(QDialog):
 	# 	settings.set_string("debugger.adapter.address", address, self.bv, SettingsScope.SettingsContextScope)
 	# 	settings.set_integer("debugger.adapter.port", port, self.bv, SettingsScope.SettingsContextScope)
 
-	def updateArguments(self):
+	def apply(self):
 		debug_state = binjaplug.get_state(self.bv)
 		arguments = shlex.split(self.argumentsEntry.text())
 		debug_state.command_line_args = arguments
+
+	def updateArguments(self):
+		try:
+			arguments = shlex.split(self.argumentsEntry.text())
+			self.acceptButton.setEnabled(True)
+		except:
+			self.acceptButton.setEnabled(False)
 

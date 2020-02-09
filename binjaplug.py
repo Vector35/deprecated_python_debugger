@@ -56,7 +56,7 @@ class DebuggerState:
 		self.old_symbols = []
 		self.old_dvs = set()
 		self.last_rip = 0
-		self.command_line_args = [""]
+		self.command_line_args = []
 
 	#--------------------------------------------------------------------------
 	# SUPPORT FUNCTIONS (HIGHER LEVEL)
