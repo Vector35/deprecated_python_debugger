@@ -243,7 +243,7 @@ class DebuggerState:
 
 		# Special struct for stack frame
 		if self.bv.arch.name == 'x86_64':
-			width = reg_addrs['rbp'] - reg_addrs['rsp']
+			width = reg_addrs['rbp'] - reg_addrs['rsp'] + self.bv.arch.address_size
 			if width > 0:
 				if width > 0x1000:
 					width = 0x1000
@@ -251,7 +251,8 @@ class DebuggerState:
 				struct.type = StructureType.StructStructureType
 				struct.width = width
 				for i in range(0, width, self.bv.arch.address_size):
-					struct.insert(i, Type.pointer(self.bv.arch, Type.void()))
+					var_name = "var_{:x}".format(width - i)
+					struct.insert(i, Type.pointer(self.bv.arch, Type.void()), var_name)
 				self.memory_view.define_data_var(reg_addrs['rsp'], Type.structure_type(struct))
 				self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, reg_addrs['rsp'], "$stack_frame", raw_name="$stack_frame"))
 
