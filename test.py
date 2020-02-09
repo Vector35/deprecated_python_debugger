@@ -379,7 +379,11 @@ if __name__ == '__main__':
 		print('checking that at least one thread progressed')
 		#print(' rips: ', rips)
 		#print('rips2: ', rips2)
-		assert list(filter(lambda x: not x, [rips[i]==rips2[i] for i in range(len(rips))])) != []
+		if list(filter(lambda x: not x, [rips[i]==rips2[i] for i in range(len(rips))])) == []:
+			print('did any threads progress?')
+			print('rips:   ', rips)
+			print('rips2:  ', rips2)
+			assert False
 		print('done')
 		adapter.quit()
 

@@ -15,15 +15,18 @@
 
 #if defined(OS_IS_WINDOWS)
 DWORD WINAPI ThreadFunc(void* vargp)
-#define SLEEP1SEC Sleep(1000)
+//#define SLEEP1SEC Sleep(1000)
 #else
 void *thread_func(void *vargp)
 //#define SLEEP1SEC sleep(1)
-#define SLEEP1SEC for(int i=0; i<99999999; ++i) { foo *= 3; }
 #endif
+
+#define SLEEP1SEC for(int i=0; i<99999999; ++i) { foo *= 3; }
+
 {
 	int i;
 	int myid = *(int *)vargp;
+	srand(myid);
 	for(i=0; i<1000; ++i) {
 		printf("I'm thread %d.\n", myid);
 		int foo = 7;
