@@ -32,7 +32,7 @@ ERROR_UNSPECIFIED = -1
 
 class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	def __init__(self, **kwargs):
-		self.dll = CDLL(".\windows\dbgengadapt.dll")
+		self.dll = CDLL(".\dbgengadapt\dbgengadapt.dll")
 		if not self.dll:
 			raise DebugAdapter.GeneralError("loading dbgengadapt.dll")
 
