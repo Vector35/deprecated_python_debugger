@@ -102,6 +102,7 @@ class DebugMemoryView(BinaryView):
 	def __init__(self, parent):
 		BinaryView.__init__(self, parent_view=parent, file_metadata=parent.file)
 		self.value_cache = {}
+		self.error_cache = {}
 		self.arch = parent.arch
 		self.platform = parent.platform
 
@@ -134,6 +135,8 @@ class DebugMemoryView(BinaryView):
 		cache_blocks = range(cache_start, cache_start + cache_len, 0x100)
 
 		for block in cache_blocks:
+			if block in self.error_cache:
+				return None
 			if block not in self.value_cache:
 				try:
 					batch = adapter.mem_read(block, cache_len)
@@ -143,6 +146,7 @@ class DebugMemoryView(BinaryView):
 					self.value_cache.update(batch)
 				except DebugAdapter.GeneralError as e:
 					# Probably disconnected; can't read
+					self.error_cache[block] = True
 					return None
 
 		# Now that we know we have cached every address in the region, assemble the
@@ -184,6 +188,7 @@ class DebugMemoryView(BinaryView):
 
 	def mark_dirty(self):
 		self.value_cache = {}
+		self.error_cache = {}
 
 DebugProcessView.register()
 DebugMemoryView.register()
