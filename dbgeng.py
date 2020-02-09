@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import re
 import socket
 from struct import pack, unpack
@@ -32,7 +33,11 @@ ERROR_UNSPECIFIED = -1
 
 class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	def __init__(self, **kwargs):
-		self.dll = CDLL(".\dbgengadapt\dbgengadapt.dll")
+		fpath = os.path.abspath(__file__)
+		fpath = os.path.dirname(fpath)
+		fpath = os.path.join(fpath, 'dbgengadapt\dbgengadapt.dll')
+		#print('dll path: %s' % fpath)
+		self.dll = CDLL(fpath)
 		if not self.dll:
 			raise DebugAdapter.GeneralError("loading dbgengadapt.dll")
 
