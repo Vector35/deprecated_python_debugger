@@ -1,3 +1,6 @@
+import platform
+from pathlib import Path, PureWindowsPath
+
 import binaryninja
 import binaryninjaui
 from binaryninja import BinaryView, SegmentFlag
@@ -57,9 +60,13 @@ class DebugProcessView(BinaryView):
 	def get_remote_base(self):
 		adapter = binjaplug.get_state(self.local_view).adapter
 		modules = adapter.mem_modules()
-		if not self.local_view.file.original_filename in modules:
-			raise Exception('expected %s to be in %s' % (self.local_view.file.original_filename, modules))
-		return modules[self.local_view.file.original_filename]
+
+		fpath_exe = self.local_view.file.original_filename
+		if platform.system() == 'Windows':
+			fpath_exe = PureWindowsPath(Path(fpath_exe))
+		if not fpath_exe in modules:
+			raise Exception('expected %s to be in %s' % (fpath_exe, modules))
+		return modules[fpath_exe]
 
 	"""
 	Determine if the debugged process is using ASLR for its code segment
