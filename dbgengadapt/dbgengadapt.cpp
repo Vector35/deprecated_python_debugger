@@ -65,9 +65,9 @@ IDebugRegisters *g_Registers = NULL;
 IDebugSymbols *g_Symbols = NULL;
 IDebugSystemObjects *g_Objects = NULL;
 
-ULONG lastSessionStatus;
-bool b_PROCESS_CREATED;
-bool b_PROCESS_EXITED;
+ULONG lastSessionStatus = DEBUG_SESSION_FAILURE;
+bool b_PROCESS_CREATED = false;
+bool b_PROCESS_EXITED = false;
 ULONG process_exit_code;
 ULONG64 image_base;
 
@@ -680,6 +680,7 @@ int process_start(char *path)
 
 	b_PROCESS_CREATED = false;
 	b_PROCESS_EXITED = false;
+	lastSessionStatus = DEBUG_SESSION_FAILURE;
 
 	printf_debug("starting process: %s\n", path);
 
@@ -911,15 +912,18 @@ int mem_write(uint64_t addr, uint8_t *data, uint32_t len)
 }
 
 EASY_CTYPES_SPEC
-int module_num(int *result)
+int module_num(int *num)
 {
 	ULONG n_loaded, n_unloaded;
-	if(g_Symbols->GetNumberModules(&n_loaded, &n_unloaded) != S_OK) {
-		printf_debug("ERROR: GetNumberModules()\n");
+	HRESULT hr;
+
+	hr = g_Symbols->GetNumberModules(&n_loaded, &n_unloaded);
+	if(hr != S_OK) {
+		printf_debug("ERROR: GetNumberModules() returned 0x%X\n", hr);
 		return ERROR_UNSPECIFIED;
 	}
 
-	*result = n_loaded;
+	*num = n_loaded;
 	return 0;
 }
 
@@ -1032,7 +1036,7 @@ EASY_CTYPES_SPEC
 int reg_name(int idx, char *name)
 {
 	HRESULT rc;
-	
+
 	ULONG len;
 	DEBUG_REGISTER_DESCRIPTION descr;
 
