@@ -40,6 +40,7 @@
 
 */
 
+#include <stdio.h>
 #include <stdint.h>
 
 #include <windows.h>
@@ -74,9 +75,15 @@ ULONG64 image_base;
 /* forward declarations */
 void status_to_str(ULONG status, char *str);
 
-#include <stdio.h>
-//#define printf_debug(x, ...) printf(x, __VA_ARGS__)
-#define printf_debug(x, ...) while(0);
+#define verbose(...) { \
+	char buf[1024]; \
+	sprintf(buf, __VA_ARGS__); \
+	OutputDebugString(buf); \
+	printf(buf); \
+}
+
+#define printf_debug verbose
+//#define printf_debug(x, ...) while(0);
 
 /*****************************************************************************/
 /* EVENT CALLBACKS */
@@ -686,16 +693,19 @@ int process_start(char *path)
 
 	if(!g_Client) {
 		printf_debug("ERROR: interfaces not initialized\n");
+		rc = -2;
 		goto cleanup;
 	}
 
 	if(g_Control->SetEngineOptions(DEBUG_ENGOPT_INITIAL_BREAK) != S_OK) {
 		printf_debug("ERROR: SetEngineOptions()\n");
+		rc = -3;
 		goto cleanup;
 	}
 
 	if(g_Client->CreateProcess(0, path, DEBUG_ONLY_THIS_PROCESS) != S_OK) {
 		printf_debug("ERROR: creating debug process\n");
+		rc = -4;
 		goto cleanup;
 	}
 
@@ -706,13 +716,16 @@ int process_start(char *path)
 
 	/* wait for active session */
 	for(int i=0; i<10; ++i) {
+		wait(100);
+
 		if(lastSessionStatus == DEBUG_SESSION_ACTIVE && b_PROCESS_CREATED) {
 			printf_debug("process created!\n");
 			rc = 0;
 			goto cleanup;
 		}
-
-		wait(100);
+		else {
+			rc = -5;
+		}
 	}
 
 	cleanup:
