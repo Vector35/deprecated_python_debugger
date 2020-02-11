@@ -150,7 +150,7 @@ def test_prologue(prog, testtype):
 
 	print('launching')
 	adapter = DebugAdapter.get_adapter_for_current_system()
-	adapter.exec(fpath)
+	adapter.exec(fpath, '')
 
 	# learn load address, entrypoint
 	#

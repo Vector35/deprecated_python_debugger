@@ -35,7 +35,7 @@ class DebugView(QWidget, View):
 		self.memory_editor = LinearView(memory_view, frame)
 		self.binary_editor = DisassemblyContainer(frame, data, frame)
 
-		self.binary_text = TokenizedTextView(self, self.bv)
+		self.binary_text = TokenizedTextView(self, memory_view)
 		self.is_raw_disassembly = False
 
 		# TODO: Handle these and change views accordingly
@@ -137,7 +137,7 @@ class DebugView(QWidget, View):
 	def updateTimerEvent(self):
 		if self.needs_update:
 			self.needs_update = False
-			adapter = binjaplug.get_state(self.bv).adapter
+			adapter = self.debug_state.adapter
 
 			# Refresh the editor
 			if adapter is None:
@@ -145,6 +145,14 @@ class DebugView(QWidget, View):
 				return
 
 			self.memory_editor.navigate(adapter.reg_read('rsp'))
+
+	def showEvent(self, event):
+		if not event.spontaneous():
+			self.update_timer.start()
+
+	def hideEvent(self, event):
+		if not event.spontaneous():
+			self.update_timer.stop()
 
 	def shouldBeVisible(self, view_frame):
 		if view_frame is None:

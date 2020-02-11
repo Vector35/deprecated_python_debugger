@@ -56,16 +56,31 @@ class DebuggerState:
 		self.old_symbols = []
 		self.old_dvs = set()
 		self.last_rip = 0
+		self.command_line_args = []
 
 	#--------------------------------------------------------------------------
 	# SUPPORT FUNCTIONS (HIGHER LEVEL)
 	#--------------------------------------------------------------------------
 
 	def context_display(self):
+		registers_widget = widget.get_dockwidget(self.bv, 'Registers')
+		modules_widget = widget.get_dockwidget(self.bv, 'Modules')
+		threads_widget = widget.get_dockwidget(self.bv, 'Threads')
+		stack_widget = widget.get_dockwidget(self.bv, 'Stack')
+
+		if self.adapter is None:
+			# Disconnected
+			registers_widget.notifyRegistersChanged([])
+			modules_widget.notifyModulesChanged([])
+			threads_widget.notifyThreadsChanged([])
+			self.debug_view.controls.set_thread_list([])
+			stack_widget.notifyStackChanged([])
+			self.memory_dirty()
+			return
+
 		#----------------------------------------------------------------------
 		# Update Registers
 		#----------------------------------------------------------------------
-		registers_widget = widget.get_dockwidget(self.bv, 'Registers')
 		regs = []
 		for register in self.adapter.reg_list():
 			value = self.adapter.reg_read(register)
@@ -80,21 +95,14 @@ class DebuggerState:
 		#----------------------------------------------------------------------
 		# Update Modules
 		#----------------------------------------------------------------------
-		modules_widget = widget.get_dockwidget(self.bv, 'Modules')
-		mods = []
-		for (modpath, address) in self.adapter.mem_modules().items():
-			mods.append({
-				'address': address,
-				'modpath': modpath
-				# TODO: Length, segments, etc
-			})
-		mods.sort(key=lambda row: row['address'])
-		modules_widget.notifyModulesChanged(mods)
+
+		# Updating this widget is slow, so just show "Data is Stale" and the user
+		# can refresh later if they desire
+		modules_widget.mark_dirty()
 
 		#----------------------------------------------------------------------
 		# Update Threads
 		#----------------------------------------------------------------------
-		threads_widget = widget.get_dockwidget(self.bv, 'Threads')
 
 		if self.bv.arch.name == 'x86_64':
 			reg_ip_name = 'rip'
@@ -122,7 +130,6 @@ class DebuggerState:
 		#----------------------------------------------------------------------
 		# Update Stack
 		#----------------------------------------------------------------------
-		stack_widget = widget.get_dockwidget(self.bv, 'Stack')
 
 		if self.bv.arch.name == 'x86_64':
 			stack_pointer = self.adapter.reg_read('rsp')
@@ -191,6 +198,18 @@ class DebuggerState:
 			self.update_raw_disassembly()
 			self.debug_view.controls.state_stopped_extern()
 
+	def update_modules(self):
+		mods = []
+		for (modpath, address) in self.adapter.mem_modules().items():
+			mods.append({
+				'address': address,
+				'modpath': modpath
+				# TODO: Length, segments, etc
+			})
+		mods.sort(key=lambda row: row['address'])
+		modules_widget = widget.get_dockwidget(self.bv, 'Modules')
+		modules_widget.notifyModulesChanged(mods)
+
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):
 		self.memory_view.mark_dirty()
@@ -228,12 +247,10 @@ class DebuggerState:
 		self.old_dvs = set()
 		new_dvs = set()
 
-		for (addr, regs) in addr_regs.items():
-			symbol_name = "@".join(regs)
-			fancy_name = ",".join(regs)
-
-			self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, addr, fancy_name, raw_name=symbol_name))
-			self.old_symbols.append(self.memory_view.get_symbol_by_raw_name(symbol_name))
+		for (reg, addr) in reg_addrs.items():
+			symbol_name = '$' + reg
+			self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, addr, symbol_name, namespace=symbol_name))
+			self.old_symbols.append(self.memory_view.get_symbol_by_raw_name(symbol_name, namespace=symbol_name))
 			new_dvs.add(addr)
 
 		for new_dv in new_dvs:
@@ -242,7 +259,7 @@ class DebuggerState:
 
 		# Special struct for stack frame
 		if self.bv.arch.name == 'x86_64':
-			width = reg_addrs['rbp'] - reg_addrs['rsp']
+			width = reg_addrs['rbp'] - reg_addrs['rsp'] + self.bv.arch.address_size
 			if width > 0:
 				if width > 0x1000:
 					width = 0x1000
@@ -250,7 +267,8 @@ class DebuggerState:
 				struct.type = StructureType.StructStructureType
 				struct.width = width
 				for i in range(0, width, self.bv.arch.address_size):
-					struct.insert(i, Type.pointer(self.bv.arch, Type.void()))
+					var_name = "var_{:x}".format(width - i)
+					struct.insert(i, Type.pointer(self.bv.arch, Type.void()), var_name)
 				self.memory_view.define_data_var(reg_addrs['rsp'], Type.structure_type(struct))
 				self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, reg_addrs['rsp'], "$stack_frame", raw_name="$stack_frame"))
 
@@ -374,6 +392,10 @@ class DebuggerState:
 				for tag in delqueue:
 					func.remove_user_address_tag(local_address, tag)
 
+	def on_stdout(self, output):
+		# TODO: Send to debugger console when stdin is working
+		print(output)
+
 	#--------------------------------------------------------------------------
 	# DEBUGGER FUNCTIONS (MEDIUM LEVEL, BLOCKING)
 	#--------------------------------------------------------------------------
@@ -384,8 +406,8 @@ class DebuggerState:
 		if not os.path.exists(fpath):
 			raise Exception('cannot find debug target: ' + fpath)
 
-		self.adapter = DebugAdapter.get_adapter_for_current_system()
-		self.adapter.exec(fpath)
+		self.adapter = DebugAdapter.get_adapter_for_current_system(stdout=self.on_stdout)
+		self.adapter.exec(fpath, self.command_line_args)
 
 		self.memory_view.update_base()
 

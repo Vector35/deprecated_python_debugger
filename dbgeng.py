@@ -33,10 +33,11 @@ ERROR_UNSPECIFIED = -1
 
 class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	def __init__(self, **kwargs):
+		DebugAdapter.DebugAdapter.__init__(self, **kwargs)
+
 		fpath = os.path.abspath(__file__)
 		fpath = os.path.dirname(fpath)
 		fpath = os.path.join(fpath, 'dbgengadapt\dbgengadapt.dll')
-		#print('dll path: %s' % fpath)
 		self.dll = CDLL(fpath)
 		if not self.dll:
 			raise DebugAdapter.GeneralError("loading dbgengadapt.dll")
@@ -73,12 +74,11 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	#--------------------------------------------------------------------------
 
 	# session start/stop
-	def exec(self, fpath):
+	def exec(self, fpath, args):
 		if '/' in fpath:
 			fpath = fpath.replace('/', '\\')
-
-		tmp = create_string_buffer(fpath.encode('utf-8'))
-		rc = self.dll.process_start(tmp)
+		fpath = create_string_buffer(fpath.encode('utf-8'))
+		rc = self.dll.process_start(fpath)
 		if rc:
 			raise Exception('unable to launch %s, dbgeng adapter returned %d' % (fpath, rc))
 
@@ -225,6 +225,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	# execution control, all return:
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go(self):
+		# TODO: Handle output
 		self.dll.go()
 		return self.thunk_stop_reason()
 

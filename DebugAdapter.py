@@ -8,17 +8,17 @@ class BreakpointClearError(Exception):
 class BreakpointSetError(Exception):
 	pass
 
-def get_adapter_for_current_system():
+def get_adapter_for_current_system(**kwargs):
 	from . import dbgeng, gdb, lldb
 
 	system = platform.system()
 
 	if system == 'Windows':
-		return dbgeng.DebugAdapterDbgeng()
+		return dbgeng.DebugAdapterDbgeng(**kwargs)
 	elif system == 'Linux':
-		return gdb.DebugAdapterGdb()
+		return gdb.DebugAdapterGdb(**kwargs)
 	elif system == 'Darwin':
-		return lldb.DebugAdapterLLDB()
+		return lldb.DebugAdapterLLDB(**kwargs)
 	else:
 		raise Exception('unsupported system: %s' % system)
 
@@ -64,8 +64,12 @@ class STOP_REASON(Enum):
 	SIGNAL_POLL = auto()
 
 class DebugAdapter:
+	def __init__(self, **kwargs):
+		# stdout handling callback
+		self.cb_stdout = kwargs.get('stdout', None)
+
 	# session start/stop
-	def exec(self, path):
+	def exec(self, path, args):
 		raise NotImplementedError('')
 	def attach(self, pid):
 		raise NotImplementedError('')

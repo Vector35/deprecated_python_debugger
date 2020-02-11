@@ -5,6 +5,7 @@ from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QToolBar, QToolButton, QMenu, QAction
 import threading
 
+from . import AdapterSettingsDialog
 from .. import binjaplug, DebugAdapter
 
 class DebugControlsWidget(QToolBar):
@@ -33,7 +34,7 @@ class DebugControlsWidget(QToolBar):
 		self.actionAttach.triggered.connect(lambda: self.perform_attach())
 		self.actionDetach = QAction("Detach", self)
 		self.actionDetach.triggered.connect(lambda: self.perform_detach())
-		self.actionSettings = QAction("Adapter Settings... (todo)", self)
+		self.actionSettings = QAction("Settings...", self)
 		self.actionSettings.triggered.connect(lambda: self.perform_settings())
 		self.actionPause = QAction("Pause", self)
 		self.actionPause.triggered.connect(lambda: self.perform_pause())
@@ -56,8 +57,8 @@ class DebugControlsWidget(QToolBar):
 		# self.controlMenu.addAction(self.actionAttach)
 		self.controlMenu.addAction(self.actionDetach)
 		# TODO: Switch adapter/etc (could go in regular settings)
-		# self.controlMenu.addSeparator()
-		# self.controlMenu.addAction(self.actionSettings)
+		self.controlMenu.addSeparator()
+		self.controlMenu.addAction(self.actionSettings)
 
 		self.btnControl = QToolButton(self)
 		self.btnControl.setMenu(self.controlMenu)
@@ -120,8 +121,8 @@ class DebugControlsWidget(QToolBar):
 		self.state_inactive()
 
 	def perform_settings(self):
-		# TODO: Show settings dialog
-		pass
+		dialog = AdapterSettingsDialog.AdapterSettingsDialog(self, self.bv)
+		dialog.show()
 
 	def perform_pause(self):
 		self.debug_state.pause()
