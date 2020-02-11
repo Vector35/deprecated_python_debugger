@@ -488,8 +488,7 @@ class DebuggerState:
 			raise Exception('missing adapter')
 
 		try:
-			self.adapter.step_over()
-			return
+			return self.adapter.step_over()
 		except NotImplementedError:
 			pass
 
@@ -598,10 +597,7 @@ class DebuggerState:
 		if not self.adapter:
 			raise Exception('missing adapter')
 
-		if self.adapter.breakpoint_set(remote_address) != 0:
-			print('ERROR: breakpoint set failed')
-			return False
-
+		self.adapter.breakpoint_set(remote_address)
 		local_address = self.memory_view.remote_addr_to_local(remote_address)
 
 		# save it

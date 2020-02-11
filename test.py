@@ -12,6 +12,7 @@ from struct import unpack
 
 sys.path.append('..')
 import debugger.lldb as lldb
+import debugger.dbgeng as dbgeng
 import debugger.DebugAdapter as DebugAdapter
 import debugger.utils as utils
 
@@ -181,11 +182,11 @@ if __name__ == '__main__':
 
 	# one-off tests
 	if arg == 'oneoff':
-		fpath = test_prog_to_fpath('asmtest')
-		print(fpath)
-		(load_addr, entry_offs) = parse_image(fpath)
-		print('load_addr: 0x%X' % load_addr)
-		print('entry_offs: 0x%X' % entry_offs)
+		fpath = test_prog_to_fpath('helloworld_thread')
+		adapter = DebugAdapter.get_adapter_for_current_system()
+		adapter.exec(fpath)
+		print(adapter.mem_modules())
+		print(type(adapter) == dbgeng.DebugAdapterDbgeng)
 		sys.exit(0)
 
 	tests = []

@@ -4,6 +4,7 @@ from binaryninja import BinaryView, SegmentFlag
 
 from . import binjaplug
 from . import DebugAdapter
+from . import dbgeng
 
 """
 The debug memory BinaryView layout is in a few pieces:
@@ -59,8 +60,12 @@ class DebugProcessView(BinaryView):
 		modules = adapter.mem_modules()
 
 		fpath_exe = self.local_view.file.original_filename
+		if isinstance(adapter, dbgeng.DebugAdapterDbgeng):
+			fpath_exe = fpath_exe.replace('/', '\\')
+
 		if not fpath_exe in modules:
 			raise Exception('expected %s to be in %s' % (fpath_exe, modules))
+
 		return modules[fpath_exe]
 
 	"""
