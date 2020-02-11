@@ -247,12 +247,10 @@ class DebuggerState:
 		self.old_dvs = set()
 		new_dvs = set()
 
-		for (addr, regs) in addr_regs.items():
-			symbol_name = "@".join(regs)
-			fancy_name = ",".join(regs)
-
-			self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, addr, fancy_name, raw_name=symbol_name))
-			self.old_symbols.append(self.memory_view.get_symbol_by_raw_name(symbol_name))
+		for (reg, addr) in reg_addrs.items():
+			symbol_name = '$' + reg
+			self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, addr, symbol_name, namespace=symbol_name))
+			self.old_symbols.append(self.memory_view.get_symbol_by_raw_name(symbol_name, namespace=symbol_name))
 			new_dvs.add(addr)
 
 		for new_dv in new_dvs:

@@ -35,7 +35,7 @@ class DebugView(QWidget, View):
 		self.memory_editor = LinearView(memory_view, frame)
 		self.binary_editor = DisassemblyContainer(frame, data, frame)
 
-		self.binary_text = TokenizedTextView(self, self.bv)
+		self.binary_text = TokenizedTextView(self, memory_view)
 		self.is_raw_disassembly = False
 
 		# TODO: Handle these and change views accordingly
