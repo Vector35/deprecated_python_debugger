@@ -1,4 +1,4 @@
-# Debugger Plugin (v1.0-alpha)
+# Debugger Plugin (v0.1-alpha)
 
 Author: **Vector35 Inc**
 _Debugger plugin allows Windows, Linux, and Mac binaries to be debugged from within Binary Ninja.
