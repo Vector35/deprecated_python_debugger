@@ -6,6 +6,7 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, Q
 import binaryninja
 import binaryninjaui
 from binaryninja import BinaryView
+from binaryninja.enums import InstructionTextTokenType
 from binaryninjaui import View, ViewType, UIAction, UIActionHandler, LinearView, DisassemblyContainer, ViewFrame, DockHandler, TokenizedTextView
 
 from . import widget, ControlsWidget
@@ -164,6 +165,16 @@ class DebugView(QWidget, View):
 		if raw != self.is_raw_disassembly:
 			self.splitter.replaceWidget(0, self.disasm_widget if raw else self.bv_widget)
 			self.is_raw_disassembly = raw
+
+		# terrible workaround for libshiboken conversion issue
+		for line in lines:
+			# line is LinearDisassemblyLine
+			last_tok = line.contents.tokens[-1]
+			#if last_tok.type != InstructionTextTokenType.PossibleAddressToken: continue
+			#if last_tok.width != 18: continue # strlen("0xFFFFFFFFFFFFFFF0")
+			if last_tok.size != 8: continue
+			#print('fixing: %s' % line)
+			last_tok.value &= 0x7FFFFFFFFFFFFFFF
 
 		self.binary_text.setLines(lines)
 
