@@ -69,13 +69,13 @@ Sometimes the adapter must "shape" the behavior of the underlying debug subsyste
 +-------------------+    +----------------+
 ```
 
-The various pieces of the plugin are organized under the `DebugState` class. When the debugger is loaded as a plugin in Binary Ninja, its `ui` field is initialized with a `DebuggerUI` instance that controls the various dock widgets and the main debugging view. When a process is being debugged, `DebugState` contains an instance of `DebugAdapter` through the `adapter` field. `DebugState` contains an instance of `ProcessView` through `memory_view` at all times.
+The various pieces of the plugin are organized under the `DebugState` class. When the debugger is loaded as a plugin in Binary Ninja, its `ui` field is initialized with a `DebuggerUI` instance that controls the various dock widgets and the main debugging view. When a process is being debugged, `DebugState` contains an instance of `DebugAdapter` through the `adapter` field. `DebugState` contains an instance of `DebugProcessView` through `memory_view` at all times.
 
-## ProcessView
+## DebugProcessView
 
-`ProcessView` is a specialized `BinaryView` that reads and writes its memory from the connected `DebugAdapter`. When the adapter is not present, all reads/writes will return `None` to indicate an error. To save on data transfer, `ProcessView` caches all reads from the adapter. Whenever the debugger executes instructions or writes data it will call `mark_dirty` on the `ProcessView` and clear the cached data.
+`DebugProcessView` is a specialized `BinaryView` that reads and writes its memory from the connected `DebugAdapter`. When the adapter is not present, all reads/writes will return `None` to indicate an error. To save on data transfer, `DebugProcessView` caches all reads from the adapter. Whenever the debugger executes instructions or writes data it will call `mark_dirty` on the `DebugProcessView` and clear the cached data.
 
-`ProcessView` provides two functions, `local_addr_to_remote` and `remote_addr_to_local` which will translate addresses for use in binaries that are compiled with Position Independent Code. **Local addresses** correspond to the loaded `BinaryView` analysis and **remote addresses** represent addresses in the debugged binary, which may be relocated in PIE executables.
+`DebugProcessView` provides two functions, `local_addr_to_remote` and `remote_addr_to_local` which will translate addresses for use in binaries that are compiled with Position Independent Code. **Local addresses** correspond to the loaded `BinaryView` analysis and **remote addresses** represent addresses in the debugged binary, which may be relocated in PIE executables.
 
 ## testing
 
