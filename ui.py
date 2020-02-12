@@ -125,6 +125,7 @@ class DebuggerUI:
 		# Update Memory
 		#----------------------------------------------------------------------
 		self.state.update_memory_view()
+		self.memory_dirty()
 
 		#----------------------------------------------------------------------
 		# Update Status

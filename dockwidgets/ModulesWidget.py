@@ -173,7 +173,7 @@ class DebugModulesWidget(QWidget, DockContextHandler):
 
 	def refresh(self):
 		debug_state = binjaplug.get_state(self.bv)
-		debug_state.update_modules()
+		debug_state.ui.update_modules()
 
 	def notifyModulesChanged(self, new_modules):
 		self.model.update_rows(new_modules)

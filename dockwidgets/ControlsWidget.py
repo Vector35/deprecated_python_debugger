@@ -97,7 +97,8 @@ class DebugControlsWidget(QToolBar):
 	def __del__(self):
 		# TODO: Move this elsewhere
 		# This widget is tasked with cleaning up the state after the view is closed
-		binjaplug.delete_state(self.bv)
+		# binjaplug.delete_state(self.bv)
+		pass
 
 	def perform_run(self):
 		self.debug_state.run()
