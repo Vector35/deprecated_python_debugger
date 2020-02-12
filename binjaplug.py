@@ -509,20 +509,41 @@ class DebuggerState:
 			self.memory_view.define_data_var(addr, Type.int(bits // 8, sign=False))
 			self.old_dvs.add(addr)
 
-		# Special struct for stack frame
-		if self.remote_arch.name == 'x86_64':
-			width = self.registers['rbp'] - self.registers['rsp'] + self.remote_arch.address_size
+		# Create structure for stack frame
+		if self.bv.arch.name == 'x86_64':
+			local_rip = self.memory_view.remote_addr_to_local(reg_addrs['rip'])
+			current_function = None
+			use_fancy_stack = False
+			for fn in self.bv.get_functions_containing(local_rip):
+				if fn.arch == self.memory_view.arch:
+					current_function = fn
+					# Some instructions cause no stack variables to be defined
+					use_fancy_stack = current_function.get_stack_var_at_frame_offset(0, local_rip) is not None
+
+			width = reg_addrs['rbp'] - reg_addrs['rsp'] + self.bv.arch.address_size
 			if width > 0:
 				if width > 0x1000:
 					width = 0x1000
 				struct = Structure()
 				struct.type = StructureType.StructStructureType
 				struct.width = width
-				for i in range(0, width, self.remote_arch.address_size):
-					var_name = "var_{:x}".format(width - i)
-					struct.insert(i, Type.pointer(self.remote_arch, Type.void()), var_name)
-				self.memory_view.define_data_var(self.registers['rsp'], Type.structure_type(struct))
-				self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, self.registers['rsp'], "$stack_frame", raw_name="$stack_frame"))
+
+				if use_fancy_stack:
+					# Take variables from current function
+					for var in current_function.stack_layout:
+						current_var = current_function.get_stack_var_at_frame_offset(var.storage, local_rip)
+						if current_var == var:
+							offset = width + var.storage
+							struct.insert(offset, var.type, var.name)
+				else:
+					# No function info, just use offsets
+					for i in range(0, width, self.bv.arch.address_size):
+						offset = (width - i)
+						var_name = "var_{:x}".format(offset)
+						struct.insert(i, Type.pointer(self.bv.arch, Type.void()), var_name)
+
+				self.memory_view.define_data_var(reg_addrs['rsp'], Type.structure_type(struct))
+				self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, reg_addrs['rsp'], "$stack_frame", raw_name="$stack_frame"))
 
 				self.old_symbols.append(self.memory_view.get_symbol_by_raw_name("$stack_frame"))
 				self.old_dvs.add(self.registers['rsp'])
