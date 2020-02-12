@@ -33,7 +33,7 @@ To install this manually, please see the "Using Plugins" section of the [Getting
 
 This plugin requires the following minimum version of Binary Ninja:
 
-* 2015
+* 1.3.2015
 
 ## Required Dependencies
 
