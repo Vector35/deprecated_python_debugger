@@ -12,11 +12,14 @@ class DebuggerUI:
 		self.state = state
 		self.debug_view = None
 
+	def widget(self, name):
+		return widget.get_dockwidget(self.state.bv, name)
+
 	def context_display(self):
-		registers_widget = widget.get_dockwidget(self.state.bv, 'Registers')
-		modules_widget = widget.get_dockwidget(self.state.bv, 'Modules')
-		threads_widget = widget.get_dockwidget(self.state.bv, 'Threads')
-		stack_widget = widget.get_dockwidget(self.state.bv, 'Stack')
+		registers_widget = self.widget('Registers')
+		modules_widget = self.widget('Modules')
+		threads_widget = self.widget('Threads')
+		stack_widget = self.widget('Stack')
 
 		if self.state.adapter is None:
 			# Disconnected
@@ -158,7 +161,7 @@ class DebuggerUI:
 				# TODO: Length, segments, etc
 			})
 		mods.sort(key=lambda row: row['address'])
-		modules_widget = widget.get_dockwidget(self.state.bv, 'Modules')
+		modules_widget = self.widget('Modules')
 		modules_widget.notifyModulesChanged(mods)
 
 	def update_raw_disassembly(self):
@@ -236,7 +239,7 @@ class DebuggerUI:
 						'address': local_bp
 					})
 
-		bp_widget = widget.get_dockwidget(self.state.bv, "Breakpoints")
+		bp_widget = self.widget("Breakpoints")
 		bp_widget.notifyBreakpointsChanged(bps)
 
 #------------------------------------------------------------------------------
