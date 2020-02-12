@@ -216,7 +216,7 @@ class DebugThreadsWidget(QWidget, DockContextHandler):
 			adapter = stateObj.adapter
 			tid = int(tid_str, 16)
 			adapter.thread_select(tid)
-			stateObj.context_display()
+			stateObj.ui.context_display()
 		else:
 			print('cannot set thread in state %s' % stateObj.state)
 

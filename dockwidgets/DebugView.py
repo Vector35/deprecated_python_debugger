@@ -20,7 +20,7 @@ class DebugView(QWidget, View):
 
 		self.debug_state = binjaplug.get_state(data)
 		memory_view = self.debug_state.memory_view
-		self.debug_state.debug_view = self
+		self.debug_state.ui.debug_view = self
 
 		QWidget.__init__(self, parent)
 		View.__init__(self)

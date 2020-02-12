@@ -2,15 +2,8 @@
 
 #print('__init__.py sees __name__=', __name__)
 
-# create the widgets, debugger, etc.
-try:
-	from . import binjaplug
-	binjaplug.initialize()
+from . import binjaplug
 
-	def get(bv):
-		return binjaplug.get_state(bv)
-
-except (ModuleNotFoundError, ImportError) as e:
-	print(e)
-	print('IF THIS IS CLI MODE, IT\'S OK!')
+def get(bv):
+	return binjaplug.get_state(bv)
 

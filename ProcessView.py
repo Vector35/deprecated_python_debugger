@@ -1,5 +1,5 @@
 import binaryninja
-import binaryninjaui
+
 from binaryninja import BinaryView, SegmentFlag
 
 from . import binjaplug

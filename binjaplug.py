@@ -3,15 +3,19 @@ import re
 import time
 
 import binaryninja
-from binaryninja import Symbol, SymbolType, Type, Structure, StructureType, LinearDisassemblyLine, LinearDisassemblyLineType, DisassemblyTextLine, InstructionTextToken, InstructionTextTokenType
-from binaryninja.plugin import PluginCommand
-from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
-from PySide2 import QtCore
-from PySide2.QtCore import Qt
-from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
+from binaryninja import Symbol, SymbolType, Type, Structure, StructureType
 
 from . import DebugAdapter, ProcessView
-from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, ConsoleWidget, ModulesWidget, widget
+
+try:
+	# create the widgets, debugger, etc.
+	from . import ui
+	ui.initialize_ui()
+	have_ui = True
+except (ModuleNotFoundError, ImportError) as e:
+	have_ui = False
+	print(e)
+	print("Could not initialize UI, using headless mode only")
 
 #------------------------------------------------------------------------------
 # globals
@@ -58,163 +62,18 @@ class DebuggerState:
 		self.last_rip = 0
 		self.command_line_args = []
 
+		if have_ui:
+			self.ui = ui.DebuggerUI(self)
+		else:
+			self.ui = None
+
 	#--------------------------------------------------------------------------
 	# SUPPORT FUNCTIONS (HIGHER LEVEL)
 	#--------------------------------------------------------------------------
 
-	def context_display(self):
-		registers_widget = widget.get_dockwidget(self.bv, 'Registers')
-		modules_widget = widget.get_dockwidget(self.bv, 'Modules')
-		threads_widget = widget.get_dockwidget(self.bv, 'Threads')
-		stack_widget = widget.get_dockwidget(self.bv, 'Stack')
-
-		if self.adapter is None:
-			# Disconnected
-			registers_widget.notifyRegistersChanged([])
-			modules_widget.notifyModulesChanged([])
-			threads_widget.notifyThreadsChanged([])
-			self.debug_view.controls.set_thread_list([])
-			stack_widget.notifyStackChanged([])
-			self.memory_dirty()
-			return
-
-		#----------------------------------------------------------------------
-		# Update Registers
-		#----------------------------------------------------------------------
-		regs = []
-		for register in self.adapter.reg_list():
-			value = self.adapter.reg_read(register)
-			bits = self.adapter.reg_bits(register)
-			regs.append({
-				'name': register,
-				'bits': bits,
-				'value': value
-			})
-		registers_widget.notifyRegistersChanged(regs)
-
-		#----------------------------------------------------------------------
-		# Update Modules
-		#----------------------------------------------------------------------
-
-		# Updating this widget is slow, so just show "Data is Stale" and the user
-		# can refresh later if they desire
-		modules_widget.mark_dirty()
-
-		#----------------------------------------------------------------------
-		# Update Threads
-		#----------------------------------------------------------------------
-
-		if self.bv.arch.name == 'x86_64':
-			reg_ip_name = 'rip'
-		else:
-			raise NotImplementedError('only x86_64 so far')
-
-		threads = []
-		tid_selected = self.adapter.thread_selected()
-		last_thread = tid_selected
-		for tid in self.adapter.thread_list():
-			if last_thread != tid:
-				self.adapter.thread_select(tid)
-				last_thread = tid
-			reg_ip_val = self.adapter.reg_read(reg_ip_name)
-			threads.append({
-				'tid': tid,
-				reg_ip_name: reg_ip_val,
-				'selected': (tid == tid_selected)
-			})
-		if last_thread != tid_selected:
-			self.adapter.thread_select(tid_selected)
-		threads_widget.notifyThreadsChanged(threads)
-		self.debug_view.controls.set_thread_list(threads)
-
-		#----------------------------------------------------------------------
-		# Update Stack
-		#----------------------------------------------------------------------
-
-		if self.bv.arch.name == 'x86_64':
-			stack_pointer = self.adapter.reg_read('rsp')
-			# Read up and down from rsp
-			stack_range = [-8, 60] # Inclusive
-			stack = []
-			for i in range(stack_range[0], stack_range[1] + 1):
-				offset = i * self.bv.arch.address_size
-				address = stack_pointer + offset
-				value = self.memory_view.read(address, self.bv.arch.address_size)
-				value_int = value
-				if self.bv.arch.endianness == binaryninja.Endianness.LittleEndian:
-					value_int = value_int[::-1]
-				value_int = int(value_int.hex(), 16)
-
-				refs = []
-				for register in regs:
-					if register['value'] == address:
-						refs.append({
-							'source': 'register',
-							'dest': 'address',
-							'register': register
-						})
-					# Ignore zeroes because most registers start at zero and give false data
-					if value_int != 0 and register['value'] == value_int:
-						refs.append({
-							'source': 'register',
-							'dest': 'value',
-							'register': register
-						})
-
-				stack.append({
-					'offset': offset,
-					'value': value,
-					'address': address,
-					'refs': refs
-				})
-			stack_widget.notifyStackChanged(stack)
-		else:
-			raise NotImplementedError('only x86_64 so far')
-
-		#----------------------------------------------------------------------
-		# Update Memory
-		#----------------------------------------------------------------------
-		self.update_memory_view()
-
-		#----------------------------------------------------------------------
-		# Update Status
-		#----------------------------------------------------------------------
-
-		if self.bv.arch.name == 'x86_64':
-			remote_rip = self.adapter.reg_read('rip')
-			local_rip = self.memory_view.remote_addr_to_local(remote_rip)
-		else:
-			raise NotImplementedError('only x86_64 so far')
-
-		self.update_highlights()
-		self.last_rip = local_rip
-
-		# select instruction currently at
-		if self.bv.read(local_rip, 1):
-			self.debug_view.setRawDisassembly(False)
-			self.bv.navigate(self.bv.file.view, local_rip)
-			self.debug_view.controls.state_stopped()
-		else:
-			self.update_raw_disassembly()
-			self.debug_view.controls.state_stopped_extern()
-
-	def update_modules(self):
-		mods = []
-		for (modpath, address) in self.adapter.mem_modules().items():
-			mods.append({
-				'address': address,
-				'modpath': modpath
-				# TODO: Length, segments, etc
-			})
-		mods.sort(key=lambda row: row['address'])
-		modules_widget = widget.get_dockwidget(self.bv, 'Modules')
-		modules_widget.notifyModulesChanged(mods)
-
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):
 		self.memory_view.mark_dirty()
-		if self.debug_view is not None:
-			self.debug_view.notifyMemoryChanged()
 
 	# Create symbols and variables for the memory view
 	def update_memory_view(self):
@@ -277,64 +136,6 @@ class DebuggerState:
 		else:
 			raise NotImplementedError('only x86_64 so far')
 
-	def update_raw_disassembly(self):
-		# Read a few instructions from rip and disassemble them
-		inst_count = 50
-		if self.bv.arch.name == 'x86_64':
-			rip = self.adapter.reg_read('rip')
-			# Assume the worst, just in case
-			read_length = self.bv.arch.max_instr_length * inst_count
-			data = self.memory_view.read(rip, read_length)
-
-			lines = []
-
-			# Append header line
-			tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "(Code not backed by loaded file, showing only raw disassembly)")]
-			contents = DisassemblyTextLine(tokens, rip)
-			line = LinearDisassemblyLine(LinearDisassemblyLineType.BasicLineType, None, None, 0, contents)
-			lines.append(line)
-
-			total_read = 0
-			for i in range(inst_count):
-				line_addr = rip + total_read
-				(insn_tokens, length) = self.bv.arch.get_instruction_text(data[total_read:], line_addr)
-
-				tokens = []
-				color = binaryninja.HighlightStandardColor.NoHighlightColor
-				if i == 0:
-					if (rip + total_read) in self.breakpoints:
-						# Breakpoint & pc
-						tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.bv.tag_types["Crashes"].icon + ">", width=5))
-						color = binaryninja.HighlightStandardColor.RedHighlightColor
-					else:
-						# PC
-						tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, " ==> "))
-						color = binaryninja.HighlightStandardColor.BlueHighlightColor
-				else:
-					if (rip + total_read) in self.breakpoints:
-						# Breakpoint
-						tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.bv.tag_types["Crashes"].icon, width=5))
-						color = binaryninja.HighlightStandardColor.RedHighlightColor
-					else:
-						# Regular line
-						tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "     "))
-				# Address
-				tokens.append(InstructionTextToken(InstructionTextTokenType.AddressDisplayToken, hex(line_addr)[2:], line_addr))
-				tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "  "))
-				tokens.extend(insn_tokens)
-
-				# Convert to linear disassembly line
-				contents = DisassemblyTextLine(tokens, line_addr, color=color)
-				line = LinearDisassemblyLine(LinearDisassemblyLineType.CodeDisassemblyLineType, None, None, 0, contents)
-				lines.append(line)
-
-				total_read += length
-
-			self.debug_view.setRawDisassembly(True, lines)
-
-		else:
-			raise NotImplementedError('only x86_64 so far')
-
 	# Highlight lines
 	def update_highlights(self):
 		# Clear old highlighted rip
@@ -354,20 +155,6 @@ class DebuggerState:
 
 			for func in self.bv.get_functions_containing(local_rip):
 				func.set_auto_instr_highlight(local_rip, binaryninja.HighlightStandardColor.BlueHighlightColor)
-
-	def update_breakpoints(self):
-		bps = []
-		if self.adapter is not None:
-			for remote_bp in self.adapter.breakpoint_list():
-				local_bp = self.memory_view.remote_addr_to_local(remote_bp)
-				if local_bp in self.breakpoints.keys():
-					bps.append({
-						'enabled': self.breakpoints[local_bp],
-						'address': local_bp
-					})
-
-		bp_widget = widget.get_dockwidget(self.bv, "Breakpoints")
-		bp_widget.notifyBreakpointsChanged(bps)
 
 	def breakpoint_tag_add(self, local_address):
 		# create tag
@@ -626,7 +413,8 @@ class DebuggerState:
 		self.breakpoints[local_address] = True
 		#print('breakpoint address=0x%X (remote=0x%X) set' % (local_address, remote_address))
 		self.update_highlights()
-		self.update_breakpoints()
+		if self.ui is not None:
+			self.ui.update_breakpoints()
 
 		self.breakpoint_tag_add(local_address)
 
@@ -653,7 +441,8 @@ class DebuggerState:
 			del self.breakpoints[local_address]
 
 			self.update_highlights()
-			self.update_breakpoints()
+			if self.ui is not None:
+				self.ui.update_breakpoints()
 		else:
 			print('ERROR: breakpoint not found in list')
 
@@ -672,40 +461,3 @@ class DebuggerState:
 				func(*args)
 
 		return (reason, data)
-
-#------------------------------------------------------------------------------
-# right click plugin
-#------------------------------------------------------------------------------
-
-def cb_bp_set(bv, local_address):
-	debug_state = get_state(bv)
-	remote_address = debug_state.memory_view.local_addr_to_remote(local_address)
-	debug_state.breakpoint_set(remote_address)
-	debug_state.context_display()
-
-def cb_bp_clr(bv, local_address):
-	debug_state = get_state(bv)
-	remote_address = debug_state.memory_view.local_addr_to_remote(local_address)
-	debug_state.breakpoint_clear(remote_address)
-	debug_state.context_display()
-
-def require_adapter(bv, local_address):
-	debug_state = get_state(bv)
-	return debug_state.adapter is not None
-
-#------------------------------------------------------------------------------
-# "main"
-#------------------------------------------------------------------------------
-
-def initialize():
-	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Breakpoints", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
-	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Registers", Qt.RightDockWidgetArea, Qt.Vertical, False)
-	widget.register_dockwidget(ThreadsWidget.DebugThreadsWidget, "Threads", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
-	widget.register_dockwidget(StackWidget.DebugStackWidget, "Stack", Qt.LeftDockWidgetArea, Qt.Vertical, False)
-	widget.register_dockwidget(ModulesWidget.DebugModulesWidget, "Modules", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
-	# TODO: Needs adapter support
-	# widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
-
-	PluginCommand.register_for_address("Set Breakpoint", "sets breakpoint at right-clicked address", cb_bp_set, is_valid=require_adapter)
-	PluginCommand.register_for_address("Clear Breakpoint", "clears breakpoint at right-clicked address", cb_bp_clr, is_valid=require_adapter)
-	ViewType.registerViewType(DebugView.DebugViewType())

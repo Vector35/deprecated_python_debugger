@@ -102,7 +102,7 @@ class DebugControlsWidget(QToolBar):
 	def perform_run(self):
 		self.debug_state.run()
 		self.state_stopped()
-		self.debug_state.context_display()
+		self.debug_state.ui.context_display()
 
 	def perform_restart(self):
 		self.debug_state.restart()
@@ -132,7 +132,7 @@ class DebugControlsWidget(QToolBar):
 		def perform_resume_thread():
 			(reason, data) = self.debug_state.go()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: self.debug_state.context_display())
+			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
 
 		self.state_running()
 		threading.Thread(target=perform_resume_thread).start()
@@ -142,7 +142,7 @@ class DebugControlsWidget(QToolBar):
 		def perform_step_into_thread():
 			(reason, data) = self.debug_state.step_into()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: self.debug_state.context_display())
+			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
 
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_into_thread).start()
@@ -152,7 +152,7 @@ class DebugControlsWidget(QToolBar):
 		def perform_step_over_thread():
 			(reason, data) = self.debug_state.step_over()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: self.debug_state.context_display())
+			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
 
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_over_thread).start()
@@ -162,7 +162,7 @@ class DebugControlsWidget(QToolBar):
 		def perform_step_return_thread():
 			(reason, data) = self.debug_state.step_return()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: self.debug_state.context_display())
+			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
 
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_return_thread).start()
@@ -222,7 +222,7 @@ class DebugControlsWidget(QToolBar):
 				if stateObj.state == 'STOPPED':
 					adapter = stateObj.adapter
 					adapter.thread_select(tid)
-					self.debug_state.context_display()
+					self.debug_state.ui.context_display()
 				else:
 					print('cannot set thread in state %s' % stateObj.state)
 
