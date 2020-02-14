@@ -2,8 +2,10 @@ import binaryninja
 from binaryninja import execute_on_main_thread_and_wait
 from PySide2 import QtCore
 from PySide2.QtCore import Qt
+from PySide2.QtGui import QIcon
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QToolBar, QToolButton, QMenu, QAction
 import threading
+import os
 
 from . import AdapterSettingsDialog
 from .. import binjaplug, DebugAdapter
@@ -24,27 +26,28 @@ class DebugControlsWidget(QToolBar):
 		QToolButton:disabled{color: palette(alternate-base)}
 		""")
 
-		self.actionRun = QAction("Run", self)
+		iconPath=os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "icons")
+		self.actionRun = QAction(QIcon(os.path.join(iconPath, "run.svg")), "Run", self)
 		self.actionRun.triggered.connect(lambda: self.perform_run())
-		self.actionRestart = QAction("Restart", self)
+		self.actionRestart = QAction(QIcon(os.path.join(iconPath, "reload.svg")), "Restart", self)
 		self.actionRestart.triggered.connect(lambda: self.perform_restart())
-		self.actionQuit = QAction("Quit", self)
+		self.actionQuit = QAction(QIcon(os.path.join(iconPath, "stop.svg")), "Quit", self)
 		self.actionQuit.triggered.connect(lambda: self.perform_quit())
-		self.actionAttach = QAction("Attach... (todo)", self)
+		self.actionAttach = QAction(QIcon(os.path.join(iconPath, "connect.svg")), "Attach... (todo)", self)
 		self.actionAttach.triggered.connect(lambda: self.perform_attach())
-		self.actionDetach = QAction("Detach", self)
+		self.actionDetach = QAction(QIcon(os.path.join(iconPath, "disconnect.svg")), "Detach", self)
 		self.actionDetach.triggered.connect(lambda: self.perform_detach())
 		self.actionSettings = QAction("Settings...", self)
 		self.actionSettings.triggered.connect(lambda: self.perform_settings())
-		self.actionPause = QAction("Pause", self)
+		self.actionPause = QAction(QIcon(os.path.join(iconPath, "pause.svg")), "Pause", self)
 		self.actionPause.triggered.connect(lambda: self.perform_pause())
-		self.actionResume = QAction("Resume", self)
+		self.actionResume = QAction(QIcon(os.path.join(iconPath, "resume.svg")), "Resume", self)
 		self.actionResume.triggered.connect(lambda: self.perform_resume())
-		self.actionStepInto = QAction("Step Into", self)
+		self.actionStepInto = QAction(QIcon(os.path.join(iconPath, "stepinto.svg")), "Step Into", self)
 		self.actionStepInto.triggered.connect(lambda: self.perform_step_into())
-		self.actionStepOver = QAction("Step Over", self)
+		self.actionStepOver = QAction(QIcon(os.path.join(iconPath, "stepover.svg")), "Step Over", self)
 		self.actionStepOver.triggered.connect(lambda: self.perform_step_over())
-		self.actionStepReturn = QAction("Step Return", self)
+		self.actionStepReturn = QAction(QIcon(os.path.join(iconPath, "stepout.svg")), "Step Return", self)
 		self.actionStepReturn.triggered.connect(lambda: self.perform_step_return())
 
 		# session control menu
@@ -62,7 +65,6 @@ class DebugControlsWidget(QToolBar):
 		self.btnControl = QToolButton(self)
 		self.btnControl.setMenu(self.controlMenu)
 		self.btnControl.setPopupMode(QToolButton.MenuButtonPopup)
-		self.btnControl.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 		self.btnControl.setDefaultAction(self.actionRun)
 		self.addWidget(self.btnControl)
 
