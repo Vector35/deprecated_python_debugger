@@ -37,6 +37,7 @@ This plugin requires the following minimum version of Binary Ninja:
 
 ## Required Dependencies
 
+* Python 3.3+
 * Windows debugging relies on the dbgeng dll's which should be present in default installations.
 * Linux needs gdbserver in path.
 * MacOS needs debugserver in path or in its default Xcode location: `/Library/Developer/CommandLineTools/Library/PrivateFrameworks/LLDB.framework/Versions/A/Resources/`
