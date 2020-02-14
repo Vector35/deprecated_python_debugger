@@ -24,6 +24,7 @@ class DebugView(QWidget, View):
 		self.debug_state.ui.debug_view = self
 
 		QWidget.__init__(self, parent)
+		self.controls = ControlsWidget.DebugControlsWidget(self, "Controls", data, self.debug_state)
 		View.__init__(self)
 
 		self.setupView(self)
@@ -94,8 +95,6 @@ class DebugView(QWidget, View):
 
 		# Equally sized
 		self.splitter.setSizes([0x7fffffff, 0x7fffffff])
-
-		self.controls = ControlsWidget.DebugControlsWidget(self, "Controls", data, self.debug_state)
 
 		layout = QVBoxLayout()
 		layout.setContentsMargins(0, 0, 0, 0)

@@ -258,12 +258,117 @@ def cb_bp_clr(bv, local_address):
 	debug_state.breakpoint_clear(remote_address)
 	debug_state.ui.context_display()
 
-def require_adapter(bv, local_address):
+def require_adapter(bv):
 	debug_state = binjaplug.get_state(bv)
 	return debug_state.adapter is not None
 
 #------------------------------------------------------------------------------
-# "main"
+# Plugin actions for the various debugger controls
+#------------------------------------------------------------------------------
+
+def cb_process_run(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.ui.debug_view.controls.actionRun.trigger()
+
+def cb_process_restart(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.ui.debug_view.controls.actionRestart.trigger()
+
+def cb_process_quit(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.ui.debug_view.controls.actionQuit.trigger()
+
+def cb_process_attach(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.ui.debug_view.controls.actionAttach.trigger()
+
+def cb_process_detach(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.ui.debug_view.controls.actionDetach.trigger()
+
+def cb_process_settings(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.ui.debug_view.controls.actionSettings.trigger()
+
+def cb_control_pause(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.ui.debug_view.controls.actionPause.trigger()
+
+def cb_control_resume(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.ui.debug_view.controls.actionResume.trigger()
+
+def cb_control_step_into(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.ui.debug_view.controls.actionStepInto.trigger()
+
+def cb_control_step_over(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.ui.debug_view.controls.actionStepOver.trigger()
+
+def cb_control_step_return(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.ui.debug_view.controls.actionStepReturn.trigger()
+
+# -----------------------------------------------------------------------------
+
+def valid_process_run(bv):
+	debug_state = binjaplug.get_state(bv)
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionRun.isEnabled()
+
+def valid_process_restart(bv):
+	debug_state = binjaplug.get_state(bv)
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionRestart.isEnabled()
+
+def valid_process_quit(bv):
+	debug_state = binjaplug.get_state(bv)
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionQuit.isEnabled()
+
+def valid_process_attach(bv):
+	debug_state = binjaplug.get_state(bv)
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionAttach.isEnabled()
+
+def valid_process_detach(bv):
+	debug_state = binjaplug.get_state(bv)
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionDetach.isEnabled()
+
+def valid_process_settings(bv):
+	debug_state = binjaplug.get_state(bv)
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionSettings.isEnabled()
+
+def valid_control_pause(bv):
+	debug_state = binjaplug.get_state(bv)
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionPause.isEnabled()
+
+def valid_control_resume(bv):
+	debug_state = binjaplug.get_state(bv)
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionResume.isEnabled()
+
+def valid_control_step_into(bv):
+	debug_state = binjaplug.get_state(bv)
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionStepInto.isEnabled()
+
+def valid_control_step_over(bv):
+	debug_state = binjaplug.get_state(bv)
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionStepOver.isEnabled()
+
+def valid_control_step_return(bv):
+	debug_state = binjaplug.get_state(bv)
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionStepReturn.isEnabled()
+
+#------------------------------------------------------------------------------
+# Load plugin commands and actions
 #------------------------------------------------------------------------------
 
 def initialize_ui():
@@ -275,7 +380,19 @@ def initialize_ui():
 	# TODO: Needs adapter support
 	# widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 
-	PluginCommand.register_for_address("Debugger\\Set Breakpoint", "sets breakpoint at right-clicked address", cb_bp_set, is_valid=require_adapter)
-	PluginCommand.register_for_address("Debugger\\Clear Breakpoint", "clears breakpoint at right-clicked address", cb_bp_clr, is_valid=require_adapter)
+	PluginCommand.register("Debugger\\Set Breakpoint", "sets breakpoint at right-clicked address", cb_bp_set, is_valid=require_adapter)
+	PluginCommand.register("Debugger\\Clear Breakpoint", "clears breakpoint at right-clicked address", cb_bp_clr, is_valid=require_adapter)
+
+	PluginCommand.register("Debugger\\Process\\Run", "Start new debugging session", cb_process_run, is_valid=valid_process_run)
+	PluginCommand.register("Debugger\\Process\\Restart", "Restart debugging session", cb_process_restart, is_valid=valid_process_restart)
+	PluginCommand.register("Debugger\\Process\\Quit", "Terminate debugged process and end session", cb_process_quit, is_valid=valid_process_quit)
+	# PluginCommand.register("Debugger\\Process\\Attach", "Attach to running process", cb_process_attach, is_valid=valid_process_attach)
+	PluginCommand.register("Debugger\\Process\\Detach", "Detach from current debugged process", cb_process_detach, is_valid=valid_process_detach)
+	PluginCommand.register("Debugger\\Process\\Settings", "Open adapter settings menu", cb_process_settings, is_valid=valid_process_settings)
+	PluginCommand.register("Debugger\\Control\\Pause", "Pause execution", cb_control_pause, is_valid=valid_control_pause)
+	PluginCommand.register("Debugger\\Control\\Resume", "Resume execution", cb_control_resume, is_valid=valid_control_resume)
+	PluginCommand.register("Debugger\\Control\\Step Into", "Step into assembly", cb_control_step_into, is_valid=valid_control_step_into)
+	PluginCommand.register("Debugger\\Control\\Step Over", "Step over function call", cb_control_step_over, is_valid=valid_control_step_over)
+	PluginCommand.register("Debugger\\Control\\Step Return", "Step until current function returns", cb_control_step_return, is_valid=valid_control_step_return)
 
 	ViewType.registerViewType(DebugView.DebugViewType())

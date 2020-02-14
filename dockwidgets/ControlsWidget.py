@@ -56,7 +56,6 @@ class DebugControlsWidget(QToolBar):
 		# TODO: Attach to running process
 		# self.controlMenu.addAction(self.actionAttach)
 		self.controlMenu.addAction(self.actionDetach)
-		# TODO: Switch adapter/etc (could go in regular settings)
 		self.controlMenu.addSeparator()
 		self.controlMenu.addAction(self.actionSettings)
 
