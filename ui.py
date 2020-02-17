@@ -264,7 +264,7 @@ class DebuggerUI:
 		for local_address in local_addresses:
 			# delete breakpoint tags from all functions containing this address
 			for func in self.state.bv.get_functions_containing(local_address):
-				func.set_auto_instr_highlight(local_address, binaryninja.HighlightStandardColor.NoHighlightColor)
+				func.set_auto_instr_highlight(local_address, HighlightStandardColor.NoHighlightColor)
 				delqueue = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
 				for tag in delqueue:
 					func.remove_user_address_tag(local_address, tag)
@@ -273,19 +273,16 @@ class DebuggerUI:
 # right click plugin
 #------------------------------------------------------------------------------
 
-def cb_bp_set(bv, local_address):
+def cb_bp_toggle(bv, local_address):
 	debug_state = binjaplug.get_state(bv)
 	remote_address = debug_state.memory_view.local_addr_to_remote(local_address)
-	debug_state.breakpoint_set(remote_address)
+	if local_address in debug_state.breakpoints:
+		debug_state.breakpoint_clear(remote_address)
+	else:
+		debug_state.breakpoint_set(remote_address)
 	debug_state.ui.context_display()
 
-def cb_bp_clr(bv, local_address):
-	debug_state = binjaplug.get_state(bv)
-	remote_address = debug_state.memory_view.local_addr_to_remote(local_address)
-	debug_state.breakpoint_clear(remote_address)
-	debug_state.ui.context_display()
-
-def require_adapter(bv):
+def valid_bp_toggle(bv, local_address):
 	debug_state = binjaplug.get_state(bv)
 	return debug_state.adapter is not None
 
@@ -425,8 +422,7 @@ def initialize_ui():
 	# TODO: Needs adapter support
 	# widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 
-	PluginCommand.register("Debugger\\Set Breakpoint", "sets breakpoint at right-clicked address", cb_bp_set, is_valid=require_adapter)
-	PluginCommand.register("Debugger\\Clear Breakpoint", "clears breakpoint at right-clicked address", cb_bp_clr, is_valid=require_adapter)
+	PluginCommand.register_for_address("Debugger\\Toggle Breakpoint", "sets/clears breakpoint at right-clicked address", cb_bp_toggle, is_valid=valid_bp_toggle)
 
 	PluginCommand.register("Debugger\\Process\\Run", "Start new debugging session", cb_process_run, is_valid=valid_process_run)
 	PluginCommand.register("Debugger\\Process\\Restart", "Restart debugging session", cb_process_restart, is_valid=valid_process_restart)
