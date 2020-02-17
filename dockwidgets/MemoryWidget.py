@@ -37,14 +37,15 @@ class DebugMemoryWidget(QWidget, DockContextHandler):
 		pass
 
 	def notifyMemoryChanged(self):
-		adapter = binjaplug.get_state(self.bv).adapter
+		debug_state = binjaplug.get_state(self.bv)
+		adapter = debug_state.adapter
 
 		# Refresh the editor
 		if adapter is None:
 			self.editor.navigate(0)
 			return
 
-		self.editor.navigate(adapter.reg_read('rsp'))
+		self.editor.navigate(debug_state.stack_pointer)
 
 	def shouldBeVisible(self, view_frame):
 		if view_frame is None:

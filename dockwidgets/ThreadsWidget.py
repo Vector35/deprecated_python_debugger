@@ -36,7 +36,7 @@ class DebugThreadsListModel(QAbstractItemModel):
 		# set new data
 		sel_row = None
 		for info in new_rows:
-			(tid, rip) = (info['tid'], info['rip'])
+			(tid, rip) = (info['tid'], info['ip'])
 			# actual values for the table rows
 			self.rows.append((tid, rip))
 			# parallel list of the incoming dict, augmented

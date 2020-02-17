@@ -67,7 +67,7 @@ class DebuggerUI:
 			reg_ip_val = self.state.ip
 			threads.append({
 				'tid': tid,
-				reg_ip_name: reg_ip_val,
+				'ip': reg_ip_val,
 				'selected': (tid == tid_selected)
 			})
 		if last_thread != tid_selected:

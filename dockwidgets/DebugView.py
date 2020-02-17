@@ -144,7 +144,7 @@ class DebugView(QWidget, View):
 				self.memory_editor.navigate(0)
 				return
 
-			self.memory_editor.navigate(adapter.reg_read('rsp'))
+			self.memory_editor.navigate(self.debug_state.stack_pointer)
 
 	def showEvent(self, event):
 		if not event.spontaneous():

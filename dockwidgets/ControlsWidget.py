@@ -293,7 +293,7 @@ class DebugControlsWidget(QToolBar):
 		self.threadMenu.clear()
 		if len(threads) > 0:
 			for thread in threads:
-				item_name = "Thread {} at {}".format(thread['tid'], hex(thread['rip']))
+				item_name = "Thread {} at {}".format(thread['tid'], hex(thread['ip']))
 				action = self.threadMenu.addAction(item_name, select_thread_fn(thread['tid']))
 				if thread['selected']:
 					self.btnThreads.setDefaultAction(action)
