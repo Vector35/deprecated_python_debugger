@@ -329,15 +329,18 @@ class DebuggerState:
 		self.memory_dirty()
 		return result
 
-	# Continue until a given remote address
-	def step_to(self, remote_addresses):
+	# Continue until one of any given remote addresses
+	def step_to(self, remote_addresses=[]):
 		if not self.adapter:
 			raise Exception('missing adapter')
+		# Make sure this is an iterable
+		if not hasattr(remote_addresses, '__iter__'):
+			remote_addresses = [remote_addresses]
 
 		(reason, data) = (None, None)
 
 		# if currently a breakpoint at rip, temporarily clear it
-		# if no breakpoint at address, set it
+		# for all addresses: if no breakpoint at address, set it
 		# then go
 		# then clean up
 
@@ -364,6 +367,7 @@ class DebuggerState:
 		self.memory_dirty()
 		return result
 
+	# Step once in the disassembly / il, potentially into a function call
 	def step_into(self, il=FunctionGraphType.NormalFunctionGraph):
 		if not self.adapter:
 			raise Exception('missing adapter')
@@ -431,9 +435,10 @@ class DebuggerState:
 					start = fn.mlil.get_instruction_start(new_local_rip)
 					if start is not None and fn.mlil[start].address == new_local_rip:
 						return result
-			else:
-				raise NotImplementedError('step unimplemented for il type %s' % il)
+		else:
+			raise NotImplementedError('step unimplemented for il type %s' % il)
 
+	# Step until reaching the next line in the disassembly / il
 	def step_over(self, il=FunctionGraphType.NormalFunctionGraph):
 		if not self.adapter:
 			raise Exception('missing adapter')
@@ -466,97 +471,56 @@ class DebuggerState:
 			llil = self.memory_view.arch.get_low_level_il_from_bytes(self.memory_view.read(remote_rip, self.memory_view.arch.max_instr_length), remote_rip)
 			call = llil.operation == LowLevelILOperation.LLIL_CALL
 
+			# Optimization: just use step into if this isn't a call
+			if not call:
+				return self.step_into(il)
+
 			bphere = local_rip in self.breakpoints
 			bpnext = local_ripnext in self.breakpoints
 
-			seq = []
-
-			if not call:
-				if bphere:
-					seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
-					seq.append((self.adapter.step_into, ()))
-					seq.append((self.adapter.breakpoint_set, (remote_rip,)))
-				else:
-					seq.append((self.adapter.step_into, ()))
-			elif bphere and bpnext:
-				seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
-				seq.append((self.adapter.go, ()))
-				seq.append((self.adapter.breakpoint_set, (remote_rip,)))
-			elif bphere and not bpnext:
-				seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
-				seq.append((self.adapter.breakpoint_set, (remote_ripnext,)))
-				seq.append((self.adapter.go, ()))
-				seq.append((self.adapter.breakpoint_clear, (remote_ripnext,)))
-				seq.append((self.adapter.breakpoint_set, (remote_rip,)))
-			elif not bphere and bpnext:
-				seq.append((self.adapter.go, ()))
-			elif not bphere and not bpnext:
-				seq.append((self.adapter.breakpoint_set, (remote_ripnext,)))
-				seq.append((self.adapter.go, ()))
-				seq.append((self.adapter.breakpoint_clear, (remote_ripnext,)))
-			else:
-				raise Exception('confused by call, bphere, bpnext state')
-			# TODO: Cancel (and raise some exception)
-			result = self.exec_adapter_sequence(seq)
-			self.memory_dirty()
-			return result
+			return self.step_to([remote_ripnext])
 		else:
 			targets = []
 			if il == FunctionGraphType.LowLevelILFunctionGraph:
-				# Find current llil function
-				current_function = self.bv.get_functions_containing(local_rip)
-				current_llil = None
-				for function in current_function:
-					current_llil = function.llil
-				if not current_llil:
-					raise RuntimeError('Cannot find llil for stepping')
+				# Step over until we're at an llil instruction
+				result = (None, None)
+				while True:
+					# Step once in disassembly, then see if we've hit an IL instruction
+					result = self.step_over(FunctionGraphType.NormalFunctionGraph)
+					self.memory_dirty()
+					new_remote_rip = self.ip
+					new_local_rip = self.memory_view.remote_addr_to_local(new_remote_rip)
+					if not self.memory_view.is_local_addr(new_remote_rip):
+						# Stepped outside of loaded bv
+						return result
 
-				# Find address of next llil instruction
-				start = current_llil.get_instruction_start(local_rip)
-				if start is None:
-					# In between instructions, just do step into il
-					return self.step_into(il)
-
-				found_call = False
-				offset = start
-				local_target = current_llil[start].address
-				while local_target == local_rip and offset < len(current_llil):
-					if current_llil[offset].operation == LowLevelILOperation.LLIL_CALL:
-						found_call = True
-					local_target = current_llil[offset].address
-					offset += 1
-
-				# Continue to after a call if we're doing a call, else just step into
-				if not found_call:
-					return self.step_into(il)
-				targets.append(self.memory_view.local_addr_to_remote(local_target))
+					fns = self.bv.get_functions_containing(new_local_rip)
+					if len(fns) == 0:
+						return result
+					for fn in fns:
+						start = fn.llil.get_instruction_start(new_local_rip)
+						if start is not None and fn.llil[start].address == new_local_rip:
+							return result
 			elif il == FunctionGraphType.MediumLevelILFunctionGraph:
-				# Find current llil function
-				current_function = self.bv.get_functions_containing(local_rip)
-				current_mlil = None
-				for function in current_function:
-					current_mlil = function.mlil
-				if not current_mlil:
-					raise RuntimeError('Cannot find mlil for stepping')
+				# Step over until we're at an mlil instruction
+				result = (None, None)
+				while True:
+					# Step once in disassembly, then see if we've hit an IL instruction
+					result = self.step_over(FunctionGraphType.NormalFunctionGraph)
+					self.memory_dirty()
+					new_remote_rip = self.ip
+					new_local_rip = self.memory_view.remote_addr_to_local(new_remote_rip)
+					if not self.memory_view.is_local_addr(new_remote_rip):
+						# Stepped outside of loaded bv
+						return result
 
-				start = current_mlil.get_instruction_start(local_rip)
-				if start is None:
-					# In between instructions, just do step into il
-					return self.step_into(il)
-
-				found_call = False
-				offset = start
-				local_target = current_mlil[start].address
-				while local_target == local_rip and offset < len(current_mlil):
-					if current_mlil[offset].operation == MediumLevelILOperation.MLIL_CALL:
-						found_call = True
-					local_target = current_mlil[offset].address
-					offset += 1
-
-				# Continue to after a call if we're doing a call, else just step into
-				if not found_call:
-					return self.step_into(il)
-				targets.append(self.memory_view.local_addr_to_remote(local_target))
+					fns = self.bv.get_functions_containing(new_local_rip)
+					if len(fns) == 0:
+						return result
+					for fn in fns:
+						start = fn.mlil.get_instruction_start(new_local_rip)
+						if start is not None and fn.mlil[start].address == new_local_rip:
+							return result
 			else:
 				raise NotImplementedError('step unimplemented for il type %s' % il)
 
@@ -577,29 +541,11 @@ class DebuggerState:
 			bphere = local_rip in self.breakpoints
 
 			# Set a bp on every ret in the function and go
-			old_bps = set()
-			new_bps = set()
+			rets = set()
 			for insn in mlil.instructions:
 				if insn.operation == binaryninja.MediumLevelILOperation.MLIL_RET or insn.operation == binaryninja.MediumLevelILOperation.MLIL_TAILCALL:
-					if insn.address in self.breakpoints:
-						rets.add(self.memory_view.local_addr_to_remote(insn.address))
-					else:
-						new_bps.add(self.memory_view.local_addr_to_remote(insn.address))
-
-			seq = []
-			if bphere and not local_rip in new_bps and not local_rip in old_bps:
-				seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
-			for bp in new_bps:
-				seq.append((self.adapter.breakpoint_set, (bp,)))
-			seq.append((self.adapter.go, ()))
-			for bp in new_bps:
-				seq.append((self.adapter.breakpoint_clear, (bp,)))
-			if bphere and not local_rip in new_bps and not local_rip in old_bps:
-				seq.append((self.adapter.breakpoint_set, (remote_rip,)))
-			# TODO: Cancel (and raise some exception)
-			result = self.exec_adapter_sequence(seq)
-			self.memory_dirty()
-			return result
+					rets.add(self.memory_view.local_addr_to_remote(insn.address))
+			return self.step_to(rets)
 		else:
 			print("Can't find current function")
 			return (None, None)
