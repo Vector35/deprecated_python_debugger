@@ -104,6 +104,15 @@ class DebugProcessView(BinaryView):
 			return remote_addr
 		return local_addr
 
+	"""
+	Determine if a remote address is within the loaded BinaryView
+	"""
+	def is_local_addr(self, remote_addr):
+		local_base = self.local_view.start
+		remote_base = self.remote_base
+		local_addr = remote_addr - remote_base + local_base
+		return local_addr > local_base and local_addr < local_base + len(self.local_view)
+
 class DebugMemoryView(BinaryView):
 	name = "Debugged Process Memory"
 	def __init__(self, parent):

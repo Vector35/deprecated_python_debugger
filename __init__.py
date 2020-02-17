@@ -1,9 +1,12 @@
-# this makes the current directory a python module and a valid binja plugin
-
-#print('__init__.py sees __name__=', __name__)
-
+# This plugin supports scripting both in the ui and in headless plugins
+# Start scripts with the following:
+# import debugger
+# dbg = debugger.get(bv)
 from . import binjaplug
 
+"""
+Retrieve the debugger state instance for a given BinaryView
+"""
 def get(bv):
 	return binjaplug.get_state(bv)
 
