@@ -3,7 +3,7 @@ import re
 import time
 
 import binaryninja
-from binaryninja import Symbol, SymbolType, Type, Structure, StructureType
+from binaryninja import Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType
 
 from . import DebugAdapter, ProcessView
 
@@ -264,27 +264,37 @@ class DebuggerState:
 		self.memory_dirty()
 		return result
 
-	def step_into(self):
+	# Continue until a given remote address
+	def step_to(self, remote_addresses):
 		if not self.adapter:
 			raise Exception('missing adapter')
 
 		(reason, data) = (None, None)
 
 		if self.bv.arch.name == 'x86_64':
+			# if currently a breakpoint at rip, temporarily clear it
+			# if no breakpoint at address, set it
+			# then go
+			# then clean up
+
 			remote_rip = self.adapter.reg_read('rip')
 			local_rip = self.memory_view.remote_addr_to_local(remote_rip)
-
-			# if currently a breakpoint at rip, temporarily clear it
-			# TODO: detect windbg adapter because dbgeng's step behavior might ignore breakpoint
-			# at current rip
+			local_addresses = [self.memory_view.remote_addr_to_local(addr) for addr in remote_addresses]
 
 			seq = []
 			if local_rip in self.breakpoints:
 				seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
-				seq.append((self.adapter.step_into, ()))
+			for (local_address, remote_address) in zip(local_addresses, remote_addresses):
+				if local_address not in self.breakpoints:
+					seq.append((self.adapter.breakpoint_set, (remote_address,)))
+
+			seq.append((self.adapter.go, ()))
+
+			for (local_address, remote_address) in zip(local_addresses, remote_addresses):
+				if local_address not in self.breakpoints:
+					seq.append((self.adapter.breakpoint_clear, (remote_address,)))
+			if local_rip in self.breakpoints:
 				seq.append((self.adapter.breakpoint_set, (remote_rip,)))
-			else:
-				seq.append((self.adapter.step_into, ()))
 			# TODO: Cancel (and raise some exception)
 			result = self.exec_adapter_sequence(seq)
 			self.memory_dirty()
@@ -292,7 +302,77 @@ class DebuggerState:
 		else:
 			raise NotImplementedError('step unimplemented for architecture %s' % self.bv.arch.name)
 
-	def step_over(self):
+	def step_into(self, il=FunctionGraphType.NormalFunctionGraph):
+		if not self.adapter:
+			raise Exception('missing adapter')
+
+		if self.bv.arch.name == 'x86_64':
+			remote_rip = self.adapter.reg_read('rip')
+			local_rip = self.memory_view.remote_addr_to_local(remote_rip)
+
+			# Cannot IL step through non-analyzed code
+			if not self.memory_view.is_local_addr(remote_rip):
+				il = FunctionGraphType.NormalFunctionGraph
+
+			if il == FunctionGraphType.NormalFunctionGraph:
+				# if currently a breakpoint at rip, temporarily clear it
+				# TODO: detect windbg adapter because dbgeng's step behavior might ignore breakpoint
+				# at current rip
+
+				seq = []
+				if local_rip in self.breakpoints:
+					seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
+					seq.append((self.adapter.step_into, ()))
+					seq.append((self.adapter.breakpoint_set, (remote_rip,)))
+				else:
+					seq.append((self.adapter.step_into, ()))
+				# TODO: Cancel (and raise some exception)
+				result = self.exec_adapter_sequence(seq)
+				self.memory_dirty()
+				return result
+			elif il == FunctionGraphType.LowLevelILFunctionGraph:
+				# Step into until we're at an llil instruction
+				result = (None, None)
+				while True:
+					# Step once in disassembly, then see if we've hit an IL instruction
+					result = self.step_into(FunctionGraphType.NormalFunctionGraph)
+					self.memory_dirty()
+					new_remote_rip = self.adapter.reg_read('rip')
+					new_local_rip = self.memory_view.remote_addr_to_local(new_remote_rip)
+					if not self.memory_view.is_local_addr(new_remote_rip):
+						# Stepped outside of loaded bv
+						return result
+
+					fns = self.bv.get_functions_containing(new_local_rip)
+					for fn in fns:
+						start = fn.llil.get_instruction_start(new_local_rip)
+						if start is not None and fn.llil[start].address == new_local_rip:
+							return result
+			elif il == FunctionGraphType.MediumLevelILFunctionGraph:
+				# Step into until we're at an mlil instruction
+				result = (None, None)
+				while True:
+					# Step once in disassembly, then see if we've hit an IL instruction
+					result = self.step_into(FunctionGraphType.NormalFunctionGraph)
+					self.memory_dirty()
+					new_remote_rip = self.adapter.reg_read('rip')
+					new_local_rip = self.memory_view.remote_addr_to_local(new_remote_rip)
+					if not self.memory_view.is_local_addr(new_remote_rip):
+						# Stepped outside of loaded bv
+						return result
+
+					fns = self.bv.get_functions_containing(new_local_rip)
+					for fn in fns:
+						start = fn.mlil.get_instruction_start(new_local_rip)
+						if start is not None and fn.mlil[start].address == new_local_rip:
+							return result
+				else:
+					raise NotImplementedError('step unimplemented for il type %s' % il)
+
+		else:
+			raise NotImplementedError('step unimplemented for architecture %s' % self.bv.arch.name)
+
+	def step_over(self, il=FunctionGraphType.NormalFunctionGraph):
 		if not self.adapter:
 			raise Exception('missing adapter')
 

@@ -1,5 +1,6 @@
 import binaryninja
 from binaryninja import execute_on_main_thread_and_wait
+from binaryninjaui import ViewFrame
 from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QToolBar, QToolButton, QMenu, QAction
@@ -40,10 +41,14 @@ class DebugControlsWidget(QToolBar):
 		self.actionPause.triggered.connect(lambda: self.perform_pause())
 		self.actionResume = QAction("Resume", self)
 		self.actionResume.triggered.connect(lambda: self.perform_resume())
-		self.actionStepInto = QAction("Step Into", self)
-		self.actionStepInto.triggered.connect(lambda: self.perform_step_into())
-		self.actionStepOver = QAction("Step Over", self)
-		self.actionStepOver.triggered.connect(lambda: self.perform_step_over())
+		self.actionStepIntoAsm = QAction("Step Into (Assembly)", self)
+		self.actionStepIntoAsm.triggered.connect(lambda: self.perform_step_into_asm())
+		self.actionStepIntoIL = QAction("Step Into", self)
+		self.actionStepIntoIL.triggered.connect(lambda: self.perform_step_into_il())
+		self.actionStepOverAsm = QAction("Step Over (Assembly)", self)
+		self.actionStepOverAsm.triggered.connect(lambda: self.perform_step_over_asm())
+		self.actionStepOverIL = QAction("Step Over", self)
+		self.actionStepOverIL.triggered.connect(lambda: self.perform_step_over_il())
 		self.actionStepReturn = QAction("Step Return", self)
 		self.actionStepReturn.triggered.connect(lambda: self.perform_step_return())
 
@@ -59,6 +64,14 @@ class DebugControlsWidget(QToolBar):
 		self.controlMenu.addSeparator()
 		self.controlMenu.addAction(self.actionSettings)
 
+		self.stepIntoMenu = QMenu("Step Into", self)
+		self.stepIntoMenu.addAction(self.actionStepIntoIL)
+		self.stepIntoMenu.addAction(self.actionStepIntoAsm)
+
+		self.stepOverMenu = QMenu("Step Over", self)
+		self.stepOverMenu.addAction(self.actionStepOverIL)
+		self.stepOverMenu.addAction(self.actionStepOverAsm)
+
 		self.btnControl = QToolButton(self)
 		self.btnControl.setMenu(self.controlMenu)
 		self.btnControl.setPopupMode(QToolButton.MenuButtonPopup)
@@ -69,8 +82,21 @@ class DebugControlsWidget(QToolBar):
 		# execution control buttons
 		self.addAction(self.actionPause)
 		self.addAction(self.actionResume)
-		self.addAction(self.actionStepInto)
-		self.addAction(self.actionStepOver)
+
+		self.btnStepInto = QToolButton(self)
+		self.btnStepInto.setMenu(self.stepIntoMenu)
+		self.btnStepInto.setPopupMode(QToolButton.MenuButtonPopup)
+		self.btnStepInto.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+		self.btnStepInto.setDefaultAction(self.actionStepIntoIL)
+		self.addWidget(self.btnStepInto)
+
+		self.btnStepOver = QToolButton(self)
+		self.btnStepOver.setMenu(self.stepOverMenu)
+		self.btnStepOver.setPopupMode(QToolButton.MenuButtonPopup)
+		self.btnStepOver.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+		self.btnStepOver.setDefaultAction(self.actionStepOverIL)
+		self.addWidget(self.btnStepOver)
+
 		# TODO: Step until returning from current function
 		self.addAction(self.actionStepReturn)
 
@@ -137,25 +163,51 @@ class DebugControlsWidget(QToolBar):
 		self.state_running()
 		threading.Thread(target=perform_resume_thread).start()
 
-	def perform_step_into(self):
+	def perform_step_into_asm(self):
 
-		def perform_step_into_thread():
+		def perform_step_into_asm_thread():
 			(reason, data) = self.debug_state.step_into()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
 			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
 
 		self.state_busy("STEPPING")
-		threading.Thread(target=perform_step_into_thread).start()
+		threading.Thread(target=perform_step_into_asm_thread).start()
 
-	def perform_step_over(self):
+	def perform_step_into_il(self):
 
-		def perform_step_over_thread():
+		disasm = self.debug_state.ui.debug_view.binary_editor.getDisassembly()
+		graph_type = disasm.getGraphType()
+
+		def perform_step_into_il_thread():
+			(reason, data) = self.debug_state.step_into(graph_type)
+			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
+			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
+
+		self.state_busy("STEPPING")
+		threading.Thread(target=perform_step_into_il_thread).start()
+
+	def perform_step_over_asm(self):
+
+		def perform_step_over_asm_thread():
 			(reason, data) = self.debug_state.step_over()
 			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
 			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
 
 		self.state_busy("STEPPING")
-		threading.Thread(target=perform_step_over_thread).start()
+		threading.Thread(target=perform_step_over_asm_thread).start()
+
+	def perform_step_over_il(self):
+
+		disasm = self.debug_state.ui.debug_view.binary_editor.getDisassembly()
+		graph_type = disasm.getGraphType()
+
+		def perform_step_over_il_thread():
+			(reason, data) = self.debug_state.step_over(graph_type)
+			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
+			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
+
+		self.state_busy("STEPPING")
+		threading.Thread(target=perform_step_over_il_thread).start()
 
 	def perform_step_return(self):
 
@@ -168,6 +220,14 @@ class DebugControlsWidget(QToolBar):
 		threading.Thread(target=perform_step_return_thread).start()
 
 	def set_actions_enabled(self, **kwargs):
+		def enable_step_into(e):
+			self.actionStepIntoAsm.setEnabled(e)
+			self.actionStepIntoIL.setEnabled(e)
+
+		def enable_step_over(e):
+			self.actionStepOverAsm.setEnabled(e)
+			self.actionStepOverIL.setEnabled(e)
+
 		def enable_starting(e):
 			self.actionRun.setEnabled(e)
 			self.actionAttach.setEnabled(e)
@@ -178,8 +238,10 @@ class DebugControlsWidget(QToolBar):
 			self.actionDetach.setEnabled(e)
 
 		def enable_stepping(e):
-			self.actionStepInto.setEnabled(e)
-			self.actionStepOver.setEnabled(e)
+			self.actionStepIntoAsm.setEnabled(e)
+			self.actionStepIntoIL.setEnabled(e)
+			self.actionStepOverAsm.setEnabled(e)
+			self.actionStepOverIL.setEnabled(e)
 			self.actionStepReturn.setEnabled(e)
 
 		actions = {
@@ -190,8 +252,8 @@ class DebugControlsWidget(QToolBar):
 			"Detach": lambda e: self.actionDetach.setEnabled(e),
 			"Pause": lambda e: self.actionPause.setEnabled(e),
 			"Resume": lambda e: self.actionResume.setEnabled(e),
-			"StepInto": lambda e: self.actionStepInto.setEnabled(e),
-			"StepOver": lambda e: self.actionStepOver.setEnabled(e),
+			"StepInto": enable_step_into,
+			"StepOver": enable_step_over,
 			"StepReturn": lambda e: self.actionStepReturn.setEnabled(e),
 			"Threads": lambda e: self.btnThreads.setEnabled(e),
 			"Starting": enable_starting,

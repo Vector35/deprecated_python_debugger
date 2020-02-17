@@ -306,15 +306,25 @@ def cb_control_resume(bv):
 	if debug_state.ui.debug_view is not None:
 		debug_state.ui.debug_view.controls.actionResume.trigger()
 
-def cb_control_step_into(bv):
+def cb_control_step_into_asm(bv):
 	debug_state = binjaplug.get_state(bv)
 	if debug_state.ui.debug_view is not None:
-		debug_state.ui.debug_view.controls.actionStepInto.trigger()
+		debug_state.ui.debug_view.controls.actionStepIntoAsm.trigger()
 
-def cb_control_step_over(bv):
+def cb_control_step_into_il(bv):
 	debug_state = binjaplug.get_state(bv)
 	if debug_state.ui.debug_view is not None:
-		debug_state.ui.debug_view.controls.actionStepOver.trigger()
+		debug_state.ui.debug_view.controls.actionStepIntoIL.trigger()
+
+def cb_control_step_over_asm(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.ui.debug_view.controls.actionStepOverAsm.trigger()
+
+def cb_control_step_over_il(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.ui.debug_view.controls.actionStepOverIL.trigger()
 
 def cb_control_step_return(bv):
 	debug_state = binjaplug.get_state(bv)
@@ -355,13 +365,21 @@ def valid_control_resume(bv):
 	debug_state = binjaplug.get_state(bv)
 	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionResume.isEnabled()
 
-def valid_control_step_into(bv):
+def valid_control_step_into_asm(bv):
 	debug_state = binjaplug.get_state(bv)
-	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionStepInto.isEnabled()
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionStepIntoAsm.isEnabled()
 
-def valid_control_step_over(bv):
+def valid_control_step_into_il(bv):
 	debug_state = binjaplug.get_state(bv)
-	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionStepOver.isEnabled()
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionStepIntoIL.isEnabled()
+
+def valid_control_step_over_asm(bv):
+	debug_state = binjaplug.get_state(bv)
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionStepOverAsm.isEnabled()
+
+def valid_control_step_over_il(bv):
+	debug_state = binjaplug.get_state(bv)
+	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionStepOverIL.isEnabled()
 
 def valid_control_step_return(bv):
 	debug_state = binjaplug.get_state(bv)
@@ -391,8 +409,10 @@ def initialize_ui():
 	PluginCommand.register("Debugger\\Process\\Settings", "Open adapter settings menu", cb_process_settings, is_valid=valid_process_settings)
 	PluginCommand.register("Debugger\\Control\\Pause", "Pause execution", cb_control_pause, is_valid=valid_control_pause)
 	PluginCommand.register("Debugger\\Control\\Resume", "Resume execution", cb_control_resume, is_valid=valid_control_resume)
-	PluginCommand.register("Debugger\\Control\\Step Into", "Step into assembly", cb_control_step_into, is_valid=valid_control_step_into)
-	PluginCommand.register("Debugger\\Control\\Step Over", "Step over function call", cb_control_step_over, is_valid=valid_control_step_over)
+	PluginCommand.register("Debugger\\Control\\Step Into (Assembly)", "Step into assembly", cb_control_step_into_asm, is_valid=valid_control_step_into_asm)
+	PluginCommand.register("Debugger\\Control\\Step Into (IL)", "Step into IL", cb_control_step_into_il, is_valid=valid_control_step_into_il)
+	PluginCommand.register("Debugger\\Control\\Step Over (Assembly)", "Step over function call", cb_control_step_over_asm, is_valid=valid_control_step_over_asm)
+	PluginCommand.register("Debugger\\Control\\Step Over (IL)", "Step over function call", cb_control_step_over_il, is_valid=valid_control_step_over_il)
 	PluginCommand.register("Debugger\\Control\\Step Return", "Step until current function returns", cb_control_step_return, is_valid=valid_control_step_return)
 
 	ViewType.registerViewType(DebugView.DebugViewType())
