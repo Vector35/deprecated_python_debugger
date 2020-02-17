@@ -1,9 +1,9 @@
-from binaryninja.plugin import PluginCommand
-from binaryninja import Endianness, HighlightStandardColor, LinearDisassemblyLine, LinearDisassemblyLineType, DisassemblyTextLine, InstructionTextToken, InstructionTextTokenType
-from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
 from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
+from binaryninja.plugin import PluginCommand
+from binaryninja import Endianness, HighlightStandardColor, LinearDisassemblyLine, LinearDisassemblyLineType, DisassemblyTextLine, InstructionTextToken, InstructionTextTokenType
+from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
 from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, ConsoleWidget, ModulesWidget, widget
 from . import binjaplug
 

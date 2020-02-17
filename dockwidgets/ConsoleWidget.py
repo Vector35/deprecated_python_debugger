@@ -1,8 +1,8 @@
-import binaryninja
-from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, getMonospaceFont
 from PySide2 import QtCore
 from PySide2.QtCore import Qt, QSize
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QTextEdit
+import binaryninja
+from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, getMonospaceFont
 
 from .. import binjaplug
 
@@ -25,7 +25,7 @@ class DebugConsoleWidget(QWidget, DockContextHandler):
 
 		inputLayout = QHBoxLayout()
 		inputLayout.setContentsMargins(4, 4, 4, 4)
-		
+
 		promptLayout = QVBoxLayout()
 		promptLayout.setContentsMargins(0, 5, 0, 5)
 
