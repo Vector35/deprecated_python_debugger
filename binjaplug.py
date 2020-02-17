@@ -139,6 +139,21 @@ class DebuggerState:
 		else:
 			raise NotImplementedError('only x86_64 so far')
 
+	@property
+	def local_ip(self):
+		return self.memory_view.remote_addr_to_local(self.ip)
+
+	@property
+	def remote_ip(self):
+		return self.ip
+
+	@property
+	def stack_pointer(self):
+		if self.bv.arch.name == 'x86_64':
+			return self.adapter.reg_read('rsp')
+		else:
+			raise NotImplementedError('only x86_64 so far')
+
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):
 		self.memory_view.mark_dirty()

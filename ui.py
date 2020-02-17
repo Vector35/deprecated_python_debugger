@@ -57,11 +57,6 @@ class DebuggerUI:
 		# Update Threads
 		#----------------------------------------------------------------------
 
-		if self.state.bv.arch.name == 'x86_64':
-			reg_ip_name = 'rip'
-		else:
-			raise NotImplementedError('only x86_64 so far')
-
 		threads = []
 		tid_selected = self.state.adapter.thread_selected()
 		last_thread = tid_selected
@@ -69,7 +64,7 @@ class DebuggerUI:
 			if last_thread != tid:
 				self.state.adapter.thread_select(tid)
 				last_thread = tid
-			reg_ip_val = self.state.adapter.reg_read(reg_ip_name)
+			reg_ip_val = self.state.ip
 			threads.append({
 				'tid': tid,
 				reg_ip_name: reg_ip_val,
@@ -84,45 +79,42 @@ class DebuggerUI:
 		# Update Stack
 		#----------------------------------------------------------------------
 
-		if self.state.bv.arch.name == 'x86_64':
-			stack_pointer = self.state.adapter.reg_read('rsp')
-			# Read up and down from rsp
-			stack_range = [-8, 60] # Inclusive
-			stack = []
-			for i in range(stack_range[0], stack_range[1] + 1):
-				offset = i * self.state.bv.arch.address_size
-				address = stack_pointer + offset
-				value = self.state.memory_view.read(address, self.state.bv.arch.address_size)
-				value_int = value
-				if self.state.bv.arch.endianness == Endianness.LittleEndian:
-					value_int = value_int[::-1]
-				value_int = int(value_int.hex(), 16)
+		stack_pointer = self.state.stack_pointer
+		# Read up and down from rsp
+		stack_range = [-8, 60] # Inclusive
+		stack = []
+		for i in range(stack_range[0], stack_range[1] + 1):
+			offset = i * self.state.bv.arch.address_size
+			address = stack_pointer + offset
+			value = self.state.memory_view.read(address, self.state.bv.arch.address_size)
+			value_int = value
+			if self.state.bv.arch.endianness == Endianness.LittleEndian:
+				value_int = value_int[::-1]
+			value_int = int(value_int.hex(), 16)
 
-				refs = []
-				for register in regs:
-					if register['value'] == address:
-						refs.append({
-							'source': 'register',
-							'dest': 'address',
-							'register': register
-						})
-					# Ignore zeroes because most registers start at zero and give false data
-					if value_int != 0 and register['value'] == value_int:
-						refs.append({
-							'source': 'register',
-							'dest': 'value',
-							'register': register
-						})
+			refs = []
+			for register in regs:
+				if register['value'] == address:
+					refs.append({
+						'source': 'register',
+						'dest': 'address',
+						'register': register
+					})
+				# Ignore zeroes because most registers start at zero and give false data
+				if value_int != 0 and register['value'] == value_int:
+					refs.append({
+						'source': 'register',
+						'dest': 'value',
+						'register': register
+					})
 
-				stack.append({
-					'offset': offset,
-					'value': value,
-					'address': address,
-					'refs': refs
-				})
-			stack_widget.notifyStackChanged(stack)
-		else:
-			raise NotImplementedError('only x86_64 so far')
+			stack.append({
+				'offset': offset,
+				'value': value,
+				'address': address,
+				'refs': refs
+			})
+		stack_widget.notifyStackChanged(stack)
 
 		#----------------------------------------------------------------------
 		# Update Memory
@@ -134,17 +126,14 @@ class DebuggerUI:
 		# Update Status
 		#----------------------------------------------------------------------
 
-		if self.state.bv.arch.name == 'x86_64':
-			remote_rip = self.state.adapter.reg_read('rip')
-			local_rip = self.state.memory_view.remote_addr_to_local(remote_rip)
-		else:
-			raise NotImplementedError('only x86_64 so far')
+		remote_rip = self.state.ip
+		local_rip = self.state.memory_view.remote_addr_to_local(remote_rip)
 
 		self.state.update_highlights()
 		self.state.last_rip = local_rip
 
 		# select instruction currently at
-		if self.state.bv.read(local_rip, 1):
+		if self.state.bv.read(local_rip, 1) and len(self.state.bv.get_functions_containing(local_rip)) > 0:
 			self.debug_view.setRawDisassembly(False)
 			self.state.bv.navigate(self.state.bv.file.view, local_rip)
 			self.debug_view.controls.state_stopped()
@@ -167,60 +156,57 @@ class DebuggerUI:
 	def update_raw_disassembly(self):
 		# Read a few instructions from rip and disassemble them
 		inst_count = 50
-		if self.state.bv.arch.name == 'x86_64':
-			rip = self.state.adapter.reg_read('rip')
-			# Assume the worst, just in case
-			read_length = self.state.bv.arch.max_instr_length * inst_count
-			data = self.state.memory_view.read(rip, read_length)
 
-			lines = []
+		rip = self.state.ip
+		# Assume the worst, just in case
+		read_length = self.state.bv.arch.max_instr_length * inst_count
+		data = self.state.memory_view.read(rip, read_length)
 
-			# Append header line
-			tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "(Code not backed by loaded file, showing only raw disassembly)")]
-			contents = DisassemblyTextLine(tokens, rip)
-			line = LinearDisassemblyLine(LinearDisassemblyLineType.BasicLineType, None, None, 0, contents)
+		lines = []
+
+		# Append header line
+		tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "(Code not backed by loaded file, showing only raw disassembly)")]
+		contents = DisassemblyTextLine(tokens, rip)
+		line = LinearDisassemblyLine(LinearDisassemblyLineType.BasicLineType, None, None, 0, contents)
+		lines.append(line)
+
+		total_read = 0
+		for i in range(inst_count):
+			line_addr = rip + total_read
+			(insn_tokens, length) = self.state.bv.arch.get_instruction_text(data[total_read:], line_addr)
+
+			tokens = []
+			color = HighlightStandardColor.NoHighlightColor
+			if i == 0:
+				if (rip + total_read) in self.state.breakpoints:
+					# Breakpoint & pc
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.state.bv.tag_types["Crashes"].icon + ">", width=5))
+					color = HighlightStandardColor.RedHighlightColor
+				else:
+					# PC
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, " ==> "))
+					color = HighlightStandardColor.BlueHighlightColor
+			else:
+				if (rip + total_read) in self.state.breakpoints:
+					# Breakpoint
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.state.bv.tag_types["Crashes"].icon, width=5))
+					color = HighlightStandardColor.RedHighlightColor
+				else:
+					# Regular line
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "     "))
+			# Address
+			tokens.append(InstructionTextToken(InstructionTextTokenType.AddressDisplayToken, hex(line_addr)[2:], line_addr))
+			tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "  "))
+			tokens.extend(insn_tokens)
+
+			# Convert to linear disassembly line
+			contents = DisassemblyTextLine(tokens, line_addr, color=color)
+			line = LinearDisassemblyLine(LinearDisassemblyLineType.CodeDisassemblyLineType, None, None, 0, contents)
 			lines.append(line)
 
-			total_read = 0
-			for i in range(inst_count):
-				line_addr = rip + total_read
-				(insn_tokens, length) = self.state.bv.arch.get_instruction_text(data[total_read:], line_addr)
+			total_read += length
 
-				tokens = []
-				color = HighlightStandardColor.NoHighlightColor
-				if i == 0:
-					if (rip + total_read) in self.state.breakpoints:
-						# Breakpoint & pc
-						tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.state.bv.tag_types["Crashes"].icon + ">", width=5))
-						color = HighlightStandardColor.RedHighlightColor
-					else:
-						# PC
-						tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, " ==> "))
-						color = HighlightStandardColor.BlueHighlightColor
-				else:
-					if (rip + total_read) in self.state.breakpoints:
-						# Breakpoint
-						tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.state.bv.tag_types["Crashes"].icon, width=5))
-						color = HighlightStandardColor.RedHighlightColor
-					else:
-						# Regular line
-						tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "     "))
-				# Address
-				tokens.append(InstructionTextToken(InstructionTextTokenType.AddressDisplayToken, hex(line_addr)[2:], line_addr))
-				tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "  "))
-				tokens.extend(insn_tokens)
-
-				# Convert to linear disassembly line
-				contents = DisassemblyTextLine(tokens, line_addr, color=color)
-				line = LinearDisassemblyLine(LinearDisassemblyLineType.CodeDisassemblyLineType, None, None, 0, contents)
-				lines.append(line)
-
-				total_read += length
-
-			self.debug_view.setRawDisassembly(True, lines)
-
-		else:
-			raise NotImplementedError('only x86_64 so far')
+		self.debug_view.setRawDisassembly(True, lines)
 
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):
