@@ -3,7 +3,7 @@ import re
 import time
 
 import binaryninja
-from binaryninja import Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType
+from binaryninja import Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation
 
 from . import DebugAdapter, ProcessView
 
@@ -344,6 +344,8 @@ class DebuggerState:
 						return result
 
 					fns = self.bv.get_functions_containing(new_local_rip)
+					if len(fns) == 0:
+						return result
 					for fn in fns:
 						start = fn.llil.get_instruction_start(new_local_rip)
 						if start is not None and fn.llil[start].address == new_local_rip:
@@ -362,6 +364,8 @@ class DebuggerState:
 						return result
 
 					fns = self.bv.get_functions_containing(new_local_rip)
+					if len(fns) == 0:
+						return result
 					for fn in fns:
 						start = fn.mlil.get_instruction_start(new_local_rip)
 						if start is not None and fn.mlil[start].address == new_local_rip:
@@ -385,54 +389,119 @@ class DebuggerState:
 			remote_rip = self.adapter.reg_read('rip')
 			local_rip = self.memory_view.remote_addr_to_local(remote_rip)
 
-			if self.bv.read(local_rip, 1):
-				instxt = self.bv.get_disassembly(local_rip)
-				inslen = self.bv.get_instruction_length(local_rip)
-			else:
-				data = self.adapter.mem_read(remote_rip, 16)
-				(tokens, length) = self.bv.arch.get_instruction_text(data, local_rip)
-				instxt = ''.join([x.text for x in tokens])
-				inslen = length
+			# Cannot IL step through non-analyzed code
+			if not self.memory_view.is_local_addr(remote_rip):
+				il = FunctionGraphType.NormalFunctionGraph
 
-			local_ripnext = local_rip + inslen
-			remote_ripnext = remote_rip + inslen
-
-			call = instxt.startswith('call ')
-			bphere = local_rip in self.breakpoints
-			bpnext = local_ripnext in self.breakpoints
-
-			seq = []
-
-			if not call:
-				if bphere:
-					seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
-					seq.append((self.adapter.step_into, ()))
-					seq.append((self.adapter.breakpoint_set, (remote_rip,)))
+			if il == FunctionGraphType.NormalFunctionGraph:
+				if self.bv.read(local_rip, 1):
+					instxt = self.bv.get_disassembly(local_rip)
+					inslen = self.bv.get_instruction_length(local_rip)
 				else:
-					seq.append((self.adapter.step_into, ()))
-			elif bphere and bpnext:
-				seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
-				seq.append((self.adapter.go, ()))
-				seq.append((self.adapter.breakpoint_set, (remote_rip,)))
-			elif bphere and not bpnext:
-				seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
-				seq.append((self.adapter.breakpoint_set, (remote_ripnext,)))
-				seq.append((self.adapter.go, ()))
-				seq.append((self.adapter.breakpoint_clear, (remote_ripnext,)))
-				seq.append((self.adapter.breakpoint_set, (remote_rip,)))
-			elif not bphere and bpnext:
-				seq.append((self.adapter.go, ()))
-			elif not bphere and not bpnext:
-				seq.append((self.adapter.breakpoint_set, (remote_ripnext,)))
-				seq.append((self.adapter.go, ()))
-				seq.append((self.adapter.breakpoint_clear, (remote_ripnext,)))
-			else:
-				raise Exception('confused by call, bphere, bpnext state')
-			# TODO: Cancel (and raise some exception)
-			result = self.exec_adapter_sequence(seq)
-			self.memory_dirty()
-			return result
+					data = self.adapter.mem_read(remote_rip, 16)
+					(tokens, length) = self.bv.arch.get_instruction_text(data, local_rip)
+					instxt = ''.join([x.text for x in tokens])
+					inslen = length
 
+				local_ripnext = local_rip + inslen
+				remote_ripnext = remote_rip + inslen
+
+				call = instxt.startswith('call ')
+				bphere = local_rip in self.breakpoints
+				bpnext = local_ripnext in self.breakpoints
+
+				seq = []
+
+				if not call:
+					if bphere:
+						seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
+						seq.append((self.adapter.step_into, ()))
+						seq.append((self.adapter.breakpoint_set, (remote_rip,)))
+					else:
+						seq.append((self.adapter.step_into, ()))
+				elif bphere and bpnext:
+					seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
+					seq.append((self.adapter.go, ()))
+					seq.append((self.adapter.breakpoint_set, (remote_rip,)))
+				elif bphere and not bpnext:
+					seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
+					seq.append((self.adapter.breakpoint_set, (remote_ripnext,)))
+					seq.append((self.adapter.go, ()))
+					seq.append((self.adapter.breakpoint_clear, (remote_ripnext,)))
+					seq.append((self.adapter.breakpoint_set, (remote_rip,)))
+				elif not bphere and bpnext:
+					seq.append((self.adapter.go, ()))
+				elif not bphere and not bpnext:
+					seq.append((self.adapter.breakpoint_set, (remote_ripnext,)))
+					seq.append((self.adapter.go, ()))
+					seq.append((self.adapter.breakpoint_clear, (remote_ripnext,)))
+				else:
+					raise Exception('confused by call, bphere, bpnext state')
+				# TODO: Cancel (and raise some exception)
+				result = self.exec_adapter_sequence(seq)
+				self.memory_dirty()
+				return result
+			else:
+				targets = []
+				if il == FunctionGraphType.LowLevelILFunctionGraph:
+					# Find current llil function
+					current_function = self.bv.get_functions_containing(local_rip)
+					current_llil = None
+					for function in current_function:
+						current_llil = function.llil
+					if not current_llil:
+						raise RuntimeError('Cannot find llil for stepping')
+
+					# Find address of next llil instruction
+					start = current_llil.get_instruction_start(local_rip)
+					if start is None:
+						# In between instructions, just do step into il
+						return self.step_into(il)
+
+					found_call = False
+					offset = start
+					local_target = current_llil[start].address
+					while local_target == local_rip and offset < len(current_llil):
+						if current_llil[offset].operation == LowLevelILOperation.LLIL_CALL:
+							found_call = True
+						local_target = current_llil[offset].address
+						offset += 1
+
+					# Continue to after a call if we're doing a call, else just step into
+					if not found_call:
+						return self.step_into(il)
+					targets.append(self.memory_view.local_addr_to_remote(local_target))
+				elif il == FunctionGraphType.MediumLevelILFunctionGraph:
+					# Find current llil function
+					current_function = self.bv.get_functions_containing(local_rip)
+					current_mlil = None
+					for function in current_function:
+						current_mlil = function.mlil
+					if not current_mlil:
+						raise RuntimeError('Cannot find mlil for stepping')
+
+					start = current_mlil.get_instruction_start(local_rip)
+					if start is None:
+						# In between instructions, just do step into il
+						return self.step_into(il)
+
+					found_call = False
+					offset = start
+					local_target = current_mlil[start].address
+					while local_target == local_rip and offset < len(current_mlil):
+						if current_mlil[offset].operation == MediumLevelILOperation.MLIL_CALL:
+							found_call = True
+						local_target = current_mlil[offset].address
+						offset += 1
+
+					# Continue to after a call if we're doing a call, else just step into
+					if not found_call:
+						return self.step_into(il)
+					targets.append(self.memory_view.local_addr_to_remote(local_target))
+				else:
+					raise NotImplementedError('step unimplemented for il type %s' % il)
+
+				return self.step_to(targets)
 		else:
 			raise NotImplementedError('step over unimplemented for architecture %s' % self.bv.arch.name)
 
