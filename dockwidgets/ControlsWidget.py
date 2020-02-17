@@ -306,7 +306,7 @@ class DebugControlsWidget(QToolBar):
 		debug_state = binjaplug.get_state(self.bv)
 
 		# clear breakpoints
-		debug_state.breakpoint_tag_del()
+		debug_state.ui.breakpoint_tag_del()
 		debug_state.breakpoints = {}
 
 		debug_state.state = 'INACTIVE'

@@ -115,7 +115,6 @@ class DebuggerState:
 		self.memory_view = ProcessView.DebugProcessView(bv)
 		self.old_symbols = []
 		self.old_dvs = set()
-		self.last_rip = 0
 		self.command_line_args = []
 
 		# Convenience
@@ -137,7 +136,7 @@ class DebuggerState:
 		if self.bv.arch.name == 'x86_64':
 			return self.adapter.reg_read('rip')
 		else:
-			raise NotImplementedError('only x86_64 so far')
+			raise NotImplementedError('unimplemented architecture %s' % self.bv.arch.name)
 
 	@property
 	def local_ip(self):
@@ -152,7 +151,7 @@ class DebuggerState:
 		if self.bv.arch.name == 'x86_64':
 			return self.adapter.reg_read('rsp')
 		else:
-			raise NotImplementedError('only x86_64 so far')
+			raise NotImplementedError('unimplemented architecture %s' % self.bv.arch.name)
 
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):
@@ -218,46 +217,6 @@ class DebuggerState:
 				self.old_dvs.add(reg_addrs['rsp'])
 		else:
 			raise NotImplementedError('only x86_64 so far')
-
-	# Highlight lines
-	def update_highlights(self):
-		# Clear old highlighted rip
-		for func in self.bv.get_functions_containing(self.last_rip):
-			func.set_auto_instr_highlight(self.last_rip, binaryninja.HighlightStandardColor.NoHighlightColor)
-
-		for bp in self.breakpoints:
-			for func in self.bv.get_functions_containing(bp):
-				func.set_auto_instr_highlight(bp, binaryninja.HighlightStandardColor.RedHighlightColor)
-
-		if self.adapter is not None:
-			remote_rip = self.ip
-			local_rip = self.memory_view.remote_addr_to_local(remote_rip)
-
-			for func in self.bv.get_functions_containing(local_rip):
-				func.set_auto_instr_highlight(local_rip, binaryninja.HighlightStandardColor.BlueHighlightColor)
-
-	def breakpoint_tag_add(self, local_address):
-		# create tag
-		tt = self.bv.tag_types["Crashes"]
-		for func in self.bv.get_functions_containing(local_address):
-			tags = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
-			if len(tags) == 0:
-				tag = func.create_user_address_tag(local_address, tt, "breakpoint")
-
-	# breakpoint TAG removal - strictly presentation
-	# (doesn't remove actual breakpoints, just removes the binja tags that mark them)
-	#
-	def breakpoint_tag_del(self, local_addresses=None):
-		if local_addresses == None:
-			local_addresses = [self.memory_view.local_addr_to_remote(addr) for addr in self.breakpoints]
-
-		for local_address in local_addresses:
-			# delete breakpoint tags from all functions containing this address
-			for func in self.bv.get_functions_containing(local_address):
-				func.set_auto_instr_highlight(local_address, binaryninja.HighlightStandardColor.NoHighlightColor)
-				delqueue = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
-				for tag in delqueue:
-					func.remove_user_address_tag(local_address, tag)
 
 	def on_stdout(self, output):
 		# TODO: Send to debugger console when stdin is working
@@ -575,11 +534,10 @@ class DebuggerState:
 		# save it
 		self.breakpoints[local_address] = True
 		#print('breakpoint address=0x%X (remote=0x%X) set' % (local_address, remote_address))
-		self.update_highlights()
 		if self.ui is not None:
+			self.ui.update_highlights()
 			self.ui.update_breakpoints()
-
-		self.breakpoint_tag_add(local_address)
+			self.ui.breakpoint_tag_add(local_address)
 
 		return True
 
@@ -597,14 +555,15 @@ class DebuggerState:
 			else:
 				print('ERROR: clearing breakpoint')
 
-			# delete breakpoint tags from all functions containing this address
-			self.breakpoint_tag_del([local_address])
+			if self.ui is not None:
+				# delete breakpoint tags from all functions containing this address
+				self.ui.breakpoint_tag_del([local_address])
 
 			# delete from our list
 			del self.breakpoints[local_address]
 
-			self.update_highlights()
 			if self.ui is not None:
+				self.ui.update_highlights()
 				self.ui.update_breakpoints()
 		else:
 			print('ERROR: breakpoint not found in list')

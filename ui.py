@@ -11,6 +11,7 @@ class DebuggerUI:
 	def __init__(self, state):
 		self.state = state
 		self.debug_view = None
+		self.last_ip = 0
 
 	def widget(self, name):
 		return widget.get_dockwidget(self.state.bv, name)
@@ -129,8 +130,8 @@ class DebuggerUI:
 		remote_rip = self.state.ip
 		local_rip = self.state.memory_view.remote_addr_to_local(remote_rip)
 
-		self.state.update_highlights()
-		self.state.last_rip = local_rip
+		self.update_highlights()
+		self.last_ip = local_rip
 
 		# select instruction currently at
 		if self.state.bv.read(local_rip, 1) and len(self.state.bv.get_functions_containing(local_rip)) > 0:
@@ -140,6 +141,23 @@ class DebuggerUI:
 		else:
 			self.update_raw_disassembly()
 			self.debug_view.controls.state_stopped_extern()
+
+	# Highlight lines
+	def update_highlights(self):
+		# Clear old highlighted rip
+		for func in self.state.bv.get_functions_containing(self.last_ip):
+			func.set_auto_instr_highlight(self.last_ip, HighlightStandardColor.NoHighlightColor)
+
+		for bp in self.state.breakpoints:
+			for func in self.state.bv.get_functions_containing(bp):
+				func.set_auto_instr_highlight(bp, HighlightStandardColor.RedHighlightColor)
+
+		if self.state.adapter is not None:
+			remote_rip = self.state.ip
+			local_rip = self.state.memory_view.remote_addr_to_local(remote_rip)
+
+			for func in self.state.bv.get_functions_containing(local_rip):
+				func.set_auto_instr_highlight(local_rip, HighlightStandardColor.BlueHighlightColor)
 
 	def update_modules(self):
 		mods = []
@@ -227,6 +245,29 @@ class DebuggerUI:
 
 		bp_widget = self.widget("Breakpoints")
 		bp_widget.notifyBreakpointsChanged(bps)
+
+	def breakpoint_tag_add(self, local_address):
+		# create tag
+		tt = self.state.bv.tag_types["Crashes"]
+		for func in self.state.bv.get_functions_containing(local_address):
+			tags = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
+			if len(tags) == 0:
+				tag = func.create_user_address_tag(local_address, tt, "breakpoint")
+
+	# breakpoint TAG removal - strictly presentation
+	# (doesn't remove actual breakpoints, just removes the binja tags that mark them)
+	#
+	def breakpoint_tag_del(self, local_addresses=None):
+		if local_addresses == None:
+			local_addresses = [self.state.memory_view.local_addr_to_remote(addr) for addr in self.state.breakpoints]
+
+		for local_address in local_addresses:
+			# delete breakpoint tags from all functions containing this address
+			for func in self.state.bv.get_functions_containing(local_address):
+				func.set_auto_instr_highlight(local_address, binaryninja.HighlightStandardColor.NoHighlightColor)
+				delqueue = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
+				for tag in delqueue:
+					func.remove_user_address_tag(local_address, tag)
 
 #------------------------------------------------------------------------------
 # right click plugin
