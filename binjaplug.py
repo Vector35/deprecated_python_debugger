@@ -293,9 +293,12 @@ class DebuggerState:
 
 		seq = []
 		if bphere:
+			# Clear the breakpoint and step once (past the breakpoint)
+			# Then re-set it in case we loop and hit it again
 			seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
-			seq.append((self.adapter.go, ()))
+			seq.append((self.adapter.step_into, ()))
 			seq.append((self.adapter.breakpoint_set, (remote_rip,)))
+			seq.append((self.adapter.go, ()))
 		else:
 			seq.append((self.adapter.go, ()))
 
@@ -323,19 +326,23 @@ class DebuggerState:
 		local_addresses = [self.memory_view.remote_addr_to_local(addr) for addr in remote_addresses]
 
 		seq = []
-		if local_rip in self.breakpoints:
-			seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
 		for (local_address, remote_address) in zip(local_addresses, remote_addresses):
 			if local_address not in self.breakpoints:
 				seq.append((self.adapter.breakpoint_set, (remote_address,)))
 
-		seq.append((self.adapter.go, ()))
+		if local_rip in self.breakpoints:
+			# Clear the breakpoint and step once (past the breakpoint)
+			# Then re-set it in case we loop and hit it again
+			seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
+			seq.append((self.adapter.step_into, ()))
+			seq.append((self.adapter.breakpoint_set, (remote_rip,)))
+			seq.append((self.adapter.go, ()))
+		else:
+			seq.append((self.adapter.go, ()))
 
 		for (local_address, remote_address) in zip(local_addresses, remote_addresses):
 			if local_address not in self.breakpoints:
 				seq.append((self.adapter.breakpoint_clear, (remote_address,)))
-		if local_rip in self.breakpoints:
-			seq.append((self.adapter.breakpoint_set, (remote_rip,)))
 		# TODO: Cancel (and raise some exception)
 		result = self.exec_adapter_sequence(seq)
 		self.memory_dirty()
