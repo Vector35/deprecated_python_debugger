@@ -42,6 +42,62 @@ def delete_state(bv):
 			return
 
 #------------------------------------------------------------------------------
+# HELPER CLASSES
+#------------------------------------------------------------------------------
+
+class DebuggerRegisters:
+	def __init__(self, state):
+		self.state = state
+
+	def __getitem__(self, reg):
+		if self.state.adapter is None:
+			return None
+		return self.state.adapter.reg_read(reg)
+
+	def __setitem__(self, reg, value):
+		if self.state.adapter is None:
+			return None
+		self.state.adapter.reg_write(reg, value)
+
+	def __iter__(self):
+		if self.state.adapter is None:
+			return None
+		for reg in self.state.adapter.reg_list():
+			yield (reg, self.state.adapter.reg_read(reg))
+
+	def __repr__(self):
+		return '<debugger registers for {}>'.format(self.state.adapter)
+
+
+class DebuggerThreads:
+	def __init__(self, state):
+		self.state = state
+
+	def __iter__(self):
+		if self.state.adapter is None:
+			return None
+		for id in self.state.adapter.thread_list():
+			yield id
+
+	def __repr__(self):
+		return '<debugger threads for {}>'.format(self.state.adapter)
+
+
+class DebuggerModules:
+	def __init__(self, state):
+		self.state = state
+
+	def __iter__(self):
+		if self.state.adapter is None:
+			return None
+		for module in self.state.adapter.mem_modules():
+			yield module
+
+	def __repr__(self):
+		return '<debugger modules for {}>'.format(self.state.adapter)
+
+
+#------------------------------------------------------------------------------
 # DEBUGGER STATE / CONTROLLER
 #
 # Controller of the debugger for a single BinaryView
@@ -61,6 +117,11 @@ class DebuggerState:
 		self.old_dvs = set()
 		self.last_rip = 0
 		self.command_line_args = []
+
+		# Convenience
+		self.registers = DebuggerRegisters(self)
+		self.threads = DebuggerThreads(self)
+		self.modules = DebuggerModules(self)
 
 		if have_ui:
 			self.ui = ui.DebuggerUI(self)
