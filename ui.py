@@ -2,7 +2,7 @@ from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
 from binaryninja.plugin import PluginCommand
-from binaryninja import Endianness, HighlightStandardColor, LinearDisassemblyLine, LinearDisassemblyLineType, DisassemblyTextLine, InstructionTextToken, InstructionTextTokenType
+from binaryninja import Endianness, HighlightStandardColor, LinearDisassemblyLine, LinearDisassemblyLineType, DisassemblyTextLine, InstructionTextToken, InstructionTextTokenType, execute_on_main_thread_and_wait
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
 from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, ConsoleWidget, ModulesWidget, widget
 from . import binjaplug
@@ -276,8 +276,10 @@ class DebuggerUI:
 					func.remove_user_address_tag(local_address, tag)
 
 	def on_stdout(self, output):
-		console_widget = self.widget('Debugger Console')
-		console_widget.notifyStdout(output)
+		def on_stdout_main_thread(output):
+			console_widget = self.widget('Debugger Console')
+			console_widget.notifyStdout(output)
+		execute_on_main_thread_and_wait(lambda: on_stdout_main_thread(output))
 
 #------------------------------------------------------------------------------
 # right click plugin
