@@ -419,7 +419,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			return (reason, reason_data)
 
 		except rsp.RspDisconnected:
-			return (DebugAdapter.BACKEND_DISCONNECTED, None)
+			return (DebugAdapter.STOP_REASON.BACKEND_DISCONNECTED, None)
 
 	def raw(self, data):
 		return rsp.tx_rx(self.sock, data)

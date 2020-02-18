@@ -69,56 +69,58 @@ def consume_ack(sock):
 #	print('RSP connection status: %s' % str(result))
 
 def tx_rx(sock, data, expect='ack_then_reply', handler_async_pkt=None):
-	send_packet_data(sock, data)
+	try:
+		send_packet_data(sock, data)
 
-	reply = None
+		reply = None
 
-	if expect == 'nothing':
-		reply = ''
-	elif expect == 'ack_then_reply':
-		consume_ack(sock)
-		reply = recv_packet_data(sock)
-	elif expect == 'mixed_output_ack_then_reply':
-		ack_received = False
-		while 1:
-			peek1 = sock.recv(1, socket.MSG_PEEK)
-
-			if peek1 == b'+':
-				if ack_received:
-					raise RspGeneralError('received two acks, somethings wrong')
-				sock.recv(1)
-				ack_received = True
-				continue
-
-			if peek1 != b'$':
-				raise RspExpectedStartOfPacket('got: %s' % sock.recv(16))
+		if expect == 'nothing':
+			reply = ''
+		elif expect == 'ack_then_reply':
+			consume_ack(sock)
 			reply = recv_packet_data(sock)
-			if reply[0] == 'O':
-				if handler_async_pkt:
-					handler_async_pkt(reply)
-			else:
-				# return first non-output packet
-				break
-		if not ack_received:
-			raise RspGeneralError('expected ack, none received')
-		result = reply
-	elif expect == 'ack_then_ok':
-		consume_ack(sock)
-		reply = recv_packet_data(sock)
-		if reply != 'OK':
-			raise RspGeneralError('expected OK, got: %s' % reply)
-	elif expect == 'ack_then_empty':
-		consume_ack(sock)
-		reply = recv_packet_data(sock)
-		if reply != '':
-			raise RspGeneralError('expected empty, got: %s' % reply)
-	else:
-		print('dunno how to expect %s' % expect)
+		elif expect == 'mixed_output_ack_then_reply':
+			ack_received = False
+			while 1:
+				peek1 = sock.recv(1, socket.MSG_PEEK)
+				if peek1 == b'+':
+					if ack_received:
+						raise RspGeneralError('received two acks, somethings wrong')
+					sock.recv(1)
+					ack_received = True
+					continue
 
-	if '*' in reply:
-		reply = un_rle(reply)
+				if peek1 != b'$':
+					raise RspExpectedStartOfPacket('got: %s' % sock.recv(16))
+				reply = recv_packet_data(sock)
+				if reply[0] == 'O':
+					if handler_async_pkt:
+						handler_async_pkt(reply)
+				else:
+					# return first non-output packet
+					break
+			if not ack_received:
+				raise RspGeneralError('expected ack, none received')
+			result = reply
+		elif expect == 'ack_then_ok':
+			consume_ack(sock)
+			reply = recv_packet_data(sock)
+			if reply != 'OK':
+				raise RspGeneralError('expected OK, got: %s' % reply)
+		elif expect == 'ack_then_empty':
+			consume_ack(sock)
+			reply = recv_packet_data(sock)
+			if reply != '':
+				raise RspGeneralError('expected empty, got: %s' % reply)
+		else:
+			print('dunno how to expect %s' % expect)
 
-	return reply
+		if '*' in reply:
+			reply = un_rle(reply)
+
+		return reply
+	except OSError:
+		raise RspDisconnected('disconnection while transmitting')
 
 def send_ack(sock):
 	packet = '+'
