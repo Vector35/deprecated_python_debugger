@@ -98,7 +98,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	#--------------------------------------------------------------------------
 
 	# session start/stop
-	def exec(self, path, args):
+	def exec(self, path, args=[]):
 		# resolve path to debugserver
 		path_debugserver = shutil.which('debugserver')
 		if not path_debugserver:
@@ -121,8 +121,11 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		except Exception:
 			raise Exception('invoking debugserver (used path: %s)' % path_debugserver)
 
+		self.connect('localhost', port)
+
+	def connect(self, address, port):
 		# connect to it
-		self.sock = gdblike.connect('localhost', port)
+		self.sock = gdblike.connect(address, port)
 
 		# learn initial registers
 		self.reg_info_load()

@@ -67,6 +67,9 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		# client tracks selected thread
 		self.tid = None
 
+		# inferred architecture (from xml response, regs, whatever)
+		self.arch = None
+
 	#--------------------------------------------------------------------------
 	# API
 	#--------------------------------------------------------------------------
@@ -89,6 +92,21 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			self.sock = None
 		except rsp.RspDisconnected:
 			pass
+
+	# misc info
+	def architecture(self):
+		# if stub reported architecture during xml parsing, return it!
+		if self.arch:
+			return self.arch
+
+		if 'rax' in self.reg_info and 'rip' in self.reg_info:
+			return 'x86_64'
+		elif 'eax' in self.reg_info and 'eip' in self.reg_info:
+			return 'x86'
+		elif 'x0' in self.reg_info and 'pc' in self.reg_info:
+			return 'aarch64'
+		else:
+			raise DebugAdapter.GeneralError('determining target architecture')
 
 	# threads
 	def thread_list(self):
@@ -322,8 +340,9 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		# collect subfiles included from target.xml
 		#
 		subfiles = []
-		def search_include(name, attrs):
-			nonlocal subfiles
+		inarch = False
+		def target_xml_start_elem(name, attrs):
+			nonlocal subfiles, inarch
 			if 'include' in name:
 				if name != 'xi:include':
 					raise Exception('unknown include tag: %s' % name)
@@ -332,9 +351,21 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 				fname = attrs['href']
 				#print('found include: %s' % fname)
 				subfiles.append(fname)
+			if name == 'architecture':
+				inarch = True
+		def target_xml_end_elem(name):
+			nonlocal inarch
+			if name == 'architecture':
+				inarch = False
+		def target_xml_char_data_handler(data):
+			nonlocal inarch
+			if inarch:
+				self.arch = data
 
 		p = xml.parsers.expat.ParserCreate()
-		p.StartElementHandler = search_include
+		p.StartElementHandler = target_xml_start_elem
+		p.EndElementHandler = target_xml_end_elem
+		p.CharacterDataHandler = target_xml_char_data_handler
 		xmltxt = self.get_xml('target.xml')
 		#print(xmltxt)
 		p.Parse(xmltxt)

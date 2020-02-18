@@ -69,15 +69,21 @@ class DebugAdapter:
 		self.cb_stdout = kwargs.get('stdout', None)
 
 	# session start/stop
-	def exec(self, path, args):
+	def exec(self, path, args=[]):
 		raise NotImplementedError('')
 	def attach(self, pid):
+		raise NotImplementedError('')
+	def connect(self, server, port):
 		raise NotImplementedError('')
 	def detach(self):
 		''' quit debug session, debuggee left running '''
 		raise NotImplementedError('')
 	def quit(self):
 		''' quit debug session, debuggee terminated '''
+		raise NotImplementedError('')
+
+	# misc info
+	def architecture(self):
 		raise NotImplementedError('')
 
 	# threads

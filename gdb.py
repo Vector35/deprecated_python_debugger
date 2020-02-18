@@ -103,7 +103,7 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 	# API
 	#--------------------------------------------------------------------------
 
-	def exec(self, path, args):
+	def exec(self, path, args=[]):
 		# resolve path to gdbserver
 		path_gdbserver = shutil.which('gdbserver')
 		if not os.path.exists(path_gdbserver):
@@ -124,7 +124,11 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 			raise Exception('invoking gdbserver (used path: %s)' % path_gdbserver)
 
 		# connect to gdbserver
-		self.sock = gdblike.connect('localhost', port)
+		self.connect('localhost', port)
+
+	def connect(self, address, port):
+		# connect to gdbserver
+		self.sock = gdblike.connect(address, port)
 
 		# initial commands
 		rsp.tx_rx(self.sock, 'Hg0')

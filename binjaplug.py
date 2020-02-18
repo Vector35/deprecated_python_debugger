@@ -12,7 +12,7 @@ try:
 	from . import ui
 	ui.initialize_ui()
 	have_ui = True
-except (ModuleNotFoundError, ImportError) as e:
+except (ModuleNotFoundError, ImportError, IndexError) as e:
 	have_ui = False
 	print(e)
 	print("Could not initialize UI, using headless mode only")

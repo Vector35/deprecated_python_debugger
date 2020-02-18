@@ -14,12 +14,14 @@ from binascii import hexlify, unhexlify
 import colorama
 
 sys.path.append('..')
+import debugger.gdb as gdb
 import debugger.utils as utils
 import debugger.DebugAdapter as DebugAdapter
 
 (RED, GREEN, BROWN, NORMAL) = (utils.RED, utils.GREEN, utils.BROWN, utils.NORMAL)
 
 # globals
+arch = None
 adapter = None
 context_last = {}
 
@@ -28,63 +30,43 @@ context_last = {}
 #--------------------------------------------------------------------------
 
 def context_display(pkt_T=None):
+	global arch
 	global adapter
 	global context_last
 
 	tid = adapter.thread_selected()
 	print('thread 0x%X:' % tid)
 
-	rax = adapter.reg_read('rax')
-	rbx = adapter.reg_read('rbx')
-	rcx = adapter.reg_read('rcx')
-	rdx = adapter.reg_read('rdx')
-	rsi = adapter.reg_read('rsi')
-	rdi = adapter.reg_read('rdi')
-	rip = adapter.reg_read('rip')
-	rsp = adapter.reg_read('rsp')
-	rbp = adapter.reg_read('rbp')
-	r8 = adapter.reg_read('r8')
-	r9 = adapter.reg_read('r9')
-	r10 = adapter.reg_read('r10')
-	r11 = adapter.reg_read('r11')
-	r12 = adapter.reg_read('r12')
-	r13 = adapter.reg_read('r13')
-	r14 = adapter.reg_read('r14')
-	r15 = adapter.reg_read('r15')
+	reg2val = {x:adapter.reg_read(x) for x in adapter.reg_list()}
+	for (reg,val) in reg2val.items():
+		bits2fmt = {8:'%02X', 16:'%04X', 32:'%08X', 64:'%016X', 128:'%032X'}
+		fmt = bits2fmt.get(adapter.reg_bits(reg), '%X')
+		print(('%s=0x'+fmt) % (reg, val))
 
-	print("%srax%s=%016X %srbx%s=%016X %srcx%s=%016X" % \
-		(BROWN, NORMAL, rax, BROWN, NORMAL, rbx, BROWN, NORMAL, rcx))
-	print("%srdx%s=%016X %srsi%s=%016X %srdi%s=%016X" %
-		(BROWN, NORMAL, rdx, BROWN, NORMAL, rsi, BROWN, NORMAL, rdi))
-	print("%srip%s=%016X %srsp%s=%016X %srbp%s=%016X" % \
-		(BROWN, NORMAL, rip, BROWN, NORMAL, rsp, BROWN, NORMAL, rbp))
-	print(" %sr8%s=%016X  %sr9%s=%016X %sr10%s=%016X" % \
-		(BROWN, NORMAL, r8, BROWN, NORMAL, r9, BROWN, NORMAL, r10))
-	print("%sr11%s=%016X %sr12%s=%016X %sr13%s=%016X" % \
-		(BROWN, NORMAL, r11, BROWN, NORMAL, r12, BROWN, NORMAL, r13))
-	print("%sr14%s=%016X %sr15%s=%016X" % \
-		(BROWN, NORMAL, r14, BROWN, NORMAL, r15))
+	pc_name = {'aarch64':'pc', 'x86_64':'rip', 'x86':'eip'}[arch]
+	pc = reg2val[pc_name]
 
 	try:
-		data = adapter.mem_read(rip, 16)
+		data = adapter.mem_read(pc, 16)
 		if data:
-			(asmstr, asmlen) = utils.disasm1(data, rip)
+			(asmstr, asmlen) = utils.disasm1(data, pc, arch)
 			print('%s%016X%s: %s\t%s' % \
-				(GREEN, rip, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
+				(GREEN, pc, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
 	except DebugAdapter.GeneralError as e:
 		print('%s%016X%s: couldn\'t read mem' % \
-			(GREEN, rip, NORMAL))
+			(GREEN, pc, NORMAL))
 
 def thread_display():
 	tid_selected = adapter.thread_selected()
 
 	for tid in adapter.thread_list():
 		adapter.thread_select(tid)
-		rip = adapter.reg_read('rip')
+		reg_pc_val = adapter.reg_read(reg_pc)
 		seltxt = ['','(selected)'][tid == tid_selected]
-		print('Thread tid=0x%X rip=0x%X %s' % (tid, rip, seltxt))
+		print('Thread tid=0x%X %s=0x%X %s' % (tid, reg_pc, reg_pc_val, seltxt))
 
 	adapter.thread_select(tid_selected)
+	pass
 
 def debug_status():
 	return
@@ -132,7 +114,8 @@ if __name__ == '__main__':
 	arg1 = sys.argv[1]
 	if ':' in arg1:
 		(host, port) = arg1.split(':')
-		adapter = connect_get_adapter(host, int(port))
+		adapter = gdb.DebugAdapterGdb()
+		adapter.connect(host, int(port))
 	else:
 		if '~' in arg1:
 			arg1 = os.expanduser(arg1)
@@ -141,8 +124,9 @@ if __name__ == '__main__':
 			raise Exception('file not found: %s' % arg1)
 
 		adapter = DebugAdapter.get_adapter_for_current_system()
+		adapter.exec(arg1)
 
-	adapter.exec(arg1)
+	arch = adapter.architecture()
 
 	user_goal = 'debug'
 	while user_goal == 'debug':
@@ -157,7 +141,7 @@ if __name__ == '__main__':
 			elif text == 'test':
 				adapter.test()
 			elif text.startswith('raw '):
-				print(adapter.raw(text[4:]))	
+				print(adapter.raw(text[4:]))
 
 			# thread list, thread switch
 			elif text in ['~', 'threads']:
