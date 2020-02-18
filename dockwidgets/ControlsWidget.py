@@ -126,9 +126,14 @@ class DebugControlsWidget(QToolBar):
 		pass
 
 	def perform_run(self):
-		self.debug_state.run()
-		self.state_stopped()
-		self.debug_state.ui.context_display()
+		try:
+			self.debug_state.run()
+			self.state_stopped()
+			self.debug_state.ui.context_display()
+		except ConnectionRefusedError:
+			self.state_error('ERROR: Connection Refused')
+		except Exception as e:
+			self.state_error('ERROR: ' + ' '.join(e.args))
 
 	def perform_restart(self):
 		self.debug_state.restart()
@@ -352,7 +357,7 @@ class DebugControlsWidget(QToolBar):
 		debug_state = binjaplug.get_state(self.bv)
 		debug_state.state = 'ERROR'
 		self.editStatus.setText(msg or debug_state.state)
-		self.set_actions_enabled(Run=True, Restart=True, Quit=True, Attach=True, Detach=True, Pause=True, Resume=True, StepInto=True, StepOver=True, StepReturn=True, Threads=True)
+		self.set_actions_enabled(Run=True, Restart=False, Quit=False, Attach=True, Detach=False, Pause=False, Resume=False, StepInto=False, StepOver=False, StepReturn=False, Threads=False)
 		self.set_default_process_action("Run")
 		self.set_thread_list([])
 		self.set_resume_pause_action("Resume")
