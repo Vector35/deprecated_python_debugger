@@ -193,6 +193,12 @@ class DebuggerUI:
 			line_addr = rip + total_read
 			(insn_tokens, length) = self.state.bv.arch.get_instruction_text(data[total_read:], line_addr)
 
+			if insn_tokens is None:
+				insn_tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "??")]
+				length = self.state.bv.arch.instr_alignment
+				if length == 0:
+					length = 1
+
 			tokens = []
 			color = HighlightStandardColor.NoHighlightColor
 			if i == 0:
