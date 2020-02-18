@@ -145,3 +145,7 @@ class DebugAdapter:
 	# raw pass-thru (meaning depends on adapter)
 	def raw(self, data):
 		raise NotImplementedError('')
+
+	# send data to process stdin
+	def stdin_write(self, data):
+		raise NotImplementedError('')
