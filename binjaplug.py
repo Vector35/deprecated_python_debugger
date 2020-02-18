@@ -18,7 +18,7 @@ except (ModuleNotFoundError, ImportError, IndexError) as e:
 	print("Could not initialize UI, using headless mode only")
 
 #------------------------------------------------------------------------------
-# globals
+# Globals
 #------------------------------------------------------------------------------
 
 def get_state(bv):
@@ -42,7 +42,7 @@ def delete_state(bv):
 			return
 
 #------------------------------------------------------------------------------
-# HELPER CLASSES
+# Helper Classes
 #------------------------------------------------------------------------------
 
 class DebuggerRegisters:
@@ -128,7 +128,7 @@ class DebuggerState:
 			self.ui = None
 
 	#--------------------------------------------------------------------------
-	# SUPPORT FUNCTIONS (HIGHER LEVEL)
+	# Convenience Functions
 	#--------------------------------------------------------------------------
 
 	@property
@@ -218,12 +218,22 @@ class DebuggerState:
 		else:
 			raise NotImplementedError('only x86_64 so far')
 
+	#--------------------------------------------------------------------------
+	# I/O Handling
+	#--------------------------------------------------------------------------
+
 	def on_stdout(self, output):
-		# TODO: Send to debugger console when stdin is working
-		print(output)
+		if self.ui is not None:
+			self.ui.on_stdout(output)
+		else:
+			print(output)
+
+	def send_console_input(self, text):
+		assert self.adapter
+		self.adapter.stdin_write(text)
 
 	#--------------------------------------------------------------------------
-	# DEBUGGER FUNCTIONS (MEDIUM LEVEL, BLOCKING)
+	# Debugger Functions (Blocking)
 	#--------------------------------------------------------------------------
 
 	def run(self):

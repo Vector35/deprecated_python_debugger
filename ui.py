@@ -275,6 +275,10 @@ class DebuggerUI:
 				for tag in delqueue:
 					func.remove_user_address_tag(local_address, tag)
 
+	def on_stdout(self, output):
+		console_widget = self.widget('Debugger Console')
+		console_widget.notifyStdout(output)
+
 #------------------------------------------------------------------------------
 # right click plugin
 #------------------------------------------------------------------------------
@@ -425,8 +429,7 @@ def initialize_ui():
 	widget.register_dockwidget(ThreadsWidget.DebugThreadsWidget, "Threads", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 	widget.register_dockwidget(StackWidget.DebugStackWidget, "Stack", Qt.LeftDockWidgetArea, Qt.Vertical, False)
 	widget.register_dockwidget(ModulesWidget.DebugModulesWidget, "Modules", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
-	# TODO: Needs adapter support
-	# widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
+	widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 
 	PluginCommand.register_for_address("Debugger\\Toggle Breakpoint", "sets/clears breakpoint at right-clicked address", cb_bp_toggle, is_valid=valid_bp_toggle)
 

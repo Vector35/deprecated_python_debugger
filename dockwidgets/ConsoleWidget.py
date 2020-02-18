@@ -1,6 +1,7 @@
 from PySide2 import QtCore
 from PySide2.QtCore import Qt, QSize
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QTextEdit
+from PySide2.QtGui import QTextCursor
 import binaryninja
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, getMonospaceFont
 
@@ -21,6 +22,7 @@ class DebugConsoleWidget(QWidget, DockContextHandler):
 		layout = QVBoxLayout()
 		self.consoleText = QTextEdit(self)
 		self.consoleText.setReadOnly(True)
+		self.consoleText.setFont(getMonospaceFont(self))
 		layout.addWidget(self.consoleText, 1)
 
 		inputLayout = QHBoxLayout()
@@ -34,12 +36,12 @@ class DebugConsoleWidget(QWidget, DockContextHandler):
 		self.consoleEntry = QLineEdit(self)
 		inputLayout.addWidget(self.consoleEntry, 1)
 
-		label = QLabel("lldb>>> ", self)
+		label = QLabel("dbg>>> ", self)
 		label.setFont(getMonospaceFont(self))
 		promptLayout.addWidget(label)
 		promptLayout.addStretch(1)
 
-		self.consoleEntry.returnPressed.connect(lambda: self.consoleText.append("TODO"))
+		self.consoleEntry.returnPressed.connect(lambda: self.sendLine())
 
 		layout.addLayout(inputLayout)
 		layout.setContentsMargins(0, 0, 0, 0)
@@ -48,6 +50,25 @@ class DebugConsoleWidget(QWidget, DockContextHandler):
 
 	def sizeHint(self):
 		return QSize(300, 100)
+
+	def sendLine(self):
+		line = self.consoleEntry.text()
+		self.consoleEntry.setText("")
+
+		debug_state = binjaplug.get_state(self.bv)
+		try:
+			debug_state.send_console_input(line)
+		except Exception as e:
+			self.notifyStdout("Error sending input: {} {}\n".format(type(e).__name__, ' '.join(e.args)))
+
+	def notifyStdout(self, line):
+		self.consoleText.insertPlainText(line)
+
+		# Scroll down
+		cursor = self.consoleText.textCursor()
+		cursor.clearSelection()
+		cursor.movePosition(QTextCursor.End)
+		self.consoleText.setTextCursor(cursor)
 
 	#--------------------------------------------------------------------------
 	# callbacks to us api/ui/dockhandler.h
