@@ -174,7 +174,7 @@ class DebuggerBreakpoints:
 			self.state.bv.store_metadata('debugger.breakpoints', self.breakpoints)
 
 			if self.state.adapter is not None:
-				remote_address = self.state.bv.start + offset
+				remote_address = self.state.modules[module] + offset
 				return self.state.adapter.breakpoint_set(remote_address)
 			else:
 				return True
