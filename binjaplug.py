@@ -123,6 +123,19 @@ class DebuggerModules:
 		return (closest_modpath, closest_modaddr)
 
 
+'''
+Breakpoints are stored inside this helper class, in the format (module, offset).
+Storing like this allows us to persist breakpoints even with ASLR changing module bases.
+The downside is that, currently, getting the list of modules+bases is very slow.
+
+To use this class, first figure out what data you have / state you're in:
+- If you want to set a breakpoint at a module-offset pair, use the xxx_offset functions
+- If you want to use a remote address, the debugger MUST be running. Then, use the
+  various xxx_absolute functions with your address. This class will automatically
+  translate your address into a module-offset pair internally
+- If you are not debugging and want to use a remote address, translate it into a
+  module-offset pair yourself first.
+'''
 class DebuggerBreakpoints:
 	def __init__(self, state, initial=[]):
 		self.state = state
@@ -132,6 +145,11 @@ class DebuggerBreakpoints:
 		for bp in self.breakpoints:
 			yield (bp['module'], bp['offset'])
 
+	'''
+	Add a breakpoint at a given remote address in the running process and save to metadata
+	Requires that the debugger be running.
+	Will set the breakpoint immediately on the debugger.
+	'''
 	def add_absolute(self, remote_address):
 		assert self.state.adapter is not None
 
@@ -145,6 +163,10 @@ class DebuggerBreakpoints:
 			return self.state.adapter.breakpoint_set(remote_address)
 		return False
 
+	'''
+	Add a breakpoint at a given module/offset and save to metadata.
+	If the debugger is running, will set the breakpoint immediately.
+	'''
 	def add_offset(self, module, offset):
 		info = {'module': module, 'offset': offset}
 		if info not in self.breakpoints:
@@ -159,6 +181,11 @@ class DebuggerBreakpoints:
 
 		return False
 
+	'''
+	Unset a breakpoint at a given remote address in the running process and save to metadata
+	Requires that the debugger be running.
+	Will unset the breakpoint immediately on the debugger.
+	'''
 	def remove_absolute(self, remote_address):
 		assert self.state.adapter is not None
 
@@ -172,6 +199,10 @@ class DebuggerBreakpoints:
 			return self.state.adapter.breakpoint_clear(remote_address)
 		return False
 
+	'''
+	Unset a breakpoint at a given module/offset and save to metadata.
+	If the debugger is running, will unset the breakpoint immediately.
+	'''
 	def remove_offset(self, module, offset):
 		info = {'module': module, 'offset': offset}
 		if info in self.breakpoints:
@@ -186,6 +217,10 @@ class DebuggerBreakpoints:
 
 		return False
 
+	'''
+	Determine if a given remote address has a breakpoint set.
+	Requires that the debugger be running.
+	'''
 	def contains_absolute(self, remote_address):
 		assert self.state.adapter is not None
 
@@ -195,10 +230,18 @@ class DebuggerBreakpoints:
 		info = {'module': module, 'offset': relative_address}
 		return info in self.breakpoints
 
+	'''
+	Determine if a given module/offset has a breakpoint set.
+	'''
 	def contains_offset(self, module, offset):
 		info = {'module': module, 'offset': offset}
 		return info in self.breakpoints
 
+	'''
+	Set all saved breakpoints on the running debugger.
+	Requires that the debugger be running.
+	This method is used when starting the debugger or a new module is loaded (TODO)
+	'''
 	def apply(self):
 		assert self.state.adapter is not None
 
@@ -654,6 +697,11 @@ class DebuggerState:
 			print("Can't find current function")
 			return (None, None)
 
+	'''
+	Add a breakpoint at a given remote address in the running process and save to metadata
+	Requires that the debugger be running.
+	Will set the breakpoint immediately on the debugger.
+	'''
 	def breakpoint_set_absolute(self, remote_address):
 		assert self.adapter is not None
 		self.breakpoints.add_absolute(remote_address)
@@ -664,16 +712,10 @@ class DebuggerState:
 
 		return True
 
-	def breakpoint_clear_absolute(self, remote_address):
-		assert self.adapter is not None
-		# find/remove address tag
-		if self.breakpoints.contains_absolute(remote_address):
-			self.breakpoints.remove_absolute(remote_address)
-
-			if self.ui is not None:
-				self.ui.update_highlights()
-				self.ui.update_breakpoints()
-
+	'''
+	Add a breakpoint at a given module/offset and save to metadata.
+	If the debugger is running, will set the breakpoint immediately.
+	'''
 	def breakpoint_set_offset(self, module, offset):
 		self.breakpoints.add_offset(module, offset)
 
@@ -686,6 +728,25 @@ class DebuggerState:
 
 		return True
 
+	'''
+	Unset a breakpoint at a given remote address in the running process and save to metadata
+	Requires that the debugger be running.
+	Will unset the breakpoint immediately on the debugger.
+	'''
+	def breakpoint_clear_absolute(self, remote_address):
+		assert self.adapter is not None
+		# find/remove address tag
+		if self.breakpoints.contains_absolute(remote_address):
+			self.breakpoints.remove_absolute(remote_address)
+
+			if self.ui is not None:
+				self.ui.update_highlights()
+				self.ui.update_breakpoints()
+
+	'''
+	Unset a breakpoint at a given module/offset and save to metadata.
+	If the debugger is running, will unset the breakpoint immediately.
+	'''
 	def breakpoint_clear_offset(self, module, offset):
 		# find/remove address tag
 		if self.breakpoints.contains_offset(module, offset):
