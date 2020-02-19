@@ -269,15 +269,19 @@ class DebuggerState:
 		self.memory_view = ProcessView.DebugProcessView(bv)
 		self.old_symbols = []
 		self.old_dvs = set()
-		try:
-			self.command_line_args = bv.query_metadata('debugger.command_line_args')
-		except:
-			self.command_line_args = []
 
-		try:
-			initial_bps = bv.query_metadata('debugger.breakpoints')
-		except:
-			initial_bps = []
+		def get_metadata(key, default):
+			try:
+				return bv.query_metadata(key)
+			except:
+				return default
+
+		self.command_line_args = get_metadata('debugger.command_line_args', [])
+		initial_bps = get_metadata('debugger.breakpoints', [])
+
+		self.adapter_type = list(DebugAdapter.ADAPTER_TYPE)[get_metadata('debugger.adapter_type', DebugAdapter.ADAPTER_TYPE.DEFAULT.value)]
+		self.remote_host = get_metadata('debugger.remote_host', 'localhost')
+		self.remote_port = get_metadata('debugger.remote_port', 31337)
 
 		# Convenience
 		self.registers = DebuggerRegisters(self)
@@ -414,8 +418,14 @@ class DebuggerState:
 		if not os.path.exists(fpath):
 			raise Exception('cannot find debug target: ' + fpath)
 
-		self.adapter = DebugAdapter.get_adapter_for_current_system(stdout=self.on_stdout)
-		self.adapter.exec(fpath, self.command_line_args)
+		self.adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
+
+		if DebugAdapter.ADAPTER_TYPE.use_exec(self.adapter_type):
+			self.adapter.exec(fpath, self.command_line_args)
+		elif DebugAdapter.ADAPTER_TYPE.use_connect(self.adapter_type):
+			self.adapter.connect(self.remote_host, self.remote_port)
+		else:
+			raise Exception("don't know how to connect to adapter of type %s" % self.adapter_type)
 
 		self.memory_view.update_base()
 		self.breakpoints.apply()

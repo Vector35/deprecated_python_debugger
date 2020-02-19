@@ -8,6 +8,33 @@ class BreakpointClearError(Exception):
 class BreakpointSetError(Exception):
 	pass
 
+@unique
+class ADAPTER_TYPE(Enum):
+	DEFAULT = 0
+	LOCAL_DBGENG = auto()
+	LOCAL_GDB = auto()
+	LOCAL_LLDB = auto()
+	REMOTE_DBGENG = auto()
+	REMOTE_GDB = auto()
+	REMOTE_LLDB = auto()
+
+	@staticmethod
+	def use_exec(adapter_type):
+		return adapter_type in [
+			ADAPTER_TYPE.DEFAULT,
+			ADAPTER_TYPE.LOCAL_DBGENG,
+			ADAPTER_TYPE.LOCAL_GDB,
+			ADAPTER_TYPE.LOCAL_LLDB
+		]
+
+	@staticmethod
+	def use_connect(adapter_type):
+		return adapter_type in [
+			ADAPTER_TYPE.REMOTE_DBGENG,
+			ADAPTER_TYPE.REMOTE_GDB,
+			ADAPTER_TYPE.REMOTE_LLDB
+		]
+
 def get_adapter_for_current_system(**kwargs):
 	from . import dbgeng, gdb, lldb
 
@@ -21,6 +48,20 @@ def get_adapter_for_current_system(**kwargs):
 		return lldb.DebugAdapterLLDB(**kwargs)
 	else:
 		raise Exception('unsupported system: %s' % system)
+
+def get_new_adapter(adapter_type = ADAPTER_TYPE.DEFAULT, **kwargs):
+	from . import dbgeng, gdb, lldb
+
+	if adapter_type == ADAPTER_TYPE.LOCAL_DBGENG or adapter_type == ADAPTER_TYPE.REMOTE_DBGENG:
+		return dbgeng.DebugAdapterDbgeng(**kwargs)
+	elif adapter_type == ADAPTER_TYPE.LOCAL_GDB or adapter_type == ADAPTER_TYPE.REMOTE_GDB:
+		return gdb.DebugAdapterGdb(**kwargs)
+	elif adapter_type == ADAPTER_TYPE.LOCAL_LLDB or adapter_type == ADAPTER_TYPE.REMOTE_LLDB:
+		return lldb.DebugAdapterLLDB(**kwargs)
+	elif adapter.type == ADAPTER_TYPE.DEFAULT:
+		return get_adapter_for_current_system(**kwargs)
+	else:
+		raise Exception('unsupported adapter type: %s' % adapter_type)
 
 @unique
 class STOP_REASON(Enum):
