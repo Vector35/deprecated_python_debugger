@@ -22,6 +22,10 @@ except (ModuleNotFoundError, ImportError, IndexError) as e:
 #------------------------------------------------------------------------------
 
 def get_state(bv):
+	# TODO: Better way of determining this
+	if 'Memory' in bv.sections:
+		bv = bv.parent_view.parent_view
+
 	# Try to find an existing state object
 	for state in DebuggerState.states:
 		if state.bv == bv:
@@ -76,8 +80,8 @@ class DebuggerThreads:
 	def __iter__(self):
 		if self.state.adapter is None:
 			return None
-		for id in self.state.adapter.thread_list():
-			yield id
+		for tid in self.state.adapter.thread_list():
+			yield tid
 
 	def __repr__(self):
 		return '<debugger threads for {}>'.format(self.state.adapter)
@@ -86,15 +90,123 @@ class DebuggerThreads:
 class DebuggerModules:
 	def __init__(self, state):
 		self.state = state
+		self.mark_dirty()
+
+	def mark_dirty(self):
+		self.module_cache = None
 
 	def __iter__(self):
 		if self.state.adapter is None:
 			return None
-		for module in self.state.adapter.mem_modules():
+		if self.module_cache is None:
+			self.module_cache = self.state.adapter.mem_modules().items()
+		for module in self.module_cache:
 			yield module
+
+	def __getitem__(self, item):
+		for (modpath, modaddr) in self:
+			if modpath == item:
+				return modaddr
+		return None
 
 	def __repr__(self):
 		return '<debugger modules for {}>'.format(self.state.adapter)
+
+	def get_module_for_addr(self, remote_address):
+		# TODO: Compare loaded segments
+		closest_modaddr = 0
+		closest_modpath = ""
+		for (modpath, modaddr) in self:
+			if modaddr < remote_address and modaddr > closest_modaddr:
+				closest_modaddr = modaddr
+				closest_modpath = modpath
+		return (closest_modpath, closest_modaddr)
+
+
+class DebuggerBreakpoints:
+	def __init__(self, state, initial=[]):
+		self.state = state
+		self.breakpoints = initial
+
+	def __iter__(self):
+		for bp in self.breakpoints:
+			yield (bp['module'], bp['offset'])
+
+	def add_absolute(self, remote_address):
+		assert self.state.adapter is not None
+
+		(module, modstart) = self.state.modules.get_module_for_addr(remote_address)
+		relative_address = remote_address - modstart
+
+		info = {'module': module, 'offset': relative_address}
+		if info not in self.breakpoints:
+			self.breakpoints.append(info)
+			self.state.bv.store_metadata('debugger.breakpoints', self.breakpoints)
+			return self.state.adapter.breakpoint_set(remote_address)
+		return False
+
+	def add_offset(self, module, offset):
+		info = {'module': module, 'offset': offset}
+		if info not in self.breakpoints:
+			self.breakpoints.append(info)
+			self.state.bv.store_metadata('debugger.breakpoints', self.breakpoints)
+
+			if self.state.adapter is not None:
+				remote_address = self.state.bv.start + offset
+				return self.state.adapter.breakpoint_set(remote_address)
+			else:
+				return True
+
+		return False
+
+	def remove_absolute(self, remote_address):
+		assert self.state.adapter is not None
+
+		(module, modstart) = self.state.modules.get_module_for_addr(remote_address)
+		relative_address = remote_address - modstart
+
+		info = {'module': module, 'offset': relative_address}
+		if info in self.breakpoints:
+			self.breakpoints.remove(info)
+			self.state.bv.store_metadata('debugger.breakpoints', self.breakpoints)
+			return self.state.adapter.breakpoint_clear(remote_address)
+		return False
+
+	def remove_offset(self, module, offset):
+		info = {'module': module, 'offset': offset}
+		if info in self.breakpoints:
+			self.breakpoints.remove(info)
+			self.state.bv.store_metadata('debugger.breakpoints', self.breakpoints)
+
+			if self.state.adapter is not None:
+				remote_address = self.state.bv.start + offset
+				return self.state.adapter.breakpoint_clear(remote_address)
+			else:
+				return True
+
+		return False
+
+	def contains_absolute(self, remote_address):
+		assert self.state.adapter is not None
+
+		(module, modstart) = self.state.modules.get_module_for_addr(remote_address)
+		relative_address = remote_address - modstart
+
+		info = {'module': module, 'offset': relative_address}
+		return info in self.breakpoints
+
+	def contains_offset(self, module, offset):
+		info = {'module': module, 'offset': offset}
+		return info in self.breakpoints
+
+	def apply(self):
+		assert self.state.adapter is not None
+
+		remote_breakpoints = self.state.adapter.breakpoint_list()
+		for bp in self.breakpoints:
+			remote_address = self.state.modules[bp['module']] + bp['offset']
+			if remote_address not in remote_breakpoints:
+				self.state.adapter.breakpoint_set(remote_address)
 
 
 #------------------------------------------------------------------------------
@@ -111,7 +223,6 @@ class DebuggerState:
 		self.adapter = None
 		self.state = 'INACTIVE'
 		# address -> adapter id
-		self.breakpoints = {}
 		self.memory_view = ProcessView.DebugProcessView(bv)
 		self.old_symbols = []
 		self.old_dvs = set()
@@ -120,10 +231,21 @@ class DebuggerState:
 		except:
 			self.command_line_args = []
 
+		try:
+			initial_bps = bv.query_metadata('debugger.breakpoints')
+		except:
+			initial_bps = []
+
 		# Convenience
 		self.registers = DebuggerRegisters(self)
 		self.threads = DebuggerThreads(self)
 		self.modules = DebuggerModules(self)
+		self.breakpoints = DebuggerBreakpoints(self, initial_bps)
+
+		if self.bv and self.bv.entry_point:
+			local_entry_offset = self.bv.entry_point - self.bv.start
+			if not self.breakpoints.contains_offset(self.bv.file.original_filename, local_entry_offset):
+				self.breakpoint_set_offset(self.bv.file.original_filename, local_entry_offset)
 
 		if have_ui:
 			self.ui = ui.DebuggerUI(self)
@@ -159,6 +281,7 @@ class DebuggerState:
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):
 		self.memory_view.mark_dirty()
+		self.modules.mark_dirty()
 
 	# Create symbols and variables for the memory view
 	def update_memory_view(self):
@@ -249,11 +372,7 @@ class DebuggerState:
 		self.adapter.exec(fpath, self.command_line_args)
 
 		self.memory_view.update_base()
-
-		if self.bv and self.bv.entry_point:
-			local_entry = self.bv.entry_point
-			remote_entry = self.memory_view.local_addr_to_remote(local_entry)
-			self.breakpoint_set(remote_entry)
+		self.breakpoints.apply()
 		self.memory_dirty()
 
 	def quit(self):
@@ -301,8 +420,7 @@ class DebuggerState:
 			raise Exception('missing adapter')
 
 		remote_rip = self.ip
-		local_rip = self.memory_view.remote_addr_to_local(remote_rip)
-		bphere = local_rip in self.breakpoints
+		bphere = self.breakpoints.contains_absolute(remote_rip)
 
 		seq = []
 		if bphere:
@@ -335,15 +453,13 @@ class DebuggerState:
 		# then clean up
 
 		remote_rip = self.ip
-		local_rip = self.memory_view.remote_addr_to_local(remote_rip)
-		local_addresses = [self.memory_view.remote_addr_to_local(addr) for addr in remote_addresses]
 
 		seq = []
-		for (local_address, remote_address) in zip(local_addresses, remote_addresses):
-			if local_address not in self.breakpoints:
+		for remote_address in remote_addresses:
+			if not self.breakpoints.contains_absolute(remote_address):
 				seq.append((self.adapter.breakpoint_set, (remote_address,)))
 
-		if local_rip in self.breakpoints:
+		if self.breakpoints.contains_absolute(remote_rip):
 			# Clear the breakpoint and step once (past the breakpoint)
 			# Then re-set it in case we loop and hit it again
 			seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
@@ -353,8 +469,8 @@ class DebuggerState:
 		else:
 			seq.append((self.adapter.go, ()))
 
-		for (local_address, remote_address) in zip(local_addresses, remote_addresses):
-			if local_address not in self.breakpoints:
+		for remote_address in remote_addresses:
+			if not self.breakpoints.contains_absolute(remote_address):
 				seq.append((self.adapter.breakpoint_clear, (remote_address,)))
 		# TODO: Cancel (and raise some exception)
 		result = self.exec_adapter_sequence(seq)
@@ -367,7 +483,6 @@ class DebuggerState:
 			raise Exception('missing adapter')
 
 		remote_rip = self.ip
-		local_rip = self.memory_view.remote_addr_to_local(remote_rip)
 
 		# Cannot IL step through non-analyzed code
 		if not self.memory_view.is_local_addr(remote_rip):
@@ -379,7 +494,7 @@ class DebuggerState:
 			# at current rip
 
 			seq = []
-			if local_rip in self.breakpoints:
+			if self.breakpoints.contains_absolute(remote_rip):
 				seq.append((self.adapter.breakpoint_clear, (remote_rip,)))
 				seq.append((self.adapter.step_into, ()))
 				seq.append((self.adapter.breakpoint_set, (remote_rip,)))
@@ -469,9 +584,6 @@ class DebuggerState:
 			if not call:
 				return self.step_into(il)
 
-			bphere = local_rip in self.breakpoints
-			bpnext = local_ripnext in self.breakpoints
-
 			return self.step_to([remote_ripnext])
 		else:
 			targets = []
@@ -532,8 +644,6 @@ class DebuggerState:
 		if len(funcs) != 0:
 			mlil = funcs[0].mlil
 
-			bphere = local_rip in self.breakpoints
-
 			# Set a bp on every ret in the function and go
 			rets = set()
 			for insn in mlil.instructions:
@@ -544,49 +654,50 @@ class DebuggerState:
 			print("Can't find current function")
 			return (None, None)
 
-	def breakpoint_set(self, remote_address):
-		if not self.adapter:
-			raise Exception('missing adapter')
+	def breakpoint_set_absolute(self, remote_address):
+		assert self.adapter is not None
+		self.breakpoints.add_absolute(remote_address)
 
-		self.adapter.breakpoint_set(remote_address)
-		local_address = self.memory_view.remote_addr_to_local(remote_address)
-
-		# save it
-		self.breakpoints[local_address] = True
-		#print('breakpoint address=0x%X (remote=0x%X) set' % (local_address, remote_address))
 		if self.ui is not None:
 			self.ui.update_highlights()
 			self.ui.update_breakpoints()
-			self.ui.breakpoint_tag_add(local_address)
 
 		return True
 
-	def breakpoint_clear(self, remote_address):
-		if not self.adapter:
-			raise Exception('missing adapter')
-
-		local_address = self.memory_view.remote_addr_to_local(remote_address)
-
+	def breakpoint_clear_absolute(self, remote_address):
+		assert self.adapter is not None
 		# find/remove address tag
-		if local_address in self.breakpoints:
-			# delete from adapter
-			if self.adapter.breakpoint_clear(remote_address) != None:
-				print('breakpoint address=0x%X (remote=0x%X) cleared' % (local_address, remote_address))
-			else:
-				print('ERROR: clearing breakpoint')
-
-			if self.ui is not None:
-				# delete breakpoint tags from all functions containing this address
-				self.ui.breakpoint_tag_del([local_address])
-
-			# delete from our list
-			del self.breakpoints[local_address]
+		if self.breakpoints.contains_absolute(remote_address):
+			self.breakpoints.remove_absolute(remote_address)
 
 			if self.ui is not None:
 				self.ui.update_highlights()
 				self.ui.update_breakpoints()
-		else:
-			print('ERROR: breakpoint not found in list')
+
+	def breakpoint_set_offset(self, module, offset):
+		self.breakpoints.add_offset(module, offset)
+
+		if self.ui is not None:
+			self.ui.update_highlights()
+			self.ui.update_breakpoints()
+
+			if module == self.bv.file.original_filename:
+				self.ui.breakpoint_tag_add(self.bv.start + offset)
+
+		return True
+
+	def breakpoint_clear_offset(self, module, offset):
+		# find/remove address tag
+		if self.breakpoints.contains_offset(module, offset):
+			if self.ui is not None and module == self.bv.file.original_filename:
+				# delete breakpoint tags from all functions containing this address
+				self.ui.breakpoint_tag_del([self.bv.start + offset])
+
+			self.breakpoints.remove_offset(module, offset)
+
+			if self.ui is not None:
+				self.ui.update_highlights()
+				self.ui.update_breakpoints()
 
 	# execute a sequence of adapter commands, capturing the return of the last
 	# blocking call

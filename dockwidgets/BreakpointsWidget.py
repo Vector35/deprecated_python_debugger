@@ -16,7 +16,7 @@ class DebugBreakpointsListModel(QAbstractItemModel):
 	def __init__(self, parent, bv):
 		QAbstractItemModel.__init__(self, parent)
 		self.bv = bv
-		self.columns = ["Enabled", "Address"]
+		self.columns = ["Enabled", "Location", "Remote Address"]
 		self.update_rows(None)
 
 	def update_rows(self, new_rows):
@@ -53,21 +53,21 @@ class DebugBreakpointsListModel(QAbstractItemModel):
 		if parent.isValid() or column > len(self.columns) or row >= len(self.rows):
 			return QModelIndex()
 		return self.createIndex(row, column)
-	
+
 	def parent(self, child):
 		return QModelIndex()
 
 	def hasChildren(self, parent):
 		return False
-	
+
 	def rowCount(self, parent):
 		if parent.isValid():
 			return 0
 		return len(self.rows)
-	
+
 	def columnCount(self, parent):
 		return len(self.columns)
-	
+
 	def headerData(self, section, orientation, role):
 		if role != Qt.DisplayRole:
 			return None
@@ -86,9 +86,11 @@ class DebugBreakpointsListModel(QAbstractItemModel):
 		conts = self.rows[index.row()]
 
 		# Format data into displayable text
-		if index.column() == 1:
-			text = '0x%x' % conts['address']
-		else:
+		if self.columns[index.column()] == 'Location':
+			text = '%s+0x%x' % (conts['module'], conts['offset'])
+		elif self.columns[index.column()] == 'Remote Address':
+			text = '%x' % conts['address']
+		elif self.columns[index.column()] == 'Enabled':
 			text = str(conts['enabled'])
 		return text
 
@@ -96,7 +98,7 @@ class DebugBreakpointsListModel(QAbstractItemModel):
 class DebugBreakpointsItemDelegate(QItemDelegate):
 	def __init__(self, parent):
 		QItemDelegate.__init__(self, parent)
-		
+
 		self.font = binaryninjaui.getMonospaceFont(parent)
 		self.font.setKerning(False)
 		self.baseline = QFontMetricsF(self.font).ascent()
@@ -104,8 +106,8 @@ class DebugBreakpointsItemDelegate(QItemDelegate):
 		self.char_height = QFontMetricsF(self.font).height()
 		self.char_offset = binaryninjaui.getFontVerticalOffset()
 
-		self.expected_char_widths = [10, 20]
-	
+		self.expected_char_widths = [10, 20, 20]
+
 	"""
 	virtual QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& idx) const override;
 	"""
@@ -126,6 +128,10 @@ class DebugBreakpointsItemDelegate(QItemDelegate):
 		painter.drawRect(option.rect)
 
 		text = idx.data()
+		max_width = option.rect.width() // self.char_width
+		if len(text) > max_width:
+			text = text[:max_width - 1] + '…'
+
 		# Draw text
 		painter.setFont(self.font)
 		painter.setPen(option.palette.color(QPalette.WindowText).rgba())
@@ -138,7 +144,7 @@ class DebugBreakpointsWidget(QWidget, DockContextHandler):
 			raise Exception('expected widget data to be a BinaryView')
 
 		self.bv = data
-		
+
 		QWidget.__init__(self, parent)
 		DockContextHandler.__init__(self, self, name)
 		self.actionHandler = UIActionHandler()

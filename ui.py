@@ -13,6 +13,11 @@ class DebuggerUI:
 		self.debug_view = None
 		self.last_ip = 0
 
+		# Initial view data
+		self.context_display()
+		self.update_highlights()
+		self.update_breakpoints()
+
 	def widget(self, name):
 		return widget.get_dockwidget(self.state.bv, name)
 
@@ -27,7 +32,8 @@ class DebuggerUI:
 			registers_widget.notifyRegistersChanged([])
 			modules_widget.notifyModulesChanged([])
 			threads_widget.notifyThreadsChanged([])
-			self.debug_view.controls.set_thread_list([])
+			if self.debug_view is not None:
+				self.debug_view.controls.set_thread_list([])
 			stack_widget.notifyStackChanged([])
 			self.memory_dirty()
 			return
@@ -74,7 +80,8 @@ class DebuggerUI:
 		if last_thread != tid_selected:
 			self.state.adapter.thread_select(tid_selected)
 		threads_widget.notifyThreadsChanged(threads)
-		self.debug_view.controls.set_thread_list(threads)
+		if self.debug_view is not None:
+			self.debug_view.controls.set_thread_list(threads)
 
 		#----------------------------------------------------------------------
 		# Update Stack
@@ -133,14 +140,15 @@ class DebuggerUI:
 		self.update_highlights()
 		self.last_ip = local_rip
 
-		# select instruction currently at
-		if self.state.bv.read(local_rip, 1) and len(self.state.bv.get_functions_containing(local_rip)) > 0:
-			self.debug_view.setRawDisassembly(False)
-			self.state.bv.navigate(self.state.bv.file.view, local_rip)
-			self.debug_view.controls.state_stopped()
-		else:
-			self.update_raw_disassembly()
-			self.debug_view.controls.state_stopped_extern()
+		if self.debug_view is not None:
+			# select instruction currently at
+			if self.state.bv.read(local_rip, 1) and len(self.state.bv.get_functions_containing(local_rip)) > 0:
+				self.debug_view.setRawDisassembly(False)
+				self.state.bv.navigate(self.state.bv.file.view, local_rip)
+				self.debug_view.controls.state_stopped()
+			else:
+				self.update_raw_disassembly()
+				self.debug_view.controls.state_stopped_extern()
 
 	# Highlight lines
 	def update_highlights(self):
@@ -148,7 +156,10 @@ class DebuggerUI:
 		for func in self.state.bv.get_functions_containing(self.last_ip):
 			func.set_auto_instr_highlight(self.last_ip, HighlightStandardColor.NoHighlightColor)
 
-		for bp in self.state.breakpoints:
+		for (module, offset) in self.state.breakpoints:
+			if module != self.state.bv.file.original_filename:
+				continue
+			bp = self.state.bv.start + offset
 			for func in self.state.bv.get_functions_containing(bp):
 				func.set_auto_instr_highlight(bp, HighlightStandardColor.RedHighlightColor)
 
@@ -172,6 +183,9 @@ class DebuggerUI:
 		modules_widget.notifyModulesChanged(mods)
 
 	def update_raw_disassembly(self):
+		if self.debug_view is None:
+			return
+
 		# Read a few instructions from rip and disassemble them
 		inst_count = 50
 
@@ -202,7 +216,7 @@ class DebuggerUI:
 			tokens = []
 			color = HighlightStandardColor.NoHighlightColor
 			if i == 0:
-				if (rip + total_read) in self.state.breakpoints:
+				if self.state.breakpoints.contains_absolute(rip + total_read):
 					# Breakpoint & pc
 					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.state.bv.tag_types["Crashes"].icon + ">", width=5))
 					color = HighlightStandardColor.RedHighlightColor
@@ -211,7 +225,7 @@ class DebuggerUI:
 					tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, " ==> "))
 					color = HighlightStandardColor.BlueHighlightColor
 			else:
-				if (rip + total_read) in self.state.breakpoints:
+				if self.state.breakpoints.contains_absolute(rip + total_read):
 					# Breakpoint
 					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.state.bv.tag_types["Crashes"].icon, width=5))
 					color = HighlightStandardColor.RedHighlightColor
@@ -240,14 +254,25 @@ class DebuggerUI:
 
 	def update_breakpoints(self):
 		bps = []
-		if self.state.adapter is not None:
-			for remote_bp in self.state.adapter.breakpoint_list():
-				local_bp = self.state.memory_view.remote_addr_to_local(remote_bp)
-				if local_bp in self.state.breakpoints.keys():
-					bps.append({
-						'enabled': self.state.breakpoints[local_bp],
-						'address': local_bp
-					})
+		if self.state.adapter is None:
+			remote_list = []
+		else:
+			remote_list = self.state.adapter.breakpoint_list()
+
+		for (module, offset) in self.state.breakpoints:
+			if self.state.adapter is None:
+				address = 0
+				enabled = False
+			else:
+				address = self.state.modules[module] + offset
+				enabled = address in remote_list
+
+			bps.append({
+				'enabled': enabled,
+				'offset': offset,
+				'module': module,
+				'address': address
+			})
 
 		bp_widget = self.widget("Breakpoints")
 		bp_widget.notifyBreakpointsChanged(bps)
@@ -265,7 +290,7 @@ class DebuggerUI:
 	#
 	def breakpoint_tag_del(self, local_addresses=None):
 		if local_addresses == None:
-			local_addresses = [self.state.memory_view.local_addr_to_remote(addr) for addr in self.state.breakpoints]
+			local_addresses = [self.state.bv.start + offset for (module, offset) in self.state.breakpoints if module == self.state.bv.file.original_filename]
 
 		for local_address in local_addresses:
 			# delete breakpoint tags from all functions containing this address
@@ -285,18 +310,31 @@ class DebuggerUI:
 # right click plugin
 #------------------------------------------------------------------------------
 
-def cb_bp_toggle(bv, local_address):
+def cb_bp_toggle(bv, address):
+	is_debug_view = False
+	# TODO: Better way of determining this
+	if 'Memory' in bv.sections:
+		is_debug_view = True
+		bv = bv.parent_view.parent_view
+		print("Detected debug view, using {} instead".format(bv))
+
 	debug_state = binjaplug.get_state(bv)
-	remote_address = debug_state.memory_view.local_addr_to_remote(local_address)
-	if local_address in debug_state.breakpoints:
-		debug_state.breakpoint_clear(remote_address)
+	if is_debug_view:
+		if debug_state.breakpoints.contains_absolute(address):
+			debug_state.breakpoint_clear_absolute(address)
+		else:
+			debug_state.breakpoint_set_absolute(address)
 	else:
-		debug_state.breakpoint_set(remote_address)
+		offset = address - bv.start
+		if debug_state.breakpoints.contains_offset(bv.file.original_filename, offset):
+			debug_state.breakpoint_clear_offset(bv.file.original_filename, offset)
+		else:
+			debug_state.breakpoint_set_offset(bv.file.original_filename, offset)
+	debug_state.ui.update_breakpoints()
 	debug_state.ui.context_display()
 
-def valid_bp_toggle(bv, local_address):
-	debug_state = binjaplug.get_state(bv)
-	return debug_state.adapter is not None
+def valid_bp_toggle(bv, address):
+	return True
 
 #------------------------------------------------------------------------------
 # Plugin actions for the various debugger controls

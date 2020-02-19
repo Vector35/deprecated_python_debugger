@@ -130,6 +130,7 @@ class DebugControlsWidget(QToolBar):
 			self.debug_state.run()
 			self.state_stopped()
 			self.debug_state.ui.context_display()
+			self.debug_state.ui.update_breakpoints()
 		except ConnectionRefusedError:
 			self.state_error('ERROR: Connection Refused')
 		except Exception as e:
@@ -309,11 +310,6 @@ class DebugControlsWidget(QToolBar):
 
 	def state_inactive(self, msg=None):
 		debug_state = binjaplug.get_state(self.bv)
-
-		# clear breakpoints
-		debug_state.ui.breakpoint_tag_del()
-		debug_state.breakpoints = {}
-
 		debug_state.state = 'INACTIVE'
 		self.editStatus.setText(msg or debug_state.state)
 		self.set_actions_enabled(Starting=True, Stopping=False, Stepping=False, Pause=False, Resume=False, Threads=False)
