@@ -285,15 +285,15 @@ class DebuggerState:
 		self.modules = DebuggerModules(self)
 		self.breakpoints = DebuggerBreakpoints(self, initial_bps)
 
-		if self.bv and self.bv.entry_point:
-			local_entry_offset = self.bv.entry_point - self.bv.start
-			if not self.breakpoints.contains_offset(self.bv.file.original_filename, local_entry_offset):
-				self.breakpoint_set_offset(self.bv.file.original_filename, local_entry_offset)
-
 		if have_ui:
 			self.ui = ui.DebuggerUI(self)
 		else:
 			self.ui = None
+
+		if self.bv and self.bv.entry_point:
+			local_entry_offset = self.bv.entry_point - self.bv.start
+			if not self.breakpoints.contains_offset(self.bv.file.original_filename, local_entry_offset):
+				self.breakpoint_set_offset(self.bv.file.original_filename, local_entry_offset)
 
 	#--------------------------------------------------------------------------
 	# Convenience Functions
