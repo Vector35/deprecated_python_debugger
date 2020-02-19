@@ -3,7 +3,7 @@ import re
 import time
 
 import binaryninja
-from binaryninja import Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation
+from binaryninja import BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation
 
 from . import DebugAdapter, ProcessView
 
@@ -115,7 +115,10 @@ class DebuggerState:
 		self.memory_view = ProcessView.DebugProcessView(bv)
 		self.old_symbols = []
 		self.old_dvs = set()
-		self.command_line_args = []
+		try:
+			self.command_line_args = bv.query_metadata('debugger.command_line_args')
+		except:
+			self.command_line_args = []
 
 		# Convenience
 		self.registers = DebuggerRegisters(self)

@@ -88,6 +88,7 @@ class AdapterSettingsDialog(QDialog):
 		debug_state = binjaplug.get_state(self.bv)
 		arguments = shlex.split(self.argumentsEntry.text())
 		debug_state.command_line_args = arguments
+		self.bv.store_metadata('debugger.command_line_args', arguments)
 
 	def updateArguments(self):
 		try:
