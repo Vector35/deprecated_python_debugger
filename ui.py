@@ -321,15 +321,17 @@ def cb_bp_toggle(bv, address):
 	debug_state = binjaplug.get_state(bv)
 	if is_debug_view:
 		if debug_state.breakpoints.contains_absolute(address):
-			debug_state.breakpoint_clear_absolute(address)
+			debug_state.breakpoints.remove_absolute(address)
 		else:
-			debug_state.breakpoint_set_absolute(address)
+			debug_state.breakpoints.add_absolute(address)
 	else:
 		offset = address - bv.start
 		if debug_state.breakpoints.contains_offset(bv.file.original_filename, offset):
-			debug_state.breakpoint_clear_offset(bv.file.original_filename, offset)
+			debug_state.ui.breakpoint_tag_del([address])
+			debug_state.breakpoints.remove_offset(bv.file.original_filename, offset)
 		else:
-			debug_state.breakpoint_set_offset(bv.file.original_filename, offset)
+			debug_state.breakpoints.add_offset(bv.file.original_filename, offset)
+			debug_state.ui.breakpoint_tag_add(address)
 	debug_state.ui.update_breakpoints()
 	debug_state.ui.context_display()
 

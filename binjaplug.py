@@ -293,7 +293,10 @@ class DebuggerState:
 		if self.bv and self.bv.entry_point:
 			local_entry_offset = self.bv.entry_point - self.bv.start
 			if not self.breakpoints.contains_offset(self.bv.file.original_filename, local_entry_offset):
-				self.breakpoint_set_offset(self.bv.file.original_filename, local_entry_offset)
+				self.breakpoints.add_offset(self.bv.file.original_filename, local_entry_offset)
+				if self.ui is not None:
+					self.ui.breakpoint_tag_add(self.bv.entry_point)
+					self.ui.update_breakpoints()
 
 	#--------------------------------------------------------------------------
 	# Convenience Functions
@@ -696,69 +699,6 @@ class DebuggerState:
 		else:
 			print("Can't find current function")
 			return (None, None)
-
-	'''
-	Add a breakpoint at a given remote address in the running process and save to metadata
-	Requires that the debugger be running.
-	Will set the breakpoint immediately on the debugger.
-	'''
-	def breakpoint_set_absolute(self, remote_address):
-		assert self.adapter is not None
-		self.breakpoints.add_absolute(remote_address)
-
-		if self.ui is not None:
-			self.ui.update_highlights()
-			self.ui.update_breakpoints()
-
-		return True
-
-	'''
-	Add a breakpoint at a given module/offset and save to metadata.
-	If the debugger is running, will set the breakpoint immediately.
-	'''
-	def breakpoint_set_offset(self, module, offset):
-		self.breakpoints.add_offset(module, offset)
-
-		if self.ui is not None:
-			self.ui.update_highlights()
-			self.ui.update_breakpoints()
-
-			if module == self.bv.file.original_filename:
-				self.ui.breakpoint_tag_add(self.bv.start + offset)
-
-		return True
-
-	'''
-	Unset a breakpoint at a given remote address in the running process and save to metadata
-	Requires that the debugger be running.
-	Will unset the breakpoint immediately on the debugger.
-	'''
-	def breakpoint_clear_absolute(self, remote_address):
-		assert self.adapter is not None
-		# find/remove address tag
-		if self.breakpoints.contains_absolute(remote_address):
-			self.breakpoints.remove_absolute(remote_address)
-
-			if self.ui is not None:
-				self.ui.update_highlights()
-				self.ui.update_breakpoints()
-
-	'''
-	Unset a breakpoint at a given module/offset and save to metadata.
-	If the debugger is running, will unset the breakpoint immediately.
-	'''
-	def breakpoint_clear_offset(self, module, offset):
-		# find/remove address tag
-		if self.breakpoints.contains_offset(module, offset):
-			if self.ui is not None and module == self.bv.file.original_filename:
-				# delete breakpoint tags from all functions containing this address
-				self.ui.breakpoint_tag_del([self.bv.start + offset])
-
-			self.breakpoints.remove_offset(module, offset)
-
-			if self.ui is not None:
-				self.ui.update_highlights()
-				self.ui.update_breakpoints()
 
 	# execute a sequence of adapter commands, capturing the return of the last
 	# blocking call
