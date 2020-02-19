@@ -77,6 +77,14 @@ The various pieces of the plugin are organized under the `DebugState` class. Whe
 
 `DebugProcessView` provides two functions, `local_addr_to_remote` and `remote_addr_to_local` which will translate addresses for use in binaries that are compiled with Position Independent Code. **Local addresses** correspond to the loaded `BinaryView` analysis and **remote addresses** represent addresses in the debugged binary, which may be relocated in PIE executables.
 
+## Android
+
+Connect your local machine's 31337 to the phone's 31337 with `adb forward tcp:1337 tcp:1337`.
+
+Get gdbserver onto the phone. Mine came from the NDK, eg: `adb push ~/android-ndk-r17c/prebuilt/android-arm64/gdbserver /data/local/tmp`.
+
+Run gdbserver on the binary, telling it to listen on 31337, eg: `./gdbserver :31337 ./hello`.
+
 ## testing
 
 Enter ./testbins and, depending on your OS, execute:

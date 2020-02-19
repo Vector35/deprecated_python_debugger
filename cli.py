@@ -22,6 +22,7 @@ import debugger.DebugAdapter as DebugAdapter
 
 # globals
 arch = None
+arch_dis = None
 adapter = None
 context_last = {}
 
@@ -37,19 +38,43 @@ def context_display(pkt_T=None):
 	tid = adapter.thread_selected()
 	print('thread 0x%X:' % tid)
 
-	reg2val = {x:adapter.reg_read(x) for x in adapter.reg_list()}
-	for (reg,val) in reg2val.items():
-		bits2fmt = {8:'%02X', 16:'%04X', 32:'%08X', 64:'%016X', 128:'%032X'}
-		fmt = bits2fmt.get(adapter.reg_bits(reg), '%X')
-		print(('%s=0x'+fmt) % (reg, val))
+	def r(reg, fmt='%016X'):
+		return (BROWN+reg+NORMAL+'='+fmt) % adapter.reg_read(reg.strip())
 
-	pc_name = {'aarch64':'pc', 'x86_64':'rip', 'x86':'eip'}[arch]
-	pc = reg2val[pc_name]
+	if arch == 'x86_64':
+		print(r('rax'), r('rbx'), r('rcx'), r('rdx'))
+		print(r('rsi'), r('rdi'), r('rbp'), r('rsp'))
+		print(r(' r8'), r(' r9'), r('r10'), r('r11'))
+		print(r('r12'), r('r13'), r('r14'), r('r15'))
+		print(r('rip'), r('rflags'))
+	elif arch == 'x86':
+		print(r('eax'), r('ebx'), r('ecx'), r('edx'))
+		print(r('esi'), r('edi'), r('ebp'), r('esp'))
+		print(r('eip'), r('eflags'))
+	elif arch == 'aarch64':
+		print(r(' x0'), r(' x1'), r(' x2'), r(' x3'))
+		print(r(' x4'), r(' x5'), r(' x6'), r(' x7'))
+		print(r(' x8'), r(' x9'), r('x10'), r('x11'))
+		print(r('x12'), r('x13'), r('x14'), r('x15'))
+		print(r('x16'), r('x17'), r('x18'), r('x19'))
+		print(r('x20'), r('x21'), r('x22'), r('x23'))
+		print(r('x24'), r('x25'), r('x26'), r('x27'))
+		print(r('x28'), r('x29'), r('x30'), r(' sp'))
+		print(r('pc'), r('cpsr'))
+	elif arch == 'arm':
+		print(r(' r0'), r(' r1'), r(' r2'), r(' r3'))
+		print(r(' r4'), r(' r5'), r(' r6'), r(' r7'))
+		print(r(' r8'), r(' r9'), r('r10'), r('r11'))
+		print(r('r12'), r(' sp'), r(' lr'))
+		print(r(' pc'), r('cpsr'))
+
+	pc_name = {'aarch64':'pc', 'arm':'pc', 'x86_64':'rip', 'x86':'eip'}[arch]
+	pc = adapter.reg_read(pc_name)
 
 	try:
 		data = adapter.mem_read(pc, 16)
 		if data:
-			(asmstr, asmlen) = utils.disasm1(data, pc, arch)
+			(asmstr, asmlen) = utils.disasm1(data, pc, arch_dis)
 			print('%s%016X%s: %s\t%s' % \
 				(GREEN, pc, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
 	except DebugAdapter.GeneralError as e:
@@ -127,6 +152,7 @@ if __name__ == '__main__':
 		adapter.exec(arg1)
 
 	arch = adapter.architecture()
+	arch_dis = 'armv7' if arch=='arm' else arch
 
 	user_goal = 'debug'
 	while user_goal == 'debug':
@@ -195,7 +221,7 @@ if __name__ == '__main__':
 			elif text.startswith('u '):
 				addr = int(text[2:],16)
 				data = adapter.mem_read(addr, 32)
-				print(utils.disasm(data, addr))
+				print(utils.disasm(data, addr, arch_dis))
 			elif text == 'lm':
 				module2addr = adapter.mem_modules()
 				for module in sorted(module2addr, key=lambda m: module2addr[m]):

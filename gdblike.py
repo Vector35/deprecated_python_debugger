@@ -298,12 +298,11 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	#--------------------------------------------------------------------------
 	def general_read_registers(self):
 		result = {}
-
 		id2reg = {self.reg_info[k]['id']: k for k in self.reg_info.keys()}
 		reply = rsp.tx_rx(self.sock, 'g')
 		for id_ in range(max(id2reg.keys())+1):
 			reg = id2reg.get(id_)
-			if reg == None: break
+			if reg == None: continue
 			width = self.reg_info[reg]['width']
 			nchars = 2*(width//8)
 			valstr = reply[0:nchars]
@@ -386,7 +385,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 				if 'bitsize' in attrs:
 					bitsize = int(attrs['bitsize'])
 					#print('has bitsize %d' % bitsize)
-				#print('assigning reg %s num %d' % (regname, regnum))
+				print('assigning reg %s num %d' % (regname, regnum))
 				self.reg_info[regname] = {'id':regnum, 'width':bitsize}
 				regnum += 1
 
