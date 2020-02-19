@@ -1,5 +1,5 @@
 # make -f Makefile-macos
-all: helloworld helloworld_loop helloworld_thread helloworld_func helloworld_recursion helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie helloworld_recursion_pie asmtest nopspeed cat commandline_test
+all: helloworld helloworld_loop helloworld_thread helloworld_func helloworld_recursion helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie helloworld_recursion_pie asmtest nopspeed cat commandline_test helloworld_objc
 
 helloworld: helloworld.c
 	gcc -Wl,-no_pie helloworld.c -o helloworld
@@ -31,6 +31,9 @@ helloworld_func_pie: helloworld_func.c
 helloworld_recursion_pie: helloworld_recursion.c
 	gcc -Wl,-pie helloworld_recursion.c -o helloworld_recursion_pie
 
+helloworld_objc: helloworld_objc.m
+	gcc -Wl,-pie helloworld_objc.m -o helloworld_objc -framework AppKit -framework Carbon -framework Foundation
+
 asmtest: asmtest.asm
 	nasm -f macho64 -DOS_IS_MACOS asmtest.asm -o asmtest.o
 	ld -macosx_version_min 10.7.0 -lSystem asmtest.o -o asmtest
@@ -46,4 +49,4 @@ commandline_test: commandline_test.c
 	gcc -Wl,-pie -O3 commandline_test.c -o commandline_test
 
 clean:
-	rm -rf helloworld helloworld_thread helloworld_loop helloworld_func helloworld_recursion helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie helloworld_recursion_pie asmtest nopspeed cat commandline_test
+	rm -rf helloworld helloworld_thread helloworld_loop helloworld_func helloworld_recursion helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie helloworld_recursion_pie asmtest nopspeed cat commandline_test helloworld_objc
