@@ -123,6 +123,8 @@ class DebugMemoryView(BinaryView):
 		self.platform = parent.platform
 
 	def perform_get_address_size(self):
+		if self.parent_view is None or self.parent_view.arch is None:
+			return 8 # Something sane
 		return self.parent_view.arch.address_size
 
 	@classmethod
@@ -134,6 +136,8 @@ class DebugMemoryView(BinaryView):
 		return (2 ** (self.perform_get_address_size() * 8)) - 1
 
 	def perform_read(self, addr, length):
+		if self.parent_view is None:
+			return None
 		adapter = binjaplug.get_state(self.parent_view).adapter
 		if adapter is None:
 			return None
@@ -170,6 +174,8 @@ class DebugMemoryView(BinaryView):
 		return b''.join(self.value_cache[val] for val in range(addr, addr + length))
 
 	def perform_write(self, addr, data):
+		if self.parent_view is None:
+			return 0
 		adapter = binjaplug.get_state(self.parent_view).adapter
 		if adapter is None:
 			return 0
