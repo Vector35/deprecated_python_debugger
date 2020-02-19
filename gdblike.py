@@ -249,6 +249,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			if reply.startswith('E'):
 				raise DebugAdapter.GeneralError('reading from address 0x%X' % address)
 			result += bytes.fromhex(reply)
+			address += sz
 			length -= sz
 		return result
 

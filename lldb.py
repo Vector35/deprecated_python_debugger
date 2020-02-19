@@ -197,7 +197,6 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		# points to struct dyld_all_image_infos
 		# https://opensource.apple.com/source/dyld/dyld-195.5/include/mach-o/dyld_images.h.auto.html
 		data = self.mem_read(self.p_dyld_all_image_infos, 40)
-		#print(utils.hex_dump(data, addr))
 		(version, infoArrayCount, infoArray, notification, \
 		processDetachedFromSharedRegion, libSystemInitialized, \
 		_, _, _, _, _, _, dyldImageLoadAddress) = struct.unpack('<IIQQBBBBBBBBQ', data)
@@ -213,10 +212,10 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 
 		for (i,dyld_image_info) in enumerate(dyld_image_infos):
 			(pheader, ppath, ptime) = struct.unpack('<QQQ', dyld_image_info)
-			print('image %d/%d' % (i+1, infoArrayCount))
-			print('pheader: %X' % pheader)
-			print('ppath: %X' % ppath)
-			print('ptime: %X' % ptime)
+			#print('image %d/%d' % (i+1, infoArrayCount))
+			#print('pheader: %X' % pheader)
+			#print('ppath: %X' % ppath)
+			#print('ptime: %X' % ptime)
 
 			if not (pheader in self.module_cache) or self.module_cache[pheader]['ptime'] != ptime:
 				path = '(blank)'
@@ -224,7 +223,6 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 					path = first_str_from_data(self.mem_read(ppath, 1024))
 				except Exception:
 					pass
-				print('path: %s' % path)
 				self.module_cache[pheader] = {'path':path, 'ptime':ptime}
 
 		return {self.module_cache[addr]['path']:addr for addr in self.module_cache}
