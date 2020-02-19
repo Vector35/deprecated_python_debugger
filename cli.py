@@ -40,6 +40,8 @@ def context_display(pkt_T=None):
 
 	def r(reg, fmt='%016X'):
 		return (BROWN+reg+NORMAL+'='+fmt) % adapter.reg_read(reg.strip())
+	def e(reg, fmt='%08X'):
+		return (BROWN+reg+NORMAL+'='+fmt) % adapter.reg_read(reg.strip())
 
 	if arch == 'x86_64':
 		print(r('rax'), r('rbx'), r('rcx'), r('rdx'))
@@ -48,9 +50,9 @@ def context_display(pkt_T=None):
 		print(r('r12'), r('r13'), r('r14'), r('r15'))
 		print(r('rip'), r('rflags'))
 	elif arch == 'x86':
-		print(r('eax'), r('ebx'), r('ecx'), r('edx'))
-		print(r('esi'), r('edi'), r('ebp'), r('esp'))
-		print(r('eip'), r('eflags'))
+		print(e('eax'), e('ebx'), e('ecx'), e('edx'))
+		print(e('esi'), e('edi'), e('ebp'), e('esp'))
+		print(e('eip'), e('eflags'))
 	elif arch == 'aarch64':
 		print(r(' x0'), r(' x1'), r(' x2'), r(' x3'))
 		print(r(' x4'), r(' x5'), r(' x6'), r(' x7'))
@@ -60,22 +62,23 @@ def context_display(pkt_T=None):
 		print(r('x20'), r('x21'), r('x22'), r('x23'))
 		print(r('x24'), r('x25'), r('x26'), r('x27'))
 		print(r('x28'), r('x29'), r('x30'), r(' sp'))
-		print(r('pc'), r('cpsr'))
+		print(r('pc'), e('cpsr'))
 	elif arch == 'arm':
-		print(r(' r0'), r(' r1'), r(' r2'), r(' r3'))
-		print(r(' r4'), r(' r5'), r(' r6'), r(' r7'))
-		print(r(' r8'), r(' r9'), r('r10'), r('r11'))
-		print(r('r12'), r(' sp'), r(' lr'))
-		print(r(' pc'), r('cpsr'))
+		print(e(' r0'), e(' r1'), e(' r2'), e(' r3'))
+		print(e(' r4'), e(' r5'), e(' r6'), e(' r7'))
+		print(e(' r8'), e(' r9'), e('r10'), e('r11'))
+		print(e('r12'), e(' sp'), e(' lr'))
+		print(e(' pc'), e(' cpsr'))
 
 	pc_name = {'aarch64':'pc', 'arm':'pc', 'x86_64':'rip', 'x86':'eip'}[arch]
+	pc_fmt = {'aarch64':'%016X', 'arm':'%08X', 'x86_64':'%016X', 'x86':'%08X'}[arch]
 	pc = adapter.reg_read(pc_name)
 
 	try:
 		data = adapter.mem_read(pc, 16)
 		if data:
 			(asmstr, asmlen) = utils.disasm1(data, pc, arch_dis)
-			print('%s%016X%s: %s\t%s' % \
+			print(('%s'+pc_fmt+'%s: %s\t%s') % \
 				(GREEN, pc, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
 	except DebugAdapter.GeneralError as e:
 		print('%s%016X%s: couldn\'t read mem' % \
@@ -245,6 +248,7 @@ if __name__ == '__main__':
 						print('stdout: ', data)
 					elif reason == DebugAdapter.STOP_REASON.PROCESS_EXITED:
 						print('process exited, return code=%d' % data)
+						user_goal = 'quit'
 						break
 					else:
 						print('stopped, reason: %s' % reason.name)

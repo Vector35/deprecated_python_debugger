@@ -277,20 +277,20 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	def go(self):
 		self.reg_cache = {}
 		#return self.go_generic('c', self.handler_async_pkt)
-		rc = self.go_generic('vCont;c:-1', self.handler_async_pkt)
-		self.set_thread_after_stop()
-		return rc
+		(reason, reason_data) = self.go_generic('vCont;c:-1', self.handler_async_pkt)
+		self.handle_stop(reason, reason_data)
+		return (reason, reason_data)
 
 	def step_into(self):
 		self.reg_cache = {}
-		rc = self.go_generic('vCont;s', self.handler_async_pkt)
-		self.set_thread_after_stop()
-		return rc
+		(reason, reason_data) = self.go_generic('vCont;s', self.handler_async_pkt)
+		self.handle_stop(reason, reason_data)
+		return (reason, reason_data)
 
 	def step_over(self):
 		# gdb, lldb just doesn't have this, you must synthesize it yourself
 		self.reg_cache = {}
-		self.set_thread_after_stop()
+		self.handle_stop(reason, reason_data)
 		raise NotImplementedError('step over')
 
 	#--------------------------------------------------------------------------
@@ -313,7 +313,11 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 		return result
 
-	def set_thread_after_stop(self):
+	def handle_stop(self, reason, data):
+		if reason in [DebugAdapter.STOP_REASON.PROCESS_EXITED,
+			DebugAdapter.STOP_REASON.UNKNOWN, DebugAdapter.STOP_REASON.BACKEND_DISCONNECTED]:
+			return
+
 		reply = rsp.tx_rx(self.sock, '?')
 		context = rsp.packet_T_to_dict(reply)
 		if not 'thread' in context:
@@ -385,7 +389,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 				if 'bitsize' in attrs:
 					bitsize = int(attrs['bitsize'])
 					#print('has bitsize %d' % bitsize)
-				print('assigning reg %s num %d' % (regname, regnum))
+				#print('assigning reg %s num %d' % (regname, regnum))
 				self.reg_info[regname] = {'id':regnum, 'width':bitsize}
 				regnum += 1
 
