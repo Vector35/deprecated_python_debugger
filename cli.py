@@ -3,6 +3,7 @@
 import re
 import os
 import sys
+import struct
 import signal
 import platform
 if platform.system() != 'Windows':
@@ -164,11 +165,10 @@ if __name__ == '__main__':
 			if not text:
 				continue
 
-			# testing stuff
-			#elif text.startswith('packet '):
-			#	reply = tx_rx(text[7:])
 			elif text == 'test':
-				adapter.test()
+				pass
+			elif text == 'test2':
+				pass
 			elif text.startswith('raw '):
 				print(adapter.raw(text[4:]))
 

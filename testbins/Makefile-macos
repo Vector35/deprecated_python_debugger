@@ -32,7 +32,7 @@ helloworld_recursion_pie: helloworld_recursion.c
 	gcc -Wl,-pie helloworld_recursion.c -o helloworld_recursion_pie
 
 helloworld_objc: helloworld_objc.m
-	gcc -Wl,-pie helloworld_objc.m -o helloworld_objc -framework AppKit -framework Carbon -framework Foundation
+	gcc -Wl,-no_pie helloworld_objc.m -o helloworld_objc -framework AppKit -framework Carbon -framework Foundation
 
 asmtest: asmtest.asm
 	nasm -f macho64 -DOS_IS_MACOS asmtest.asm -o asmtest.o

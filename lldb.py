@@ -2,6 +2,7 @@
 
 import os
 import re
+import struct
 import shutil
 import socket
 import subprocess
@@ -78,6 +79,11 @@ macos_signal_to_debugadapter_reason = {
 	31: DebugAdapter.STOP_REASON.SIGNAL_USR2,
 }
 
+def first_str_from_data(data):
+	if b'\x00' in data:
+		data = data[0:data.find(b'\x00')]
+	return data.decode('utf-8')
+
 class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	def __init__(self, **kwargs):
 		gdblike.DebugAdapterGdbLike.__init__(self, **kwargs)
@@ -87,11 +93,15 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		# register state
 		self.reg_info = {}
 
-		# address -> True
-		self.breakpoints = {}
+		# breakpoint state
+		self.breakpoints = {} # address -> True
 
 		# thread state
 		self.thread_idx_selected = None
+
+		# modules/dylibs state
+		self.p_dyld_all_image_infos = None
+		self.module_cache = {} # address -> {'path':<str>, 'ptime':<uint64>}
 
 	#--------------------------------------------------------------------------
 	# API
@@ -129,6 +139,9 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 
 		# learn initial registers
 		self.reg_info_load()
+
+		# learn initial pointer to shared lib info in dyld
+		self.p_dyld_all_image_infos = int(rsp.tx_rx(self.sock, 'qShlibInfoAddr'), 16)
 
 	# threads
 	def thread_list(self):
@@ -177,12 +190,44 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	#def mem_write(self, address, data):
 
 	def mem_modules(self):
-		module2addr = {}
-		reply = rsp.tx_rx(self.sock, 'jGetLoadedDynamicLibrariesInfos:{"fetch_all_solibs":true}')
-		for (addr, path) in re.findall(r'"load_address":(\d+).*?"pathname":"([^"]+)"', reply):
-			addr = int(addr, 10)
-			module2addr[path] = addr
-		return module2addr
+		if not self.p_dyld_all_image_infos:
+			self.module_cache = {}
+			return self.mem_modules_slow()
+
+		# points to struct dyld_all_image_infos
+		# https://opensource.apple.com/source/dyld/dyld-195.5/include/mach-o/dyld_images.h.auto.html
+		data = self.mem_read(self.p_dyld_all_image_infos, 40)
+		#print(utils.hex_dump(data, addr))
+		(version, infoArrayCount, infoArray, notification, \
+		processDetachedFromSharedRegion, libSystemInitialized, \
+		_, _, _, _, _, _, dyldImageLoadAddress) = struct.unpack('<IIQQBBBBBBBBQ', data)
+
+		if not libSystemInitialized or dyldImageLoadAddress == 0:
+			self.module_cache = {}
+			return self.mem_modules_slow()
+
+		self.module_cache[dyldImageLoadAddress] = {'path':'/usr/lib/dyld', 'ptime':0}
+
+		data = self.mem_read(infoArray, infoArrayCount*24)
+		dyld_image_infos = [data[i:i+24] for i in range(0, len(data), 24)]
+
+		for (i,dyld_image_info) in enumerate(dyld_image_infos):
+			(pheader, ppath, ptime) = struct.unpack('<QQQ', dyld_image_info)
+			print('image %d/%d' % (i+1, infoArrayCount))
+			print('pheader: %X' % pheader)
+			print('ppath: %X' % ppath)
+			print('ptime: %X' % ptime)
+
+			if not (pheader in self.module_cache) or self.module_cache[pheader]['ptime'] != ptime:
+				path = '(blank)'
+				try:
+					path = first_str_from_data(self.mem_read(ppath, 1024))
+				except Exception:
+					pass
+				print('path: %s' % path)
+				self.module_cache[pheader] = {'path':path, 'ptime':ptime}
+
+		return {self.module_cache[addr]['path']:addr for addr in self.module_cache}
 
 	# break
 	#def break_into(self):
@@ -202,6 +247,18 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		# gdb, lldb just doesn't have this, you must synthesize it yourself
 		self.reg_cache = {}
 		raise NotImplementedError('step over')
+
+	#--------------------------------------------------------------------------
+	# NON-API UTILITIES
+	#--------------------------------------------------------------------------
+
+	def mem_modules_slow(self):
+		module2addr = {}
+		reply = rsp.tx_rx(self.sock, 'jGetLoadedDynamicLibrariesInfos:{"fetch_all_solibs":true}')
+		for (addr, path) in re.findall(r'"load_address":(\d+).*?"pathname":"([^"]+)"', reply):
+			addr = int(addr, 10)
+			module2addr[path] = addr
+		return module2addr
 
 	# asynchronously called when inside a "go" to inform us of stdout (and
 	# possibly other stuff)

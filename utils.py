@@ -1,5 +1,7 @@
-import binaryninja
+import struct
 import binascii
+
+import binaryninja
 
 RED = '\x1B[31m'
 GREEN = '\x1B[32m'
@@ -27,7 +29,7 @@ def hex_dump(data, addr=0, grouping=1, endian='little'):
 					1:'%02X ', 2:'%04X ', 4:'%08X ', 8:'%016X ' \
 				}
 
-				temp = unpack(f0[endian][grouping], buff16[i:i+grouping])[0]
+				temp = struct.unpack(f0[endian][grouping], buff16[i:i+grouping])[0]
 
 				result += f1[grouping] % temp
 
