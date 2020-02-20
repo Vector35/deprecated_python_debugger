@@ -36,26 +36,26 @@ class DebugStackModel(QAbstractItemModel):
 			self.rows.append(info)
 
 		self.endResetModel()
-	
+
 	def index(self, row, column, parent):
 		if parent.isValid() or column > len(self.columns) or row >= len(self.rows):
 			return QModelIndex()
 		return self.createIndex(row, column)
-	
+
 	def parent(self, child):
 		return QModelIndex()
 
 	def hasChildren(self, parent):
 		return False
-	
+
 	def rowCount(self, parent):
 		if parent.isValid():
 			return 0
 		return len(self.rows)
-	
+
 	def columnCount(self, parent):
 		return len(self.columns)
-	
+
 	def flags(self, index):
 		f = super().flags(index)
 		if self.columns[index.column()] == "Value":
@@ -74,7 +74,7 @@ class DebugStackModel(QAbstractItemModel):
 			return None
 		if index.row() < 0 or index.row() >= len(self.rows):
 			return None
-		
+
 		info = self.rows[index.row()]
 
 		if role == Qt.DisplayRole:
@@ -106,23 +106,37 @@ class DebugStackModel(QAbstractItemModel):
 			return info['state']
 
 		return None
-	
+
 	def setData(self, index, value, role):
 		# Verify that we can edit this value
 		if (self.flags(index) & Qt.EditRole) != Qt.EditRole:
 			return False
-		
+		if len(value) == 0:
+			return False
+
 		info = self.rows[index.row()]
 		old_val = info['value']
-		new_val = int(value, 16)
+		# Need to take string be hex and turn into bytes in the correct endianness
+		if len(value) % 2 == 1:
+			value = '0' + value
+		try:
+			new_val = bytes.fromhex(value)
+		except:
+			return False
+		if self.bv.arch.endianness == binaryninja.Endianness.LittleEndian:
+			new_val = new_val[::-1]
+		new_val = new_val.ljust(len(old_val), b'\x00')
 		address = info['address']
 
+		if new_val == old_val:
+			return False
+
 		# Tell the debugger to update
-		adapter = binjaplug.get_state(self.bv).adapter
-		adapter.mem_write(address, new_val)
+		memory_view = binjaplug.get_state(self.bv).memory_view
+		memory_view.write(address, new_val)
 
 		# Update internal copy to show modification
-		updated_val = adapter.mem_read(address, len(old_val))
+		updated_val = memory_view.read(address, len(old_val))
 
 		# Make sure the debugger actually let us set the value
 		self.rows[index.row()]['value'] = updated_val
@@ -135,7 +149,7 @@ class DebugStackModel(QAbstractItemModel):
 class DebugStackItemDelegate(QItemDelegate):
 	def __init__(self, parent):
 		QItemDelegate.__init__(self, parent)
-		
+
 		self.font = binaryninjaui.getMonospaceFont(parent)
 		self.font.setKerning(False)
 		self.baseline = QFontMetricsF(self.font).ascent()
@@ -144,7 +158,7 @@ class DebugStackItemDelegate(QItemDelegate):
 		self.char_offset = binaryninjaui.getFontVerticalOffset()
 
 		self.expected_char_widths = [10, 20, 30, 20]
-	
+
 	def sizeHint(self, option, idx):
 		return QSize(self.char_width * self.expected_char_widths[idx.column()] + 4, self.char_height)
 
@@ -170,7 +184,7 @@ class DebugStackItemDelegate(QItemDelegate):
 		else:
 			painter.setPen(option.palette.color(QPalette.WindowText).rgba())
 		painter.drawText(2 + option.rect.left(), self.char_offset + self.baseline + option.rect.top(), str(text))
-		
+
 	def setEditorData(self, editor, idx):
 		if idx.column() == 1:
 			data = idx.data()
@@ -183,7 +197,7 @@ class DebugStackWidget(QWidget, DockContextHandler):
 			raise Exception('expected widget data to be a BinaryView')
 
 		self.bv = data
-		
+
 		QWidget.__init__(self, parent)
 		DockContextHandler.__init__(self, self, name)
 		self.actionHandler = UIActionHandler()

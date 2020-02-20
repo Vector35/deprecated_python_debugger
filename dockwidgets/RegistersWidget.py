@@ -43,21 +43,21 @@ class DebugRegistersListModel(QAbstractItemModel):
 		if parent.isValid() or column > len(self.columns) or row >= len(self.rows):
 			return QModelIndex()
 		return self.createIndex(row, column)
-	
+
 	def parent(self, child):
 		return QModelIndex()
 
 	def hasChildren(self, parent):
 		return False
-	
+
 	def rowCount(self, parent):
 		if parent.isValid():
 			return 0
 		return len(self.rows)
-	
+
 	def columnCount(self, parent):
 		return len(self.columns)
-	
+
 	def flags(self, index):
 		f = super().flags(index)
 		if index.column() == 1:
@@ -76,7 +76,7 @@ class DebugRegistersListModel(QAbstractItemModel):
 			return None
 		if index.row() < 0 or index.row() >= len(self.rows):
 			return None
-		
+
 		conts = self.rows[index.row()][index.column()]
 		info = self.row_info[index.row()]
 
@@ -92,23 +92,31 @@ class DebugRegistersListModel(QAbstractItemModel):
 			return info['state']
 
 		return None
-	
+
 	def setData(self, index, value, role):
 		# Verify that we can edit this value
 		if (self.flags(index) & Qt.EditRole) != Qt.EditRole:
 			return False
-		
+		if len(value) == 0:
+			return False
+
 		info = self.row_info[index.row()]
 		old_val = self.rows[index.row()][1]
-		new_val = int(value, 16)
+		try:
+			new_val = int(value, 16)
+		except:
+			return False
 		register = info['name']
 
+		if new_val == old_val:
+			return False
+
 		# Tell the debugger to update
-		adapter = binjaplug.get_state(self.bv).adapter
-		adapter.reg_write(register, new_val)
+		debug_state = binjaplug.get_state(self.bv)
+		debug_state.registers[register] = new_val
 
 		# Update internal copy to show modification
-		updated_val = adapter.reg_read(register)
+		updated_val = debug_state.registers[register]
 
 		# Make sure the debugger actually let us set the register
 		self.rows[index.row()] = (register, updated_val)
@@ -121,7 +129,7 @@ class DebugRegistersListModel(QAbstractItemModel):
 class DebugRegistersItemDelegate(QItemDelegate):
 	def __init__(self, parent):
 		QItemDelegate.__init__(self, parent)
-		
+
 		self.font = binaryninjaui.getMonospaceFont(parent)
 		self.font.setKerning(False)
 		self.baseline = QFontMetricsF(self.font).ascent()
@@ -130,7 +138,7 @@ class DebugRegistersItemDelegate(QItemDelegate):
 		self.char_offset = binaryninjaui.getFontVerticalOffset()
 
 		self.expected_char_widths = [10, 32]
-	
+
 	def sizeHint(self, option, idx):
 		width = self.expected_char_widths[idx.column()]
 		data = idx.data()
@@ -160,7 +168,7 @@ class DebugRegistersItemDelegate(QItemDelegate):
 		else:
 			painter.setPen(option.palette.color(QPalette.WindowText).rgba())
 		painter.drawText(2 + option.rect.left(), self.char_offset + self.baseline + option.rect.top(), str(text))
-		
+
 	def setEditorData(self, editor, idx):
 		if idx.column() == 1:
 			data = idx.data()
@@ -173,7 +181,7 @@ class DebugRegistersWidget(QWidget, DockContextHandler):
 			raise Exception('expected widget data to be a BinaryView')
 
 		self.bv = data
-		
+
 		QWidget.__init__(self, parent)
 		DockContextHandler.__init__(self, self, name)
 		self.actionHandler = UIActionHandler()
