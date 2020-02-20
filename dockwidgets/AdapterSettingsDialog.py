@@ -35,6 +35,8 @@ class AdapterSettingsDialog(QDialog):
 		self.adapterEntry = QPushButton(self)
 		self.adapterMenu = QMenu(self)
 		for adapter in DebugAdapter.ADAPTER_TYPE:
+			if not DebugAdapter.ADAPTER_TYPE.can_use(adapter):
+				continue
 			def select_adapter(adapter):
 				return lambda: self.selectAdapter(adapter)
 			self.adapterMenu.addAction(adapter.name, select_adapter(adapter))

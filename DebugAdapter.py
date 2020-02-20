@@ -35,6 +35,37 @@ class ADAPTER_TYPE(Enum):
 			ADAPTER_TYPE.REMOTE_LLDB
 		]
 
+	@staticmethod
+	def can_use(adapter_type):
+		system = platform.system()
+
+		if system == 'Windows':
+			return adapter_type in [
+				ADAPTER_TYPE.DEFAULT,
+				ADAPTER_TYPE.LOCAL_DBGENG,
+				ADAPTER_TYPE.REMOTE_DBGENG,
+				ADAPTER_TYPE.REMOTE_GDB,
+				ADAPTER_TYPE.REMOTE_LLDB,
+			]
+		elif system == 'Linux':
+			return adapter_type in [
+				ADAPTER_TYPE.DEFAULT,
+				ADAPTER_TYPE.LOCAL_GDB,
+				ADAPTER_TYPE.REMOTE_DBGENG,
+				ADAPTER_TYPE.REMOTE_GDB,
+				ADAPTER_TYPE.REMOTE_LLDB,
+			]
+		elif system == 'Darwin':
+			return adapter_type in [
+				ADAPTER_TYPE.DEFAULT,
+				ADAPTER_TYPE.LOCAL_LLDB,
+				ADAPTER_TYPE.REMOTE_DBGENG,
+				ADAPTER_TYPE.REMOTE_GDB,
+				ADAPTER_TYPE.REMOTE_LLDB,
+			]
+		else:
+			return False
+
 def get_adapter_for_current_system(**kwargs):
 	from . import dbgeng, gdb, lldb
 
@@ -58,7 +89,7 @@ def get_new_adapter(adapter_type = ADAPTER_TYPE.DEFAULT, **kwargs):
 		return gdb.DebugAdapterGdb(**kwargs)
 	elif adapter_type == ADAPTER_TYPE.LOCAL_LLDB or adapter_type == ADAPTER_TYPE.REMOTE_LLDB:
 		return lldb.DebugAdapterLLDB(**kwargs)
-	elif adapter.type == ADAPTER_TYPE.DEFAULT:
+	elif adapter_type == ADAPTER_TYPE.DEFAULT:
 		return get_adapter_for_current_system(**kwargs)
 	else:
 		raise Exception('unsupported adapter type: %s' % adapter_type)

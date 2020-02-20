@@ -264,7 +264,7 @@ class DebuggerState:
 	def __init__(self, bv):
 		self.bv = bv
 		self.adapter = None
-		self.state = 'INACTIVE'
+		self.running = False
 		# address -> adapter id
 		self.memory_view = ProcessView.DebugProcessView(bv)
 		self.old_symbols = []
@@ -413,6 +413,14 @@ class DebuggerState:
 	#--------------------------------------------------------------------------
 
 	def run(self):
+		if DebugAdapter.ADAPTER_TYPE.use_exec(self.adapter_type):
+			self.exec()
+		elif DebugAdapter.ADAPTER_TYPE.use_connect(self.adapter_type):
+			self.attach()
+		else:
+			raise Exception("don't know how to connect to adapter of type %s" % self.adapter_type)
+
+	def exec(self):
 		fpath = self.bv.file.original_filename
 
 		if not os.path.exists(fpath):
@@ -421,11 +429,28 @@ class DebuggerState:
 		self.adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
 
 		if DebugAdapter.ADAPTER_TYPE.use_exec(self.adapter_type):
-			self.adapter.exec(fpath, self.command_line_args)
-		elif DebugAdapter.ADAPTER_TYPE.use_connect(self.adapter_type):
-			self.adapter.connect(self.remote_host, self.remote_port)
+			try:
+				self.adapter.exec(fpath, self.command_line_args)
+			except Exception as e:
+				self.adapter = None
+				raise e
 		else:
-			raise Exception("don't know how to connect to adapter of type %s" % self.adapter_type)
+			raise Exception("cannot exec adapter of type %s" % self.adapter_type)
+
+		self.memory_view.update_base()
+		self.breakpoints.apply()
+		self.memory_dirty()
+
+	def attach(self):
+		self.adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
+		if DebugAdapter.ADAPTER_TYPE.use_connect(self.adapter_type):
+			try:
+				self.adapter.connect(self.remote_host, self.remote_port)
+			except Exception as e:
+				self.adapter = None
+				raise e
+		else:
+			raise Exception("cannot connect to adapter of type %s" % self.adapter_type)
 
 		self.memory_view.update_base()
 		self.breakpoints.apply()
@@ -489,7 +514,9 @@ class DebuggerState:
 		else:
 			seq.append((self.adapter.go, ()))
 
+		self.running = True
 		result = self.exec_adapter_sequence(seq)
+		self.running = False
 		self.memory_dirty()
 		return result
 

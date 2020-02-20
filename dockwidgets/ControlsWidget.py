@@ -5,6 +5,8 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QW
 from binaryninja import execute_on_main_thread_and_wait
 from binaryninjaui import ViewFrame
 import threading
+import traceback
+import sys
 
 from . import AdapterSettingsDialog
 from .. import binjaplug, DebugAdapter
@@ -31,7 +33,7 @@ class DebugControlsWidget(QToolBar):
 		self.actionRestart.triggered.connect(lambda: self.perform_restart())
 		self.actionQuit = QAction("Quit", self)
 		self.actionQuit.triggered.connect(lambda: self.perform_quit())
-		self.actionAttach = QAction("Attach... (todo)", self)
+		self.actionAttach = QAction("Attach", self)
 		self.actionAttach.triggered.connect(lambda: self.perform_attach())
 		self.actionDetach = QAction("Detach", self)
 		self.actionDetach.triggered.connect(lambda: self.perform_detach())
@@ -58,8 +60,7 @@ class DebugControlsWidget(QToolBar):
 		self.controlMenu.addAction(self.actionRestart)
 		self.controlMenu.addAction(self.actionQuit)
 		self.controlMenu.addSeparator()
-		# TODO: Attach to running process
-		# self.controlMenu.addAction(self.actionAttach)
+		self.controlMenu.addAction(self.actionAttach)
 		self.controlMenu.addAction(self.actionDetach)
 		self.controlMenu.addSeparator()
 		self.controlMenu.addAction(self.actionSettings)
@@ -116,14 +117,21 @@ class DebugControlsWidget(QToolBar):
 		self.addWidget(self.editStatus)
 
 		# disable buttons
-		self.set_actions_enabled(Run=True, Restart=False, Quit=False, Attach=True, Detach=False, Pause=False, Resume=False, StepInto=False, StepOver=False, StepReturn=False)
+		self.set_actions_enabled(Run=self.can_exec(), Restart=False, Quit=False, Attach=self.can_connect(), Detach=False, Pause=False, Resume=False, StepInto=False, StepOver=False, StepReturn=False)
 		self.set_resume_pause_action("Pause")
+		self.set_default_process_action("Attach" if self.can_connect() else "Run")
 
 	def __del__(self):
 		# TODO: Move this elsewhere
 		# This widget is tasked with cleaning up the state after the view is closed
 		# binjaplug.delete_state(self.bv)
 		pass
+
+	def can_exec(self):
+		return DebugAdapter.ADAPTER_TYPE.use_exec(self.debug_state.adapter_type)
+
+	def can_connect(self):
+		return DebugAdapter.ADAPTER_TYPE.use_connect(self.debug_state.adapter_type)
 
 	def perform_run(self):
 		try:
@@ -135,6 +143,7 @@ class DebugControlsWidget(QToolBar):
 			self.state_error('ERROR: Connection Refused')
 		except Exception as e:
 			self.state_error('ERROR: ' + ' '.join(e.args))
+			traceback.print_exc(file=sys.stderr)
 
 	def perform_restart(self):
 		self.debug_state.restart()
@@ -145,16 +154,37 @@ class DebugControlsWidget(QToolBar):
 		self.state_inactive()
 
 	def perform_attach(self):
-		# TODO: Show dialog to select adapter/address/process
-		pass
+		try:
+			self.debug_state.attach()
+			self.state_stopped()
+			self.debug_state.ui.context_display()
+			self.debug_state.ui.update_breakpoints()
+		except ConnectionRefusedError:
+			self.state_error('ERROR: Connection Refused')
+		except Exception as e:
+			self.state_error('ERROR: ' + ' '.join(e.args))
+			traceback.print_exc(file=sys.stderr)
 
 	def perform_detach(self):
 		self.debug_state.detach()
 		self.state_inactive()
 
 	def perform_settings(self):
+		def settings_finished():
+			if self.debug_state.running:
+				self.state_running()
+			elif self.debug_state.adapter is not None:
+				local_rip = self.debug_state.local_ip
+				if self.debug_state.bv.read(local_rip, 1) and len(self.debug_state.bv.get_functions_containing(local_rip)) > 0:
+					self.state_stopped()
+				else:
+					self.state_stopped_extern()
+			else:
+				self.state_inactive()
+
 		dialog = AdapterSettingsDialog.AdapterSettingsDialog(self, self.bv)
 		dialog.show()
+		dialog.finished.connect(settings_finished)
 
 	def perform_pause(self):
 		self.debug_state.pause()
@@ -235,8 +265,8 @@ class DebugControlsWidget(QToolBar):
 			self.actionStepOverIL.setEnabled(e)
 
 		def enable_starting(e):
-			self.actionRun.setEnabled(e)
-			self.actionAttach.setEnabled(e)
+			self.actionRun.setEnabled(e and self.can_exec())
+			self.actionAttach.setEnabled(e and self.can_connect())
 
 		def enable_stopping(e):
 			self.actionRestart.setEnabled(e)
@@ -309,52 +339,40 @@ class DebugControlsWidget(QToolBar):
 			self.btnThreads.setDefaultAction(defaultThreadAction)
 
 	def state_inactive(self, msg=None):
-		debug_state = binjaplug.get_state(self.bv)
-		debug_state.state = 'INACTIVE'
-		self.editStatus.setText(msg or debug_state.state)
+		self.editStatus.setText(msg or 'INACTIVE')
 		self.set_actions_enabled(Starting=True, Stopping=False, Stepping=False, Pause=False, Resume=False, Threads=False)
-		self.set_default_process_action("Run")
+		self.set_default_process_action("Attach" if self.can_connect() else "Run")
 		self.set_thread_list([])
 		self.set_resume_pause_action("Pause")
 
 	def state_stopped(self, msg=None):
-		debug_state = binjaplug.get_state(self.bv)
-		debug_state.state = 'STOPPED'
-		self.editStatus.setText(msg or debug_state.state)
+		self.editStatus.setText(msg or 'STOPPED')
 		self.set_actions_enabled(Starting=False, Stopping=True, Stepping=True, Pause=True, Resume=True, Threads=True)
 		self.set_default_process_action("Quit")
 		self.set_resume_pause_action("Resume")
 
 	def state_stopped_extern(self, msg=None):
-		debug_state = binjaplug.get_state(self.bv)
-		debug_state.state = 'STOPPED'
-		self.editStatus.setText(msg or debug_state.state)
+		self.editStatus.setText(msg or 'STOPPED')
 		self.set_actions_enabled(Starting=False, Stopping=True, Stepping=True, StepReturn=False, Pause=True, Resume=True, Threads=True)
 		self.set_default_process_action("Quit")
 		self.set_resume_pause_action("Resume")
 
 	def state_running(self, msg=None):
-		debug_state = binjaplug.get_state(self.bv)
-		debug_state.state = 'RUNNING'
-		self.editStatus.setText(msg or debug_state.state)
+		self.editStatus.setText(msg or 'RUNNING')
 		self.set_actions_enabled(Starting=False, Stopping=True, Stepping=False, Pause=True, Resume=False, Threads=False)
 		self.set_default_process_action("Quit")
 		self.set_resume_pause_action("Pause")
 
 	def state_busy(self, msg=None):
-		debug_state = binjaplug.get_state(self.bv)
-		debug_state.state = 'RUNNING'
-		self.editStatus.setText(msg or debug_state.state)
+		self.editStatus.setText(msg or 'RUNNING')
 		self.set_actions_enabled(Starting=False, Stopping=True, Stepping=False, Pause=True, Resume=False, Threads=False)
 		self.set_default_process_action("Quit")
 		self.set_resume_pause_action("Pause")
 
 	def state_error(self, msg=None):
-		debug_state = binjaplug.get_state(self.bv)
-		debug_state.state = 'ERROR'
-		self.editStatus.setText(msg or debug_state.state)
-		self.set_actions_enabled(Run=True, Restart=False, Quit=False, Attach=True, Detach=False, Pause=False, Resume=False, StepInto=False, StepOver=False, StepReturn=False, Threads=False)
-		self.set_default_process_action("Run")
+		self.editStatus.setText(msg or 'ERROR')
+		self.set_actions_enabled(Starting=True, Stopping=False, Pause=False, Resume=False, Stepping=False, Threads=False)
+		self.set_default_process_action("Attach" if self.can_connect() else "Run")
 		self.set_thread_list([])
 		self.set_resume_pause_action("Resume")
 
