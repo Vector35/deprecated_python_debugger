@@ -133,22 +133,29 @@ class DebuggerUI:
 		#----------------------------------------------------------------------
 		# Update Status
 		#----------------------------------------------------------------------
-
-		remote_rip = self.state.ip
-		local_rip = self.state.memory_view.remote_addr_to_local(remote_rip)
-
+		local_rip = self.state.local_ip
 		self.update_highlights()
 		self.last_ip = local_rip
+
+		if self.debug_view is not None:
+			if self.state.bv.read(local_rip, 1) and len(self.state.bv.get_functions_containing(local_rip)) > 0:
+				self.debug_view.controls.state_stopped()
+			else:
+				self.debug_view.controls.state_stopped_extern()
+
+	def navigate_to_rip(self):
+		if self.state.adapter is None:
+			local_rip = self.state.bv.entry_point
+		else:
+			local_rip = self.state.local_ip
+		self.state.bv.navigate(self.state.bv.file.view, local_rip)
 
 		if self.debug_view is not None:
 			# select instruction currently at
 			if self.state.bv.read(local_rip, 1) and len(self.state.bv.get_functions_containing(local_rip)) > 0:
 				self.debug_view.setRawDisassembly(False)
-				self.state.bv.navigate(self.state.bv.file.view, local_rip)
-				self.debug_view.controls.state_stopped()
 			else:
 				self.update_raw_disassembly()
-				self.debug_view.controls.state_stopped_extern()
 
 	# Highlight lines
 	def update_highlights(self):

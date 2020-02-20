@@ -134,40 +134,92 @@ class DebugControlsWidget(QToolBar):
 		return DebugAdapter.ADAPTER_TYPE.use_connect(self.debug_state.adapter_type)
 
 	def perform_run(self):
-		try:
-			self.debug_state.run()
+
+		def perform_run_thread():
+			try:
+				self.debug_state.run()
+				execute_on_main_thread_and_wait(perform_run_after)
+			except ConnectionRefusedError:
+				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Connection Refused'))
+			except Exception as e:
+				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: ' + ' '.join(e.args)))
+				traceback.print_exc(file=sys.stderr)
+
+		def perform_run_after():
 			self.state_stopped()
 			self.debug_state.ui.context_display()
 			self.debug_state.ui.update_breakpoints()
-		except ConnectionRefusedError:
-			self.state_error('ERROR: Connection Refused')
-		except Exception as e:
-			self.state_error('ERROR: ' + ' '.join(e.args))
-			traceback.print_exc(file=sys.stderr)
+			self.debug_state.ui.navigate_to_rip()
+
+		def perform_run_error(e):
+			self.state_error(e)
+
+		self.state_inactive('STARTING')
+		threading.Thread(target=perform_run_thread).start()
+
 
 	def perform_restart(self):
-		self.debug_state.restart()
-		self.state_stopped()
+
+		def perform_restart_thread():
+			try:
+				self.debug_state.restart()
+				execute_on_main_thread_and_wait(perform_restart_after)
+			except ConnectionRefusedError:
+				execute_on_main_thread_and_wait(lambda: perform_restart_error('ERROR: Connection Refused'))
+			except Exception as e:
+				execute_on_main_thread_and_wait(lambda: perform_restart_error('ERROR: ' + ' '.join(e.args)))
+				traceback.print_exc(file=sys.stderr)
+
+		def perform_restart_after():
+			self.state_stopped()
+			self.debug_state.ui.context_display()
+			self.debug_state.ui.update_breakpoints()
+			self.debug_state.ui.navigate_to_rip()
+
+		def perform_restart_error(e):
+			self.state_error(e)
+
+		self.state_inactive('RESTARTING')
+		threading.Thread(target=perform_restart_thread).start()
 
 	def perform_quit(self):
 		self.debug_state.quit()
 		self.state_inactive()
+		self.debug_state.ui.context_display()
+		self.debug_state.ui.update_breakpoints()
+		self.debug_state.ui.navigate_to_rip()
 
 	def perform_attach(self):
-		try:
-			self.debug_state.attach()
+
+		def perform_attach_thread():
+			try:
+				self.debug_state.attach()
+				execute_on_main_thread_and_wait(perform_attach_after)
+			except ConnectionRefusedError:
+				execute_on_main_thread_and_wait(lambda: perform_attach_error('ERROR: Connection Refused'))
+			except Exception as e:
+				execute_on_main_thread_and_wait(lambda: perform_attach_error('ERROR: ' + ' '.join(e.args)))
+				traceback.print_exc(file=sys.stderr)
+
+		def perform_attach_after():
 			self.state_stopped()
 			self.debug_state.ui.context_display()
 			self.debug_state.ui.update_breakpoints()
-		except ConnectionRefusedError:
-			self.state_error('ERROR: Connection Refused')
-		except Exception as e:
-			self.state_error('ERROR: ' + ' '.join(e.args))
-			traceback.print_exc(file=sys.stderr)
+			self.debug_state.ui.navigate_to_rip()
+
+		def perform_attach_error(e):
+			self.state_error(e)
+
+		self.state_inactive('ATTACHING')
+		threading.Thread(target=perform_attach_thread).start()
+
 
 	def perform_detach(self):
 		self.debug_state.detach()
 		self.state_inactive()
+		self.debug_state.ui.context_display()
+		self.debug_state.ui.update_breakpoints()
+		self.debug_state.ui.navigate_to_rip()
 
 	def perform_settings(self):
 		def settings_finished():
@@ -188,13 +240,18 @@ class DebugControlsWidget(QToolBar):
 
 	def perform_pause(self):
 		self.debug_state.pause()
+		# Don't update state here-- one of the other buttons is running in a thread and updating for us
 
 	def perform_resume(self):
 
 		def perform_resume_thread():
 			(reason, data) = self.debug_state.go()
-			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
+			execute_on_main_thread_and_wait(lambda: perform_resume_after(reason, data))
+
+		def perform_resume_after(reason, data):
+			self.handle_stop_return(reason, data)
+			self.debug_state.ui.context_display()
+			self.debug_state.ui.navigate_to_rip()
 
 		self.state_running()
 		threading.Thread(target=perform_resume_thread).start()
@@ -203,8 +260,12 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_step_into_asm_thread():
 			(reason, data) = self.debug_state.step_into()
-			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
+			execute_on_main_thread_and_wait(lambda: perform_step_into_asm_after(reason, data))
+
+		def perform_step_into_asm_after(reason, data):
+			self.handle_stop_return(reason, data)
+			self.debug_state.ui.context_display()
+			self.debug_state.ui.navigate_to_rip()
 
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_into_asm_thread).start()
@@ -216,8 +277,12 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_step_into_il_thread():
 			(reason, data) = self.debug_state.step_into(graph_type)
-			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
+			execute_on_main_thread_and_wait(lambda: perform_step_into_il_after(reason, data))
+
+		def perform_step_into_il_after(reason, data):
+			self.handle_stop_return(reason, data)
+			self.debug_state.ui.context_display()
+			self.debug_state.ui.navigate_to_rip()
 
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_into_il_thread).start()
@@ -226,8 +291,12 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_step_over_asm_thread():
 			(reason, data) = self.debug_state.step_over()
-			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
+			execute_on_main_thread_and_wait(lambda: perform_step_over_asm_after(reason, data))
+
+		def perform_step_over_asm_after(reason, data):
+			self.handle_stop_return(reason, data)
+			self.debug_state.ui.context_display()
+			self.debug_state.ui.navigate_to_rip()
 
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_over_asm_thread).start()
@@ -239,8 +308,12 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_step_over_il_thread():
 			(reason, data) = self.debug_state.step_over(graph_type)
-			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
+			execute_on_main_thread_and_wait(lambda: perform_step_over_il_after(reason, data))
+
+		def perform_step_over_il_after(reason, data):
+			self.handle_stop_return(reason, data)
+			self.debug_state.ui.context_display()
+			self.debug_state.ui.navigate_to_rip()
 
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_over_il_thread).start()
@@ -249,8 +322,12 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_step_return_thread():
 			(reason, data) = self.debug_state.step_return()
-			execute_on_main_thread_and_wait(lambda: self.handle_stop_return(reason, data))
-			execute_on_main_thread_and_wait(lambda: self.debug_state.ui.context_display())
+			execute_on_main_thread_and_wait(lambda: perform_step_return_after(reason, data))
+
+		def perform_step_return_after(reason, data):
+			self.handle_stop_return(reason, data)
+			self.debug_state.ui.context_display()
+			self.debug_state.ui.navigate_to_rip()
 
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_return_thread).start()
