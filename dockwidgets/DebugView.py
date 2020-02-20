@@ -3,9 +3,11 @@ from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize, QTimer
 from PySide2.QtGui import QPalette, QFontMetricsF
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QStyle, QSplitter, QLabel
 
+import threading
+
 import binaryninja
 import binaryninjaui
-from binaryninja import BinaryView
+from binaryninja import BinaryView, PythonScriptingInstance
 from binaryninja.enums import InstructionTextTokenType
 from binaryninjaui import View, ViewType, UIAction, UIActionHandler, LinearView, DisassemblyContainer, ViewFrame, DockHandler, TokenizedTextView
 
@@ -109,15 +111,14 @@ class DebugView(QWidget, View):
 		self.update_timer.setSingleShot(False)
 		self.update_timer.timeout.connect(lambda: self.updateTimerEvent())
 
-		# Add debugger state to the interpreter as `dbg`
-		main_window = parent.window()
-		dock_handler = main_window.findChild(DockHandler, '__DockHandler')
-		if dock_handler:
-			console = dock_handler.getDockWidget('Python Console')
-			if console:
-				# Hack: Currently no way to access the scripting provider directly
-				# So just run the commands through the ui
-				console.widget().addInput("import debugger\ndbg = debugger.get(bv)")
+		self.add_scripting_ref()
+
+	def add_scripting_ref(self):
+		# Hack: The interpreter is just a thread, so look through all threads
+		# and assign our state to the interpreter's locals
+		for thread in threading.enumerate():
+			if type(thread) == PythonScriptingInstance.InterpreterThread:
+				thread.locals["dbg"] = self.debug_state
 
 	def getData(self):
 		return self.bv
@@ -149,6 +150,7 @@ class DebugView(QWidget, View):
 	def showEvent(self, event):
 		if not event.spontaneous():
 			self.update_timer.start()
+			self.add_scripting_ref()
 
 	def hideEvent(self, event):
 		if not event.spontaneous():
