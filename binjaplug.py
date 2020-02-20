@@ -6,7 +6,7 @@ import platform
 import binaryninja
 from binaryninja import BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation
 
-from . import DebugAdapter, ProcessView, dbgeng, QueuedAdapter
+from . import DebugAdapter, ProcessView, dbgeng, QueuedAdapter, StackAnalyzer
 
 try:
 	# create the widgets, debugger, etc.
@@ -509,47 +509,7 @@ class DebuggerState:
 			self.memory_view.define_data_var(addr, Type.int(bits // 8, sign=False))
 			self.old_dvs.add(addr)
 
-		# Create structure for stack frame
-		if self.bv.arch.name == 'x86_64':
-			local_rip = self.memory_view.remote_addr_to_local(reg_addrs['rip'])
-			current_function = None
-			use_fancy_stack = False
-			for fn in self.bv.get_functions_containing(local_rip):
-				if fn.arch == self.memory_view.arch:
-					current_function = fn
-					# Some instructions cause no stack variables to be defined
-					use_fancy_stack = current_function.get_stack_var_at_frame_offset(0, local_rip) is not None
-
-			width = reg_addrs['rbp'] - reg_addrs['rsp'] + self.bv.arch.address_size
-			if width > 0:
-				if width > 0x1000:
-					width = 0x1000
-				struct = Structure()
-				struct.type = StructureType.StructStructureType
-				struct.width = width
-
-				if use_fancy_stack:
-					# Take variables from current function
-					for var in current_function.stack_layout:
-						current_var = current_function.get_stack_var_at_frame_offset(var.storage, local_rip)
-						if current_var == var:
-							offset = width + var.storage
-							struct.insert(offset, var.type, var.name)
-				else:
-					# No function info, just use offsets
-					for i in range(0, width, self.bv.arch.address_size):
-						offset = (width - i)
-						var_name = "var_{:x}".format(offset)
-						struct.insert(i, Type.pointer(self.bv.arch, Type.void()), var_name)
-
-				self.memory_view.define_data_var(reg_addrs['rsp'], Type.structure_type(struct))
-				self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, reg_addrs['rsp'], "$stack_frame", raw_name="$stack_frame"))
-
-				self.old_symbols.append(self.memory_view.get_symbol_by_raw_name("$stack_frame"))
-				self.old_dvs.add(self.registers['rsp'])
-		else:
-			pass
-			# raise NotImplementedError('only x86_64 so far')
+		StackAnalyzer.analyze_stack(self)
 
 	#--------------------------------------------------------------------------
 	# I/O Handling
