@@ -42,8 +42,7 @@ class DebuggerUI:
 		# Update Registers
 		#----------------------------------------------------------------------
 		regs = []
-		for register in self.state.adapter.reg_list():
-			value = self.state.adapter.reg_read(register)
+		for (register, value) in self.state.registers:
 			bits = self.state.adapter.reg_bits(register)
 			regs.append({
 				'name': register,

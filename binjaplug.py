@@ -312,7 +312,7 @@ class DebuggerState:
 	@property
 	def ip(self):
 		if self.bv.arch.name == 'x86_64':
-			return self.adapter.reg_read('rip')
+			return self.registers['rip']
 		else:
 			raise NotImplementedError('unimplemented architecture %s' % self.bv.arch.name)
 
@@ -327,7 +327,7 @@ class DebuggerState:
 	@property
 	def stack_pointer(self):
 		if self.bv.arch.name == 'x86_64':
-			return self.adapter.reg_read('rsp')
+			return self.registers['rsp']
 		else:
 			raise NotImplementedError('unimplemented architecture %s' % self.bv.arch.name)
 
@@ -346,8 +346,7 @@ class DebuggerState:
 		addr_regs = {}
 		reg_addrs = {}
 
-		for reg in self.adapter.reg_list():
-			addr = self.adapter.reg_read(reg)
+		for (reg, addr) in self.registers:
 			reg_symbol_name = '$' + reg
 
 			if addr not in addr_regs.keys():
