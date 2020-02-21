@@ -215,7 +215,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		valstr = ''.join(reversed(valstr))
 
 		# see if gdb will respond to a single register set
-		payload = 'P%d=%s' % (self.reg_info[name]['id'], valstr)
+		payload = 'P%X=%s' % (self.reg_info[name]['id'], valstr)
 		reply = rsp.tx_rx(self.sock, payload)
 		if reply != '':
 			return
