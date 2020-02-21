@@ -399,19 +399,27 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		#
 		regnum = 0
 		self.reg_info = {}
+		general_group_id = None
 		def search_reg(name, attrs):
-			nonlocal regnum
+			nonlocal regnum, general_group_id
 			if name == 'reg':
 				regname = attrs['name']
 				if 'regnum' in attrs:
 					regnum = int(attrs['regnum'])
-					#print('-------- fast-forwarding regnum to %d' % regnum)
 				bitsize = None
 				if 'bitsize' in attrs:
 					bitsize = int(attrs['bitsize'])
-					#print('has bitsize %d' % bitsize)
+
+				# latch on first group/group_id mapping
+				if general_group_id == None:
+					if attrs.get('group') == 'general' and 'group_id' in attrs:
+						general_group_id = attrs['group_id']
+
 				group = attrs.get('group')
-				#print('assigning reg %s num %d' % (regname, regnum))
+				if group == 'general' and (not attrs['group_id'] == general_group_id):
+					group = 'unknown'
+
+				#print('assigning reg %s num=%d group=%s' % (regname, regnum, group))
 				self.reg_info[regname] = {'id':regnum, 'width':bitsize, 'group':group}
 				regnum += 1
 
