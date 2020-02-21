@@ -196,7 +196,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		else:
 			val = self.read_reg_specific(name)
 			if val == None:
-				raise DebugAdapter.GeneralERror('requested register %s missing from read reply' % name)
+				raise DebugAdapter.GeneralError('requested register %s missing from read reply' % name)
 			self.reg_cache[name] = val
 
 		return self.reg_cache[name]
@@ -351,6 +351,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		#print('saving %s' % fpath)
 		#with open(fpath, 'w') as fp:
 		#	fp.write(xml)
+
 		return xml
 
 	# See G.2.7 Registers for what's going on here
@@ -406,6 +407,9 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 				regname = attrs['name']
 				if 'regnum' in attrs:
 					regnum = int(attrs['regnum'])
+				else:
+					# regnum is the running value
+					pass
 				bitsize = None
 				if 'bitsize' in attrs:
 					bitsize = int(attrs['bitsize'])
@@ -421,23 +425,29 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 				#print('assigning reg %s num=%d group=%s' % (regname, regnum, group))
 				self.reg_info[regname] = {'id':regnum, 'width':bitsize, 'group':group}
+
+				# running value
 				regnum += 1
 
+		# parse targets.xml
 		p = xml.parsers.expat.ParserCreate()
 		p.StartElementHandler = search_reg
 		p.Parse(xmltxt)
 
+		# parse targets.xml include files
 		for fname in subfiles:
-			#print('acquiring %s' % fname)
 			xmltxt = self.get_xml(fname)
-			#print(xmltxt)
 			p = xml.parsers.expat.ParserCreate()
 			p.StartElementHandler = search_reg
 			p.Parse(xmltxt)
 
-		#
+		# if NO group information existed in the XML info, make everything general
+		# (this is observed on armv7/aarch64 over Android)
+		if general_group_id == None:
+			for reg_name in self.reg_info:
+				self.reg_info[reg_name]['group'] = 'general'
+
 		# calculate bit offset per register within a concatenated registers blob
-		#
 		id2name = {self.reg_info[k]['id']: k for k in self.reg_info.keys()}
 		id2width = {v['id']: v['width'] for v in self.reg_info.values()}
 		id_max = max(id2width.keys())
