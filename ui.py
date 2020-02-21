@@ -150,16 +150,23 @@ class DebuggerUI:
 		self.update_breakpoints()
 		self.navigate_to_rip()
 
-	def evaluate_llil(self, bv, llil):
-		if llil.operation == LowLevelILOperation.LLIL_CONST_PTR:
+	def evaluate_llil(self, state, llil):
+		if llil.operation == LowLevelILOperation.LLIL_CONST:
 			return llil.operands[0]
+		elif llil.operation == LowLevelILOperation.LLIL_CONST_PTR:
+			return llil.operands[0]
+		elif llil.operation == LowLevelILOperation.LLIL_REG:
+			reg = llil.operands[0].name
+			return state.registers[reg]
 		elif llil.operation == LowLevelILOperation.LLIL_LOAD:
-			addr = self.evaluate_llil(bv, llil.operands[0])
-			reader = BinaryReader(bv)
+			addr = self.evaluate_llil(state, llil.operands[0])
+			reader = BinaryReader(state.memory_view)
 			reader.seek(addr)
 			# TODO: 32-bit
 			deref = reader.read64()
 			return deref
+		elif llil.operation == LowLevelILOperation.LLIL_ADD:
+			return sum(self.evaluate_llil(state, op) for op in llil.operands)
 		else:
 			raise NotImplementedError('todo: evaluate llil for %s' % llil.operation)
 
@@ -174,8 +181,20 @@ class DebuggerUI:
 		call = llil.operation == LowLevelILOperation.LLIL_CALL
 		jump = llil.operation == LowLevelILOperation.LLIL_JUMP or llil.operation == LowLevelILOperation.LLIL_JUMP_TO
 
+		if self.state.modules.get_module_for_addr(remote_rip) == self.state.bv.file.original_filename:
+			if self.state.bv.read(local_rip, 1) is None:
+				print("Local address that is not local?")
+			else:
+				# If there's already a function here, then we have already been here
+				if len(self.state.bv.get_functions_containing(local_rip)) == 0:
+					print("Discovered new code at {:x}".format(local_rip))
+					self.state.bv.add_function(local_rip)
 		if call:
-			remote_target = self.evaluate_llil(self.state.memory_view, llil.dest)
+			try:
+				remote_target = self.evaluate_llil(self.state, llil.dest)
+			except e:
+				print("llil eval failed: {}".format(e))
+				return
 			print("call with remote target {:x}".format(remote_target))
 			if self.state.modules.get_module_for_addr(remote_target) == self.state.bv.file.original_filename:
 				local_target = self.state.memory_view.remote_addr_to_local(remote_target)
@@ -188,10 +207,14 @@ class DebuggerUI:
 						print("already has a function")
 						return
 
-					print("Discovered new code at {}".format(local_target))
+					print("Discovered new code at {:x}".format(local_target))
 					self.state.bv.add_function(local_target)
 		elif jump:
-			remote_target = self.evaluate_llil(self.state.memory_view, llil.dest)
+			try:
+				remote_target = self.evaluate_llil(self.state, llil.dest)
+			except e:
+				print("llil eval failed: {}".format(e))
+				return
 			print("jump with remote target {:x}".format(remote_target))
 			if self.state.modules.get_module_for_addr(remote_target) == self.state.bv.file.original_filename:
 				local_target = self.state.memory_view.remote_addr_to_local(remote_target)
@@ -204,7 +227,7 @@ class DebuggerUI:
 						print("already has a function")
 						return
 
-					print("Discovered new code at {}".format(local_target))
+					print("Discovered new code at {:x}".format(local_target))
 
 					# Add as a branch target to current function
 					if self.state.modules.get_module_for_addr(remote_rip) == self.state.bv.file.original_filename:
@@ -217,19 +240,8 @@ class DebuggerUI:
 								print("Local rip is not at a function?")
 								return
 
-							print("Discovered new code at {}".format(local_rip))
+							print("Discovered new code at {:x}".format(local_rip))
 							funcs[0].set_user_indirect_branches(local_rip, [(self.state.bv.arch, local_target)])
-		else:
-			if self.state.modules.get_module_for_addr(remote_rip) == self.state.bv.file.original_filename:
-				if self.state.bv.read(local_rip, 1) is None:
-					print("Local address that is not local?")
-				else:
-					# If there's already a function here, then we have already been here
-					if len(self.state.bv.get_functions_containing(local_rip)) > 0:
-						return
-
-					print("Discovered new code at {}".format(local_rip))
-					self.state.bv.add_function(local_rip)
 
 	def navigate_to_rip(self):
 		if self.state.adapter is None:
