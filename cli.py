@@ -161,7 +161,7 @@ if __name__ == '__main__':
 	user_goal = 'debug'
 	while user_goal == 'debug':
 		try:
-			text = input('FAKEDBG>')
+			text = input('BINJADBG>')
 			if not text:
 				continue
 
@@ -210,6 +210,11 @@ if __name__ == '__main__':
 				(_, reg) = text.split(' ')
 				val = adapter.reg_read(reg)
 				print('%s=%016X' % (reg, val))
+			elif text == '.regs':
+				for name in adapter.reg_list():
+					width = adapter.reg_bits(name)
+					value = adapter.reg_read(name)
+					print('%s (%d-bits) 0x%X' % (name, width, value))
 
 			# read/write mem, disasm mem
 			elif text.startswith('db '):

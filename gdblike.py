@@ -326,12 +326,27 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		self.tid = context.get('thread')
 
 	def get_xml(self, fname):
+		# https://sourceware.org/gdb/current/onlinedocs/gdb/General-Query-Packets.html#qXfer-target-description-read
 		#print('downloading %s' % fname)
-		data = rsp.tx_rx(self.sock, 'qXfer:features:read:%s:0,fff' % fname, 'ack_then_reply')
-		if not data[0] in ['l', 'm']:
-			raise DebugAdapter.GeneralError('acquiring register description xml')
-		data = rsp.un_rle(data[1:])
-		return data
+		xml = ''
+		offs = 0
+		while 1:
+			data = rsp.tx_rx(self.sock, 'qXfer:features:read:%s:%X,1000' % (fname, offs), 'ack_then_reply')
+			if not data[0] in ['l', 'm']:
+				raise DebugAdapter.GeneralError('acquiring register description xml')
+			if data[1:]:
+				#print('read 0x%X bytes' % len(tmp))
+				tmp = rsp.un_rle(data[1:])
+				xml += tmp
+				offs += len(tmp)
+			if data[0] == 'l':
+				break
+
+		#fpath = '/tmp/' + fname
+		#print('saving %s' % fpath)
+		#with open(fpath, 'w') as fp:
+		#	fp.write(xml)
+		return xml
 
 	# See G.2.7 Registers for what's going on here
 	# https://sourceware.org/gdb/current/onlinedocs/gdb/Target-Description-Format.html#Target-Description-Format

@@ -126,4 +126,5 @@ done
 
 `$ gdbserver --once --no-startup-with-shell localhost:31337 ./testbins/asmtest`
 
+(lldb) process connect connect://localhost:31337
 
