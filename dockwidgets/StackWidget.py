@@ -93,7 +93,7 @@ class DebugStackModel(QAbstractItemModel):
 				texts = []
 				for ref in info['refs']:
 					if ref['source'] == 'register':
-						register = ref['register']['name']
+						register = ref['register']
 						if ref['dest'] == 'address':
 							texts.append(register)
 						elif ref['dest'] == 'value':
