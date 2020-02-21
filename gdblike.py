@@ -70,6 +70,9 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		# inferred architecture (from xml response, regs, whatever)
 		self.arch = None
 
+		# server capabilities
+		self.server_capabilities = {}
+
 	#--------------------------------------------------------------------------
 	# API
 	#--------------------------------------------------------------------------
@@ -335,8 +338,9 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		#print('downloading %s' % fname)
 		xml = ''
 		offs = 0
+		pktsize = int(self.server_capabilities.get('PacketSize', '1000'), 16)
 		while 1:
-			data = rsp.tx_rx(self.sock, 'qXfer:features:read:%s:%X,1000' % (fname, offs), 'ack_then_reply')
+			data = rsp.tx_rx(self.sock, 'qXfer:features:read:%s:%X,%X' % (fname, offs, pktsize), 'ack_then_reply')
 			if not data[0] in ['l', 'm']:
 				raise DebugAdapter.GeneralError('acquiring register description xml')
 			if data[1:]:

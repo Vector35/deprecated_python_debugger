@@ -133,7 +133,17 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		# initial commands
 		rsp.tx_rx(self.sock, 'Hg0')
 		# if 'multiprocess+' in list here, thread reply is like 'pX.Y' where X is core id, Y is thread id
-		rsp.tx_rx(self.sock, 'qSupported:swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;xmlRegisters=i386')
+		# negotiate server capabilities
+		reply = rsp.tx_rx(self.sock, 'qSupported:swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;xmlRegisters=i386')
+		for line in reply.split(';'):
+			if '=' in line:
+				(name, val) = line.split('=')
+				self.server_capabilities[name] = val
+			else:
+				self.server_capabilities[line] = None
+		#for (name,val) in self.server_capabilities.items():
+		#	print('%s = %s' % (name,val))
+
 		self.reg_info_load()
 
 		# acquire pid as first tid
