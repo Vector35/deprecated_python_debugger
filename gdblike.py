@@ -181,26 +181,25 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	# register
 	def reg_read(self, name):
 		if not name in self.reg_info:
-			raise DebugAdapter.GeneralError("requested register %s doesnt exist" % name)
+			raise DebugAdapter.GeneralError("register %s doesnt exist in target description" % name)
 
 		if name in self.reg_cache:
 			#print('RETURNING CACHED VALUE! %s = 0x%X' % (name, self.reg_cache[name]))
 			return self.reg_cache[name]
 
 		# do a general purpose register query
-		tmp = self.general_read_registers()
-		if not name in tmp:
-			raise DebugAdapter.GeneralError("requested register %s doesnt exist" % name)
-		self.reg_cache.update(tmp)
-		return self.reg_cache[name]
+		if self.reg_info[name]['group'] == 'general':
+			tmp = self.read_reg_general()
+			if not name in tmp:
+				raise DebugAdapter.GeneralError("requested register %s missing in general register read reply" % name)
+			self.reg_cache.update(tmp)
+		else:
+			val = self.read_reg_specific(name)
+			if val == None:
+				raise DebugAdapter.GeneralERror('requested register %s missing from read reply' % name)
+			self.reg_cache[name] = val
 
-		# see if gdb will respond to a single register query
-		#id_ = self.reg_info[name]['id']
-		#reply = rsp.tx_rx(self.sock, 'p%02x' % id_)
-		#if reply != '':
-		#	val = int(''.join(reversed([reply[i:i+2] for i in range(0,len(reply),2)])), 16)
-		#	self.reg_cache[name] = val # cache result
-		#	return val
+		return self.reg_cache[name]
 
 	def reg_write(self, name, value):
 		if not name in self.reg_info:
@@ -297,7 +296,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	#--------------------------------------------------------------------------
 	# helpers, NOT part of the API
 	#--------------------------------------------------------------------------
-	def general_read_registers(self):
+	def read_reg_general(self):
 		result = {}
 		id2reg = {self.reg_info[k]['id']: k for k in self.reg_info.keys()}
 		reply = rsp.tx_rx(self.sock, 'g')
@@ -311,8 +310,14 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			result[reg] = int(valstr, 16)
 			reply = reply[nchars:]
 			if not reply: break
-
 		return result
+
+	def read_reg_specific(self, name):
+		id_ = self.reg_info[name]['id']
+		reply = rsp.tx_rx(self.sock, 'p%02x' % id_)
+		if reply != '':
+			val = int(''.join(reversed([reply[i:i+2] for i in range(0,len(reply),2)])), 16)
+			return val
 
 	def handle_stop(self, reason, data):
 		if reason in [DebugAdapter.STOP_REASON.PROCESS_EXITED,
@@ -405,8 +410,9 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 				if 'bitsize' in attrs:
 					bitsize = int(attrs['bitsize'])
 					#print('has bitsize %d' % bitsize)
+				group = attrs.get('group')
 				#print('assigning reg %s num %d' % (regname, regnum))
-				self.reg_info[regname] = {'id':regnum, 'width':bitsize}
+				self.reg_info[regname] = {'id':regnum, 'width':bitsize, 'group':group}
 				regnum += 1
 
 		p = xml.parsers.expat.ParserCreate()
