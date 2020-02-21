@@ -2,7 +2,7 @@ from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
 from binaryninja.plugin import PluginCommand
-from binaryninja import Endianness, HighlightStandardColor, LinearDisassemblyLine, LinearDisassemblyLineType, DisassemblyTextLine, InstructionTextToken, InstructionTextTokenType, execute_on_main_thread_and_wait
+from binaryninja import Endianness, HighlightStandardColor, LinearDisassemblyLine, LinearDisassemblyLineType, DisassemblyTextLine, InstructionTextToken, InstructionTextTokenType, execute_on_main_thread_and_wait, LowLevelILOperation, BinaryReader
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
 from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, ConsoleWidget, ModulesWidget, widget
 from . import binjaplug
@@ -145,9 +145,91 @@ class DebuggerUI:
 
 	# Called after every button action
 	def on_step(self):
+		self.detect_new_code()
 		self.context_display()
 		self.update_breakpoints()
 		self.navigate_to_rip()
+
+	def evaluate_llil(self, bv, llil):
+		if llil.operation == LowLevelILOperation.LLIL_CONST_PTR:
+			return llil.operands[0]
+		elif llil.operation == LowLevelILOperation.LLIL_LOAD:
+			addr = self.evaluate_llil(bv, llil.operands[0])
+			reader = BinaryReader(bv)
+			reader.seek(addr)
+			# TODO: 32-bit
+			deref = reader.read64()
+			return deref
+		else:
+			raise NotImplementedError('todo: evaluate llil for %s' % llil.operation)
+
+	def detect_new_code(self):
+		if self.state.adapter is None:
+			return
+
+		remote_rip = self.state.ip
+		local_rip = self.state.local_ip
+
+		llil = self.state.memory_view.arch.get_low_level_il_from_bytes(self.state.memory_view.read(remote_rip, self.state.memory_view.arch.max_instr_length), remote_rip)
+		call = llil.operation == LowLevelILOperation.LLIL_CALL
+		jump = llil.operation == LowLevelILOperation.LLIL_JUMP or llil.operation == LowLevelILOperation.LLIL_JUMP_TO
+
+		if call:
+			remote_target = self.evaluate_llil(self.state.memory_view, llil.dest)
+			print("call with remote target {:x}".format(remote_target))
+			if self.state.modules.get_module_for_addr(remote_target) == self.state.bv.file.original_filename:
+				local_target = self.state.memory_view.remote_addr_to_local(remote_target)
+				print("call with local target {:x}".format(local_target))
+				if self.state.bv.read(local_target, 1) is None:
+					print("Local address that is not local?")
+				else:
+					# If there's already a function here, then we have already been here
+					if len(self.state.bv.get_functions_containing(local_target)) > 0:
+						print("already has a function")
+						return
+
+					print("Discovered new code at {}".format(local_target))
+					self.state.bv.add_function(local_target)
+		elif jump:
+			remote_target = self.evaluate_llil(self.state.memory_view, llil.dest)
+			print("jump with remote target {:x}".format(remote_target))
+			if self.state.modules.get_module_for_addr(remote_target) == self.state.bv.file.original_filename:
+				local_target = self.state.memory_view.remote_addr_to_local(remote_target)
+				print("jump with local target {:x}".format(local_target))
+				if self.state.bv.read(local_target, 1) is None:
+					print("Local address that is not local?")
+				else:
+					# If there's already a function here, then we have already been here
+					if len(self.state.bv.get_functions_containing(local_target)) > 0:
+						print("already has a function")
+						return
+
+					print("Discovered new code at {}".format(local_target))
+
+					# Add as a branch target to current function
+					if self.state.modules.get_module_for_addr(remote_rip) == self.state.bv.file.original_filename:
+						if self.state.bv.read(local_rip, 1) is None:
+							print("Local address that is not local?")
+						else:
+							# If there's already a function here, then we have already been here
+							funcs = self.state.bv.get_functions_containing(local_rip)
+							if len(funcs) == 0:
+								print("Local rip is not at a function?")
+								return
+
+							print("Discovered new code at {}".format(local_rip))
+							funcs[0].set_user_indirect_branches(local_rip, [(self.state.bv.arch, local_target)])
+		else:
+			if self.state.modules.get_module_for_addr(remote_rip) == self.state.bv.file.original_filename:
+				if self.state.bv.read(local_rip, 1) is None:
+					print("Local address that is not local?")
+				else:
+					# If there's already a function here, then we have already been here
+					if len(self.state.bv.get_functions_containing(local_rip)) > 0:
+						return
+
+					print("Discovered new code at {}".format(local_rip))
+					self.state.bv.add_function(local_rip)
 
 	def navigate_to_rip(self):
 		if self.state.adapter is None:

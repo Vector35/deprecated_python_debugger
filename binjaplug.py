@@ -120,7 +120,7 @@ class DebuggerModules:
 			if modaddr < remote_address and modaddr > closest_modaddr:
 				closest_modaddr = modaddr
 				closest_modpath = modpath
-		return (closest_modpath, closest_modaddr)
+		return closest_modpath
 
 
 '''
@@ -153,7 +153,8 @@ class DebuggerBreakpoints:
 	def add_absolute(self, remote_address):
 		assert self.state.adapter is not None
 
-		(module, modstart) = self.state.modules.get_module_for_addr(remote_address)
+		module = self.state.modules.get_module_for_addr(remote_address)
+		modstart = self.state.modules[module]
 		relative_address = remote_address - modstart
 
 		info = {'module': module, 'offset': relative_address}
@@ -189,7 +190,8 @@ class DebuggerBreakpoints:
 	def remove_absolute(self, remote_address):
 		assert self.state.adapter is not None
 
-		(module, modstart) = self.state.modules.get_module_for_addr(remote_address)
+		module = self.state.modules.get_module_for_addr(remote_address)
+		modstart = self.state.modules[module]
 		relative_address = remote_address - modstart
 
 		info = {'module': module, 'offset': relative_address}
@@ -224,7 +226,8 @@ class DebuggerBreakpoints:
 	def contains_absolute(self, remote_address):
 		assert self.state.adapter is not None
 
-		(module, modstart) = self.state.modules.get_module_for_addr(remote_address)
+		module = self.state.modules.get_module_for_addr(remote_address)
+		modstart = self.state.modules[module]
 		relative_address = remote_address - modstart
 
 		info = {'module': module, 'offset': relative_address}
