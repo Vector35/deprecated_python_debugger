@@ -143,6 +143,12 @@ class DebuggerUI:
 			else:
 				self.debug_view.controls.state_stopped_extern()
 
+	# Called after every button action
+	def on_step(self):
+		self.context_display()
+		self.update_breakpoints()
+		self.navigate_to_rip()
+
 	def navigate_to_rip(self):
 		if self.state.adapter is None:
 			local_rip = self.state.bv.entry_point

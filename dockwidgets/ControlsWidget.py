@@ -147,9 +147,7 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_run_after():
 			self.state_stopped()
-			self.debug_state.ui.context_display()
-			self.debug_state.ui.update_breakpoints()
-			self.debug_state.ui.navigate_to_rip()
+			self.debug_state.ui.on_step()
 
 		def perform_run_error(e):
 			self.state_error(e)
@@ -172,9 +170,7 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_restart_after():
 			self.state_stopped()
-			self.debug_state.ui.context_display()
-			self.debug_state.ui.update_breakpoints()
-			self.debug_state.ui.navigate_to_rip()
+			self.debug_state.ui.on_step()
 
 		def perform_restart_error(e):
 			self.state_error(e)
@@ -185,9 +181,7 @@ class DebugControlsWidget(QToolBar):
 	def perform_quit(self):
 		self.debug_state.quit()
 		self.state_inactive()
-		self.debug_state.ui.context_display()
-		self.debug_state.ui.update_breakpoints()
-		self.debug_state.ui.navigate_to_rip()
+		self.debug_state.ui.on_step()
 
 	def perform_attach(self):
 
@@ -203,9 +197,7 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_attach_after():
 			self.state_stopped()
-			self.debug_state.ui.context_display()
-			self.debug_state.ui.update_breakpoints()
-			self.debug_state.ui.navigate_to_rip()
+			self.debug_state.ui.on_step()
 
 		def perform_attach_error(e):
 			self.state_error(e)
@@ -217,9 +209,7 @@ class DebugControlsWidget(QToolBar):
 	def perform_detach(self):
 		self.debug_state.detach()
 		self.state_inactive()
-		self.debug_state.ui.context_display()
-		self.debug_state.ui.update_breakpoints()
-		self.debug_state.ui.navigate_to_rip()
+		self.debug_state.ui.on_step()
 
 	def perform_settings(self):
 		def settings_finished():
@@ -250,8 +240,7 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_resume_after(reason, data):
 			self.handle_stop_return(reason, data)
-			self.debug_state.ui.context_display()
-			self.debug_state.ui.navigate_to_rip()
+			self.debug_state.ui.on_step()
 
 		self.state_running()
 		threading.Thread(target=perform_resume_thread).start()
@@ -264,8 +253,7 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_step_into_asm_after(reason, data):
 			self.handle_stop_return(reason, data)
-			self.debug_state.ui.context_display()
-			self.debug_state.ui.navigate_to_rip()
+			self.debug_state.ui.on_step()
 
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_into_asm_thread).start()
@@ -281,8 +269,7 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_step_into_il_after(reason, data):
 			self.handle_stop_return(reason, data)
-			self.debug_state.ui.context_display()
-			self.debug_state.ui.navigate_to_rip()
+			self.debug_state.ui.on_step()
 
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_into_il_thread).start()
@@ -295,8 +282,7 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_step_over_asm_after(reason, data):
 			self.handle_stop_return(reason, data)
-			self.debug_state.ui.context_display()
-			self.debug_state.ui.navigate_to_rip()
+			self.debug_state.ui.on_step()
 
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_over_asm_thread).start()
@@ -312,8 +298,7 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_step_over_il_after(reason, data):
 			self.handle_stop_return(reason, data)
-			self.debug_state.ui.context_display()
-			self.debug_state.ui.navigate_to_rip()
+			self.debug_state.ui.on_step()
 
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_over_il_thread).start()
@@ -326,8 +311,7 @@ class DebugControlsWidget(QToolBar):
 
 		def perform_step_return_after(reason, data):
 			self.handle_stop_return(reason, data)
-			self.debug_state.ui.context_display()
-			self.debug_state.ui.navigate_to_rip()
+			self.debug_state.ui.on_step()
 
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_return_thread).start()
