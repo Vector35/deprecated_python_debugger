@@ -42,8 +42,7 @@ class DebuggerUI:
 		# Update Registers
 		#----------------------------------------------------------------------
 		regs = []
-		for register in self.state.adapter.reg_list():
-			value = self.state.adapter.reg_read(register)
+		for (register, value) in self.state.registers:
 			bits = self.state.adapter.reg_bits(register)
 			regs.append({
 				'name': register,
@@ -101,15 +100,15 @@ class DebuggerUI:
 			value_int = int(value_int.hex(), 16)
 
 			refs = []
-			for register in regs:
-				if register['value'] == address:
+			for (register, reg_value) in self.state.registers:
+				if reg_value == address:
 					refs.append({
 						'source': 'register',
 						'dest': 'address',
 						'register': register
 					})
 				# Ignore zeroes because most registers start at zero and give false data
-				if value_int != 0 and register['value'] == value_int:
+				if value_int != 0 and reg_value == value_int:
 					refs.append({
 						'source': 'register',
 						'dest': 'value',

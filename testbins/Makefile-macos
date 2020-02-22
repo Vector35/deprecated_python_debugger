@@ -41,6 +41,11 @@ asmtest: asmtest.asm
 	nasm -f macho64 -DOS_IS_MACOS asmtest.asm -o asmtest.o
 	ld -macosx_version_min 10.7.0 -lSystem asmtest.o -o asmtest
 
+# 32-bit macos application (need to modify MacOSX Architectures.xcspec on Xcode 10+)
+sysroot := $(shell xcode-select -p)
+helloworld_i386: helloworld.c
+	gcc -Wl,-pie -arch i386 -isysroot "$(sysroot)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.13.sdk" helloworld.c -o helloworld_i386
+
 # Sample app with mmap and shellcode
 nopspeed: nopspeed.c
 	gcc -Wl,-pie -O3 nopspeed.c -o nopspeed

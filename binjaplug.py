@@ -312,7 +312,9 @@ class DebuggerState:
 	@property
 	def ip(self):
 		if self.bv.arch.name == 'x86_64':
-			return self.adapter.reg_read('rip')
+			return self.registers['rip']
+		elif self.bv.arch.name == 'x86':
+			return self.registers['eip']
 		else:
 			raise NotImplementedError('unimplemented architecture %s' % self.bv.arch.name)
 
@@ -327,7 +329,9 @@ class DebuggerState:
 	@property
 	def stack_pointer(self):
 		if self.bv.arch.name == 'x86_64':
-			return self.adapter.reg_read('rsp')
+			return self.registers['rsp']
+		elif self.bv.arch.name == 'x86':
+			return self.registers['esp']
 		else:
 			raise NotImplementedError('unimplemented architecture %s' % self.bv.arch.name)
 
@@ -346,8 +350,7 @@ class DebuggerState:
 		addr_regs = {}
 		reg_addrs = {}
 
-		for reg in self.adapter.reg_list():
-			addr = self.adapter.reg_read(reg)
+		for (reg, addr) in self.registers:
 			reg_symbol_name = '$' + reg
 
 			if addr not in addr_regs.keys():
@@ -395,7 +398,8 @@ class DebuggerState:
 				self.old_symbols.append(self.memory_view.get_symbol_by_raw_name("$stack_frame"))
 				self.old_dvs.add(reg_addrs['rsp'])
 		else:
-			raise NotImplementedError('only x86_64 so far')
+			pass
+			# raise NotImplementedError('only x86_64 so far')
 
 	#--------------------------------------------------------------------------
 	# I/O Handling
