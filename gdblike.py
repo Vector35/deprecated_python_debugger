@@ -196,8 +196,12 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		if self.reg_info[name]['group'] == 'general':
 			tmp = self.read_reg_general()
 			if not name in tmp:
-				raise DebugAdapter.GeneralError("requested register %s missing in general register read reply" % name)
-			self.reg_cache.update(tmp)
+				val = self.read_reg_specific(name)
+				if val == None:
+					raise DebugAdapter.GeneralError('requested register %s missing from read reply' % name)
+				self.reg_cache[name] = val
+			else:
+				self.reg_cache.update(tmp)
 		else:
 			val = self.read_reg_specific(name)
 			if val == None:
