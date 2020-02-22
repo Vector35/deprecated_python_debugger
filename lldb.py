@@ -250,6 +250,10 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	# NON-API UTILITIES
 	#--------------------------------------------------------------------------
 
+	def test(self):
+		print('test')
+		pass
+
 	def mem_modules_slow(self):
 		module2addr = {}
 		reply = rsp.tx_rx(self.sock, 'jGetLoadedDynamicLibrariesInfos:{"fetch_all_solibs":true}')

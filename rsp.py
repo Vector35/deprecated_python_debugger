@@ -20,7 +20,7 @@ def send_packet_data(sock, data):
 	packet = '$' + data + '#' + ("%02x" % (checksum % 256))
 	send_raw(sock, packet)
 
-def recv_packet_data(sock):
+def recv_packet_data(sock, decode=True):
 	hexes = b'abcdefABCDEF0123456789'
 
 	# consume ack's
@@ -45,7 +45,8 @@ def recv_packet_data(sock):
 	# acknowledge
 	send_raw(sock, '+')
 
-	return pkt[1:-3].decode('utf-8')
+	result = pkt[1:-3].decode('utf-8') if decode else pkt[1:-3]
+	return result
 
 def consume_ack(sock):
 	resp = sock.recv(1)
@@ -79,6 +80,29 @@ def tx_rx(sock, data, expect='ack_then_reply', handler_async_pkt=None):
 		elif expect == 'ack_then_reply':
 			consume_ack(sock)
 			reply = recv_packet_data(sock)
+		elif expect == 'host_io':
+			consume_ack(sock)
+			reply = recv_packet_data(sock, False)
+			if reply[0:1] != b'F':
+				raise RspGeneralError('host i/o packet did not start with F: ' + str(reply))
+			(result_errno, result, errno, attachment) = (None, None, None, None)
+			# split off attachment
+			if b';' in reply:
+				(result_errno, attachment) = reply.split(b';', 1)
+				attachment = binary_decode(attachment)
+			else:
+				result_errno = reply
+			# split off errno
+			result_errno = result_errno[1:].decode('utf-8')
+			if ',' in result_errno:
+				(result, errno) = result_errno.split(',')
+				errno = int(errno, 16)
+			else:
+				result = result_errno
+			# return result
+			result = int(result, 16)
+			return(result, errno, attachment)
+
 		elif expect == 'mixed_output_ack_then_reply':
 			ack_received = False
 			while 1:
@@ -119,6 +143,7 @@ def tx_rx(sock, data, expect='ack_then_reply', handler_async_pkt=None):
 			reply = un_rle(reply)
 
 		return reply
+
 	except OSError:
 		raise RspDisconnected('disconnection while transmitting')
 
@@ -154,6 +179,25 @@ def register_scan(sock):
 		#print('reg %d is %s' % (i, name))
 		result[i] = info
 
+	return result
+
+# https://sourceware.org/gdb/current/onlinedocs/gdb/Overview.html#Binary-Data
+# see "The binary data representation uses..."
+def binary_decode(data):
+	result = b''
+	skip = 0
+	for (i,val) in enumerate(data):
+		if skip:
+			skip = False
+		elif val == 0x7d: # '}'
+			result += bytes([data[i+1] ^ 0x20])
+			skip = True
+		elif val == 0x2a: # '*'
+			repeat = data[i+1] - 29
+			result = result + bytes([result[-1]] * repeat)
+			skip = True
+		else:
+			result += bytes([val])
 	return result
 
 def un_rle(data):

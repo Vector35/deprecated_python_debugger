@@ -166,7 +166,7 @@ if __name__ == '__main__':
 				continue
 
 			elif text == 'test':
-				pass
+				adapter.test()
 			elif text == 'test2':
 				pass
 			elif text.startswith('raw '):
