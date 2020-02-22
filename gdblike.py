@@ -37,7 +37,7 @@ def connect(host, port):
 	for tries in range(4):
 		try:
 			sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-			sock.connect(('localhost', port))
+			sock.connect((host, port))
 			return sock
 
 		except ConnectionRefusedError:
