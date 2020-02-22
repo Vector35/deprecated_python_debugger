@@ -343,22 +343,47 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		self.tid = context.get('thread')
 
 	def get_remote_file(self, fpath):
+		# set filesystem to target's
 		(result, errno, attachment) = rsp.tx_rx(self.sock, 'vFile:setfs:0', 'host_io')
 		if result != 0: raise DebugAdapter.GeneralError('could not set remote filesystem')
 
+		# open
 		(fpath, flags, mode) = (''.join(['%02X'%ord(c) for c in fpath]), 0, 0)
 		(result, errno, attachment) = rsp.tx_rx(self.sock, 'vFile:open:%s,%X,%X' % (fpath, flags, mode), 'host_io')
 		if result < 0: raise Exception('unable to open file with host I/O')
-
 		fd = result
+
+		# fstat
+		# NOTE: /proc/pid/maps is reported 0 length
 		(result, errno, attachment) = rsp.tx_rx(self.sock, 'vFile:fstat:%X'%fd, 'host_io')
 		if result != 0x40: raise Exception('expected 0x40 host io fstat return value')
 		if len(attachment) != 0x40:
 			raise Exception('returned struct stat is %d bytes, expected 64' % len(attachment))
-
 		flen = struct.unpack('>I', attachment[32:36])[0]
-		print('remote file length is: %d\n' % flen)
-		rsp.tx_rx(self.sock, 'vFile:close:%d'%fd, 'host_io')
+		#print('file length: %d' % flen)
+
+		# read loop
+		data = b''
+		offs = 0
+		while 1:
+			(result, errno, attachment) = rsp.tx_rx(self.sock, 'vFile:pread:%X,%X,%X'%(fd,1024,offs), 'host_io')
+			if result < 0:
+				raise Exception('host i/o pread() failed, result=%d, errno=%d' % (result, errno))
+			if result == 0: # EOF
+				break
+			if result != len(attachment):
+				raise Exception('host i/o pread() returned 0x%X but decoded binary attachment is size 0x%X' % \
+				  (result, len(attachment)))
+			data += attachment
+			offs += len(attachment)
+
+		# close
+		(result, errno, attachment) = rsp.tx_rx(self.sock, 'vFile:close:%d'%fd, 'host_io')
+		if result != 0:
+			raise Exception('host i/o close() failed, result=%d, errno=%d' % (result, errno))
+
+		# done
+		return data
 
 	def get_xml(self, fname):
 		# https://sourceware.org/gdb/current/onlinedocs/gdb/General-Query-Packets.html#qXfer-target-description-read

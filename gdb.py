@@ -155,8 +155,14 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 	def mem_modules(self):
 		module2addr = {}
 
-		with open('/proc/%d/maps' % self.pid, 'r') as fp:
-			lines = fp.readlines()
+		# TODO: prefer local open() if debuggee is on same filesystem as debugger
+		fpath = '/proc/%d/maps' % self.pid
+		#with open(fpath, 'r') as fp:
+		#	lines = fp.readlines()
+
+		data = self.get_remote_file(fpath)
+		data = data.decode('utf-8')
+		lines = data.split('\n')
 
 		for line in lines:
 			line = line.strip()
@@ -164,7 +170,6 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 			if not m: continue
 			(addr, module) = m.group(1,2)
 			if module in module2addr: continue
-			if os.path.exists(module):
-				module2addr[module] = int(addr, 16)
+			module2addr[module] = int(addr, 16)
 
 		return module2addr
