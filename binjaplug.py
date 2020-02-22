@@ -5,7 +5,7 @@ import time
 import binaryninja
 from binaryninja import BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation
 
-from . import DebugAdapter, ProcessView
+from . import DebugAdapter, ProcessView, dbgeng
 
 try:
 	# create the widgets, debugger, etc.
@@ -91,17 +91,48 @@ class DebuggerModules:
 	def __init__(self, state):
 		self.state = state
 		self.mark_dirty()
+		self.translations = {}
 
 	def mark_dirty(self):
 		self.module_cache = None
+
+	@property
+	def current(self):
+		fpath_exe = self.state.bv.file.original_filename
+		if isinstance(self.state.adapter, dbgeng.DebugAdapterDbgeng):
+			fpath_exe = fpath_exe.replace('/', '\\')
+
+		for (mod, base) in self:
+			if mod == fpath_exe:
+				return mod
+
+		# Can't find by full path, try to find by basename
+
+		def strip_to_last(path):
+			slash = path.rfind('/')
+			if slash != -1:
+				return path[slash+1:]
+			slash = path.rfind('\\')
+			if slash != -1:
+				return path[slash+1:]
+			return path
+
+		for (mod, base) in self:
+			if strip_to_last(fpath_exe) == strip_to_last(mod):
+				return mod
+
+		raise Exception("Cannot find current module! Is the loaded bndb pointing to a different file?")
 
 	def __iter__(self):
 		if self.state.adapter is None:
 			return None
 		if self.module_cache is None:
 			self.module_cache = self.state.adapter.mem_modules().items()
-		for module in self.module_cache:
-			yield module
+		for (module, modbase) in self.module_cache:
+			if module in self.translations:
+				yield (self.translations[module], modbase)
+			else:
+				yield (module, modbase)
 
 	def __getitem__(self, item):
 		for (modpath, modaddr) in self:
@@ -460,6 +491,12 @@ class DebuggerState:
 			raise Exception("cannot connect to adapter of type %s" % self.adapter_type)
 
 		self.memory_view.update_base()
+
+		current_module = self.modules.current
+		if current_module != self.bv.file.original_filename:
+			print("Detected remote process running at different path: {}".format(current_module))
+			self.modules.translations[current_module] = self.bv.file.original_filename
+
 		self.breakpoints.apply()
 		self.memory_dirty()
 

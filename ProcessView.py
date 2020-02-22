@@ -4,7 +4,6 @@ from binaryninja import BinaryView, SegmentFlag
 
 from . import binjaplug
 from . import DebugAdapter
-from . import dbgeng
 
 """
 The debug memory BinaryView layout is in a few pieces:
@@ -56,17 +55,8 @@ class DebugProcessView(BinaryView):
 	Get the base address of the binary in the debugged process
 	"""
 	def get_remote_base(self):
-		adapter = binjaplug.get_state(self.local_view).adapter
-		modules = adapter.mem_modules()
-
-		fpath_exe = self.local_view.file.original_filename
-		if isinstance(adapter, dbgeng.DebugAdapterDbgeng):
-			fpath_exe = fpath_exe.replace('/', '\\')
-
-		if not fpath_exe in modules:
-			raise Exception('expected %s to be in %s' % (fpath_exe, modules))
-
-		return modules[fpath_exe]
+		debug_state = binjaplug.get_state(self.local_view)
+		return debug_state.modules[debug_state.modules.current]
 
 	"""
 	Determine if the debugged process is using ASLR for its code segment
