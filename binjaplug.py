@@ -348,7 +348,7 @@ class DebuggerState:
 			return self.registers['eip']
 		elif self.bv.arch.name == 'aarch64':
 			return self.registers['pc']
-		elif self.bv.arch.name == 'arm':
+		elif self.bv.arch.name in ['arm', 'armv7']:
 			return self.registers['pc']
 		else:
 			raise NotImplementedError('unimplemented architecture %s' % self.bv.arch.name)
@@ -369,7 +369,7 @@ class DebuggerState:
 			return self.registers['esp']
 		elif self.bv.arch.name == 'aarch64':
 			return self.registers['sp']
-		elif self.bv.arch.name == 'arm':
+		elif self.bv.arch.name in ['arm', 'armv7']:
 			return self.registers['sp']
 		else:
 			raise NotImplementedError('unimplemented architecture %s' % self.bv.arch.name)

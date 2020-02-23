@@ -116,7 +116,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		elif 'x0' in self.reg_info and 'pc' in self.reg_info:
 			self.target_arch_ = 'aarch64'
 		elif 'r0' in self.reg_info and 'pc' in self.reg_info:
-			self.target_arch_ = 'armv7'
+			self.target_arch_ = 'arm'
 		else:
 			raise DebugAdapter.GeneralError('determining target architecture')
 
@@ -190,7 +190,11 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		if addr in self.breakpoints:
 			raise DebugAdapter.BreakpointSetError("breakpoint set at 0x%X already exists" % addr)
 
-		data = 'Z0,%x,1' % addr
+		sw_brk_sz = 1
+		# TODO: determine size of breakpoint if target switches between arm/thumb
+		if self.target_arch() == 'arm':
+			sw_brk_sz = 4
+		data = 'Z0,%x,%d' % (addr, sw_brk_sz)
 		reply = rsp.tx_rx(self.sock, data)
 		if reply != 'OK':
 			raise DebugAdapter.BreakpointSetError('rsp replied: %s' % reply)
@@ -201,7 +205,8 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		if not addr in self.breakpoints:
 			raise DebugAdapter.BreakpointClearError("breakpoint clear at 0x%X doesn't exist" % addr)
 
-		data = 'z0,%x,1' % addr
+		sw_brk_sz = 4 if self.target_arch() == 'arm' else 1
+		data = 'z0,%x,%d' % (addr, sw_brk_sz)
 		reply = rsp.tx_rx(self.sock, data)
 		if reply != 'OK':
 			raise DebugAdapter.BreakpointClearError("rsp replied: %s" % reply)
@@ -334,7 +339,6 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	def step_over(self):
 		# gdb, lldb just doesn't have this, you must synthesize it yourself
 		self.reg_cache = {}
-		self.handle_stop(reason, reason_data)
 		raise NotImplementedError('step over')
 
 	#--------------------------------------------------------------------------
