@@ -144,23 +144,26 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		#for (name,val) in self.server_capabilities.items():
 		#	print('%s = %s' % (name,val))
 
+		self.pktlen = int(self.server_capabilities.get('PacketSize', '0xfff'), 16)
+
 		self.reg_info_load()
 
 		# acquire pid as first tid
 		reply = rsp.tx_rx(self.sock, '?')
 		tdict = rsp.packet_T_to_dict(reply)
 		self.tid = tdict['thread']
-		self.pid = self.tid
+		self.target_pid_ = self.tid
 
 	def mem_modules(self):
-		module2addr = {}
+		self.module2addr = {}
+
+		fpath = '/proc/%d/maps' % self.target_pid_
 
 		# TODO: prefer local open() if debuggee is on same filesystem as debugger
-		fpath = '/proc/%d/maps' % self.pid
 		#with open(fpath, 'r') as fp:
 		#	lines = fp.readlines()
-
 		data = self.get_remote_file(fpath)
+
 		data = data.decode('utf-8')
 		lines = data.split('\n')
 
@@ -169,7 +172,7 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 			m = re.match(r'^([0-9a-f]+)-[0-9a-f]+ [rwxp-]{4} .* (/.*)$', line)
 			if not m: continue
 			(addr, module) = m.group(1,2)
-			if module in module2addr: continue
-			module2addr[module] = int(addr, 16)
+			if module in self.module2addr: continue
+			self.module2addr[module] = int(addr, 16)
 
-		return module2addr
+		return self.module2addr

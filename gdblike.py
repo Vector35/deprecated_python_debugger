@@ -69,8 +69,13 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		# client tracks selected thread
 		self.tid = None
 
-		# inferred architecture (from xml response, regs, whatever)
-		self.arch = None
+		# memory map
+		self.module2addr = None
+
+		# target info
+		self.target_arch_ = None
+		self.target_pid_ = None
+		self.target_path_ = None
 
 		# server capabilities
 		self.server_capabilities = {}
@@ -98,20 +103,44 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		except rsp.RspDisconnected:
 			pass
 
-	# misc info
-	def architecture(self):
+	# target info
+	def target_arch(self):
 		# if stub reported architecture during xml parsing, return it!
-		if self.arch:
-			return self.arch
+		if self.target_arch_:
+			return self.target_arch_
 
 		if 'rax' in self.reg_info and 'rip' in self.reg_info:
-			return 'x86_64'
+			self.target_arch_ = 'x86_64'
 		elif 'eax' in self.reg_info and 'eip' in self.reg_info:
-			return 'x86'
+			self.target_arch_ = 'x86'
 		elif 'x0' in self.reg_info and 'pc' in self.reg_info:
-			return 'aarch64'
+			self.target_arch_ = 'aarch64'
+		elif 'r0' in self.reg_info and 'pc' in self.reg_info:
+			self.target_arch_ = 'armv7'
 		else:
 			raise DebugAdapter.GeneralError('determining target architecture')
+
+		return self.target_arch_
+
+	def target_path(self):
+		if self.target_path_ != None:
+			return self.target_path_
+
+		if 'qXfer:exec-file:read+' in self.server_capabilities:
+			reply = rsp.tx_rx(self.sock, 'qXfer:exec-file:read:%X:0,%X'%(self.target_pid_, self.pktlen))
+			if reply.startswith('l'):
+				self.target_path_ = reply[1:]
+
+		return self.target_path_
+
+	def target_pid(self):
+		return self.target_pid_
+
+	def target_base(self):
+		if self.module2addr == None:
+			self.mem_modules()
+
+		return self.module2addr.get(self.target_path())
 
 	# threads
 	def thread_list(self):
@@ -269,6 +298,12 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			return 0
 
 	def mem_modules(self):
+		# this SHOULD work, but reply is always empty "l<library-list-svr4 version="1.0"/>"
+		# and online people have the same issue
+		#if 'qXfer:libraries-svr4:read+' in self.server_capabilities:
+		#	print(rsp.tx_rx(self.sock, 'qXfer:libraries-svr4:read::0,fff'))
+		#	...
+
 		raise NotImplementedError('mem_modules()')
 
 	# break
@@ -306,7 +341,8 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	# helpers, NOT part of the API
 	#--------------------------------------------------------------------------
 	def test(self):
-		self.get_remote_file('/data/local/tmp/speak.so')
+		print('%X' %self.target_base())
+		pass
 
 	def read_reg_general(self):
 		result = {}
@@ -441,7 +477,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		def target_xml_char_data_handler(data):
 			nonlocal inarch
 			if inarch:
-				self.arch = data
+				self.target_arch_ = data
 
 		p = xml.parsers.expat.ParserCreate()
 		p.StartElementHandler = target_xml_start_elem

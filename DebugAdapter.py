@@ -154,8 +154,14 @@ class DebugAdapter:
 		''' quit debug session, debuggee terminated '''
 		raise NotImplementedError('')
 
-	# misc info
-	def architecture(self):
+	# target info
+	def target_arch(self):
+		raise NotImplementedError('')
+	def target_path(self):
+		raise NotImplementedError('')
+	def target_pid(self):
+		raise NotImplementedError('')
+	def target_base(self):
 		raise NotImplementedError('')
 
 	# threads

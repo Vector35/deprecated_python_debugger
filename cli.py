@@ -155,7 +155,7 @@ if __name__ == '__main__':
 		adapter = DebugAdapter.get_adapter_for_current_system()
 		adapter.exec(arg1)
 
-	arch = adapter.architecture()
+	arch = adapter.target_arch()
 	arch_dis = 'armv7' if arch=='arm' else arch
 
 	user_goal = 'debug'
@@ -168,7 +168,7 @@ if __name__ == '__main__':
 			elif text == 'test':
 				adapter.test()
 			elif text == 'test2':
-				pass
+				print(adapter.target_path())
 			elif text.startswith('raw '):
 				print(adapter.raw(text[4:]))
 
@@ -259,6 +259,13 @@ if __name__ == '__main__':
 						print('stopped, reason: %s' % reason.name)
 						context_display()
 						break
+
+			# target info
+			elif text == 'target':
+				print('arch: %s' % adapter.target_arch())
+				print('path: %s' % adapter.target_path())
+				print(' pid: 0x%X (%d)' % (adapter.target_pid(), adapter.target_pid()))
+				print('base: 0x%X' %  adapter.target_base())
 
 			# quit, detach, quit+detach
 			elif text in ['q', 'quit', 'exit']:
