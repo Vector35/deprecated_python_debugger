@@ -278,7 +278,7 @@ class DebuggerUI:
 
 	def update_modules(self):
 		mods = []
-		for (modpath, address) in self.state.adapter.mem_modules().items():
+		for (modpath, address) in self.state.adapter.mem_modules(False).items():
 			mods.append({
 				'address': address,
 				'modpath': modpath

@@ -205,7 +205,7 @@ class DebugAdapter:
 		raise NotImplementedError('')
 	def mem_write(self, address, data):
 		raise NotImplementedError('')
-	def mem_modules(self):
+	def mem_modules(self, cache_ok=True):
 		raise NotImplementedError('')
 
 	# break

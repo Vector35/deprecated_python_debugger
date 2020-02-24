@@ -154,7 +154,10 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		self.tid = tdict['thread']
 		self.target_pid_ = self.tid
 
-	def mem_modules(self):
+	def mem_modules(self, cache_ok=True):
+		if cache_ok and self.module2addr != None:
+			return self.module2addr
+
 		self.module2addr = {}
 
 		fpath = '/proc/%d/maps' % self.target_pid_

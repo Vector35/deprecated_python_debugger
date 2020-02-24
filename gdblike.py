@@ -325,6 +325,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go(self):
 		self.reg_cache = {}
+		self.module2addr = None
 		#return self.go_generic('c', self.handler_async_pkt)
 		(reason, reason_data) = self.go_generic('vCont;c:-1', self.handler_async_pkt)
 		self.handle_stop(reason, reason_data)
@@ -339,6 +340,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	def step_over(self):
 		# gdb, lldb just doesn't have this, you must synthesize it yourself
 		self.reg_cache = {}
+		self.module2addr = None
 		raise NotImplementedError('step over')
 
 	#--------------------------------------------------------------------------
@@ -383,6 +385,10 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		self.tid = context.get('thread')
 
 	def get_remote_file(self, fpath):
+		#print('get_remote_file(%s)' % fpath)
+		#import traceback
+		#traceback.print_stack()
+
 		# set filesystem to target's
 		(result, errno, attachment) = rsp.tx_rx(self.sock, 'vFile:setfs:0', 'host_io')
 		if result != 0: raise DebugAdapter.GeneralError('could not set remote filesystem')
@@ -395,11 +401,11 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 		# fstat
 		# NOTE: /proc/pid/maps is reported 0 length
-		(result, errno, attachment) = rsp.tx_rx(self.sock, 'vFile:fstat:%X'%fd, 'host_io')
-		if result != 0x40: raise Exception('expected 0x40 host io fstat return value')
-		if len(attachment) != 0x40:
-			raise Exception('returned struct stat is %d bytes, expected 64' % len(attachment))
-		flen = struct.unpack('>I', attachment[32:36])[0]
+		#(result, errno, attachment) = rsp.tx_rx(self.sock, 'vFile:fstat:%X'%fd, 'host_io')
+		#if result != 0x40: raise Exception('expected 0x40 host io fstat return value')
+		#if len(attachment) != 0x40:
+		#	raise Exception('returned struct stat is %d bytes, expected 64' % len(attachment))
+		#flen = struct.unpack('>I', attachment[32:36])[0]
 		#print('file length: %d' % flen)
 
 		# read loop
