@@ -190,10 +190,13 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		if addr in self.breakpoints:
 			raise DebugAdapter.BreakpointSetError("breakpoint set at 0x%X already exists" % addr)
 
+		# TODO: somehow see if binja has a read on what arch the given address is,
+		# (if within target, use binja analysis, else ???)
+		# for now, we'll assume it's the arch in the cpsr for arm architectures
 		sw_brk_sz = 1
-		# TODO: determine size of breakpoint if target switches between arm/thumb
-		if self.target_arch() == 'arm':
-			sw_brk_sz = 4
+		if self.target_arch() in ['arm', 'thumb', 'thumb2']:
+			cpsr = self.reg_read('cpsr')
+			sw_brk_sz = 2 if (cpsr & 0x20) else 4
 		data = 'Z0,%x,%d' % (addr, sw_brk_sz)
 		reply = rsp.tx_rx(self.sock, data)
 		if reply != 'OK':

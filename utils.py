@@ -73,7 +73,7 @@ def disasm(data, addr, arch='x86_64'):
 	lines = []
 	offs = 0
 	while offs < len(data):
-		addrstr = '%016X' % addr
+		addrstr = '%016X' % (addr+offs)
 		(asmstr, length) = disasm1(data[offs:], addr+offs, arch)
 		if length == 0: break
 		bytestr = binascii.hexlify(data[offs:offs+length]).decode('utf-8').ljust(16)

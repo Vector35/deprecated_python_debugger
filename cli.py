@@ -23,13 +23,65 @@ import debugger.DebugAdapter as DebugAdapter
 
 # globals
 arch = None
-arch_dis = None
 adapter = None
 context_last = {}
 
 #--------------------------------------------------------------------------
 # COMMON DEBUGGER TASKS
 #--------------------------------------------------------------------------
+
+def get_arch_dis():
+	global arch
+
+	if arch in ['x86', 'x86_64', 'aarch64']:
+		return arch
+	elif arch in ['arm', 'armv7', 'thumb', 'thumb2']:
+		cpsr = adapter.reg_read('cpsr')
+		if cpsr & 0x20:
+			return 'thumb2eb' if (cpsr & 0x00000200) else 'thumb2'
+		else:
+			return 'armv7eb' if (cpsr & 0x00000200) else 'armv7'
+
+	raise Exception('couldn\'t determine architecture to disassemble with')
+
+def cpsr_tostr(cpsr):
+	result = '('
+	# bits [31, 27]
+	result += 'N' if cpsr & 0x80000000 else 'n'
+	result += 'Z' if cpsr & 0x40000000 else 'z'
+	result += 'C' if cpsr & 0x20000000 else 'c'
+	result += 'V' if cpsr & 0x10000000 else 'v'
+	result += 'Q' if cpsr & 0x08000000 else 'q'
+
+	# bits [26, 25]
+	IT_LO = (cpsr & 0x06000000) > 25
+
+	# bit 24
+	result += 'J' if cpsr & 0x01000000 else 'j'
+
+	# bits [19, 16]
+	GE = (cpsr & 0x000F0000) >> 16
+
+	# bits [15, 10]
+	IT_HI = (cpsr & 0x0000FC00) > 10
+
+	# bits [9, 5]
+	result += 'E' if cpsr & 0x00000200 else 'e'
+	result += 'A' if cpsr & 0x00000100 else 'a'
+	result += 'I' if cpsr & 0x00000080 else 'i'
+	result += 'F' if cpsr & 0x00000040 else 'f'
+	result += 'T' if cpsr & 0x00000020 else 't'
+
+	# bits [4, 0]
+	M = cpsr & 0x0000001F
+
+	IT = (IT_HI << 2) | IT_LO
+	result += ' GE=%sb' % bin(GE)[2:]
+	result += ' IT=%sb' % bin(IT)[2:]
+	result += ' M=%sb' % bin(M)[2:]
+	result += ')'
+
+	return result
 
 def context_display(pkt_T=None):
 	global arch
@@ -38,6 +90,7 @@ def context_display(pkt_T=None):
 
 	tid = adapter.thread_selected()
 	print('thread 0x%X:' % tid)
+
 
 	def r(reg, fmt='%016X'):
 		return (BROWN+reg+NORMAL+'='+fmt) % adapter.reg_read(reg.strip())
@@ -65,11 +118,12 @@ def context_display(pkt_T=None):
 		print(r('x28'), r('x29'), r('x30'), r(' sp'))
 		print(r('pc'), e('cpsr'))
 	elif arch == 'arm':
+		cpsr = adapter.reg_read('cpsr')
 		print(e(' r0'), e(' r1'), e(' r2'), e(' r3'))
 		print(e(' r4'), e(' r5'), e(' r6'), e(' r7'))
 		print(e(' r8'), e(' r9'), e('r10'), e('r11'))
 		print(e('r12'), e(' sp'), e(' lr'))
-		print(e(' pc'), e(' cpsr'))
+		print(e(' pc'), e(' cpsr'), cpsr_tostr(cpsr))
 
 	pc_name = {'aarch64':'pc', 'arm':'pc', 'x86_64':'rip', 'x86':'eip'}[arch]
 	pc_fmt = {'aarch64':'%016X', 'arm':'%08X', 'x86_64':'%016X', 'x86':'%08X'}[arch]
@@ -78,7 +132,7 @@ def context_display(pkt_T=None):
 	try:
 		data = adapter.mem_read(pc, 16)
 		if data:
-			(asmstr, asmlen) = utils.disasm1(data, pc, arch_dis)
+			(asmstr, asmlen) = utils.disasm1(data, pc, get_arch_dis())
 			print(('%s'+pc_fmt+'%s: %s\t%s') % \
 				(GREEN, pc, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
 	except DebugAdapter.GeneralError as e:
@@ -156,7 +210,6 @@ if __name__ == '__main__':
 		adapter.exec(arg1)
 
 	arch = adapter.target_arch()
-	arch_dis = 'armv7' if arch=='arm' else arch
 
 	user_goal = 'debug'
 	while user_goal == 'debug':
@@ -229,7 +282,7 @@ if __name__ == '__main__':
 			elif text.startswith('u '):
 				addr = int(text[2:],16)
 				data = adapter.mem_read(addr, 32)
-				print(utils.disasm(data, addr, arch_dis))
+				print(utils.disasm(data, addr, get_arch_dis()))
 			elif text == 'lm':
 				module2addr = adapter.mem_modules()
 				for module in sorted(module2addr, key=lambda m: module2addr[m]):
