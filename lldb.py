@@ -136,16 +136,17 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	def connect(self, address, port):
 		# connect to it
 		self.sock = gdblike.connect(address, port)
+		self.rspConn = rsp.RspConnection(self.sock)
 
 		# learn initial registers
 		self.reg_info_load()
 
 		# learn initial pointer to shared lib info in dyld
-		self.p_dyld_all_image_infos = int(rsp.tx_rx(self.sock, 'qShlibInfoAddr'), 16)
+		self.p_dyld_all_image_infos = int(self.rspConn.tx_rx('qShlibInfoAddr'), 16)
 
 	# threads
 	def thread_list(self):
-		reply = rsp.tx_rx(self.sock, 'qfThreadInfo', 'ack_then_reply')
+		reply = self.rspConn.tx_rx('qfThreadInfo', 'ack_then_reply')
 		if not reply.startswith('m'):
 			raise DebugAdapter.GeneralError("retrieving thread list from server after qfThreadInfo packet")
 		tids = reply[1:].split(',')
@@ -153,7 +154,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		return tids
 
 	def thread_selected(self):
-		reply = rsp.tx_rx(self.sock, '?', 'ack_then_reply')
+		reply = self.rspConn.tx_rx('?', 'ack_then_reply')
 		context = rsp.packet_T_to_dict(reply)
 		if not 'thread' in context:
 			raise DebugAdapter.GeneralError("setting thread on server after '?' packet")
@@ -168,11 +169,11 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 
 		# set thread for step and continue operations
 		payload = 'Hc%x' % tid
-		reply = rsp.tx_rx(self.sock, payload, 'ack_then_ok')
+		reply = self.rspConn.tx_rx(payload, 'ack_then_ok')
 
 		# set thread for other operations
 		payload = 'Hg%x' % tid
-		reply = rsp.tx_rx(self.sock, payload, 'ack_then_ok')
+		reply = self.rspConn.tx_rx(payload, 'ack_then_ok')
 
 	# breakpoints
 	#def breakpoint_set(self, addr):
@@ -256,7 +257,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 
 	def mem_modules_slow(self):
 		module2addr = {}
-		reply = rsp.tx_rx(self.sock, 'jGetLoadedDynamicLibrariesInfos:{"fetch_all_solibs":true}')
+		reply = self.rspConn.tx_rx('jGetLoadedDynamicLibrariesInfos:{"fetch_all_solibs":true}')
 		for (addr, path) in re.findall(r'"load_address":(\d+).*?"pathname":"([^"]+)"', reply):
 			addr = int(addr, 10)
 			module2addr[path] = addr
