@@ -18,7 +18,7 @@ port = 31337
 if sys.argv[1:]:
 	port = int(sys.argv[1])
 
-cap = pyshark.LiveCapture(interface='lo', bpf_filter='port %d'%port)
+cap = pyshark.LiveCapture(interface='lo', bpf_filter='(port 31337) or (port 31338) or (port 31339) or (port 31340)')
 
 for pkt in cap.sniff_continuously():
 	if not hasattr(pkt.tcp, 'payload'):

@@ -87,7 +87,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	# session start/stop
 	def detach(self):
 		try:
-			rsp.send_packet_data(self.sock, 'D')
+			self.rspConn.send_payload('D')
 			self.sock.shutdown(socket.SHUT_RDWR)
 			self.sock.close()
 			self.sock = None
@@ -96,7 +96,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 	def quit(self):
 		try:
-			rsp.send_packet_data(self.sock, 'k')
+			self.rspConn.send_payload('k')
 			self.sock.shutdown(socket.SHUT_RDWR)
 			self.sock.close()
 			self.sock = None
@@ -127,7 +127,8 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			return self.target_path_
 
 		if 'qXfer:exec-file:read+' in self.server_capabilities:
-			reply = rsp.tx_rx(self.sock, 'qXfer:exec-file:read:%X:0,%X'%(self.target_pid_, self.pktlen))
+			pktlen = self.rspConn.pktlen
+			reply = self.rspConn.tx_rx('qXfer:exec-file:read:%X:0,%X'%(self.target_pid_, pktlen))
 			if reply.startswith('l'):
 				self.target_path_ = reply[1:]
 
@@ -145,7 +146,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	# threads
 	def thread_list(self):
 		result = []
-		reply = rsp.tx_rx(self.sock, 'qfThreadInfo')
+		reply = self.rspConn.tx_rx('qfThreadInfo')
 		while 1:
 			if reply == 'l': break
 			if not reply.startswith('m'):
@@ -153,7 +154,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			tids = reply[1:].split(',')
 			tids = list(map(lambda x: int(x,16), tids))
 			result += tids
-			reply = rsp.tx_rx(self.sock, 'qsThreadInfo')
+			reply = self.rspConn.tx_rx('qsThreadInfo')
 
 		return result
 
@@ -161,25 +162,25 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		if self.tid == None:
 			raise DebugAdapter.GeneralError('no tid set by last stop or thread switch')
 
-		if rsp.tx_rx(self.sock, 'T%X'%self.tid) != 'OK':
+		if self.rspConn.tx_rx('T%X'%self.tid) != 'OK':
 			self.tid == None
 
 		return self.tid
 
 	def thread_select(self, tid):
-		if rsp.tx_rx(self.sock, 'T%X'%self.tid) != 'OK':
+		if self.rspConn.tx_rx('T%X'%self.tid) != 'OK':
 			raise DebugAdapter.GeneralError("tid 0x%X is not alive" % tid)
 
 		self.reg_cache = {}
 
 		# set thread for step and continue operations
 		payload = 'Hc%x' % tid
-		if rsp.tx_rx(self.sock, payload) != 'OK':
+		if self.rspConn.tx_rx(payload) != 'OK':
 			raise DebugAdapter.GeneralError('setting tid 0x%X for step and continue' % tid)
 
 		# set thread for other operations
 		payload = 'Hg%x' % tid
-		if rsp.tx_rx(self.sock, payload) != 'OK':
+		if self.rspConn.tx_rx(payload) != 'OK':
 			raise DebugAdapter.GeneralError('setting tid 0x%X for other operations' % tid)
 
 		#
@@ -198,7 +199,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			cpsr = self.reg_read('cpsr')
 			sw_brk_sz = 2 if (cpsr & 0x20) else 4
 		data = 'Z0,%x,%d' % (addr, sw_brk_sz)
-		reply = rsp.tx_rx(self.sock, data)
+		reply = self.rspConn.tx_rx(data)
 		if reply != 'OK':
 			raise DebugAdapter.BreakpointSetError('rsp replied: %s' % reply)
 		self.breakpoints[addr] = True
@@ -210,7 +211,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 		sw_brk_sz = 4 if self.target_arch() == 'arm' else 1
 		data = 'z0,%x,%d' % (addr, sw_brk_sz)
-		reply = rsp.tx_rx(self.sock, data)
+		reply = self.rspConn.tx_rx(data)
 		if reply != 'OK':
 			raise DebugAdapter.BreakpointClearError("rsp replied: %s" % reply)
 
@@ -261,19 +262,19 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 		# see if gdb will respond to a single register set
 		payload = 'P%X=%s' % (self.reg_info[name]['id'], valstr)
-		reply = rsp.tx_rx(self.sock, payload)
+		reply = self.rspConn.tx_rx(payload)
 		if reply != '':
 			return
 
 		# otherwise, do a general purpose register query, followed by a set
-		blob = rsp.tx_rx(self.sock, 'g')
+		blob = self.rspConn.tx_rx('g')
 		offset = self.reg_info[name].get('offset')
 		if offset == None:
 			raise DebugAdapter.GeneralError('requested register %s doesnt have offset' % name)
 		a = 2*(offset//8)
 		b = 2*((offset+width)//8)
 		payload = 'G'+blob[0:a]+valstr+blob[b:]
-		reply = rsp.tx_rx(self.sock, payload)
+		reply = self.rspConn.tx_rx(payload)
 		if reply != 'OK':
 			raise DebugAdapter.GeneralError('setting register %s' % name)
 
@@ -290,7 +291,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		result = b''
 		while(length):
 			sz = min(length, 1024) # safely below ethernet MTU 1024
-			reply = rsp.tx_rx(self.sock, 'm%x,%x' % (address, sz))
+			reply = self.rspConn.tx_rx('m%x,%x' % (address, sz))
 			if reply.startswith('E'):
 				raise DebugAdapter.GeneralError('reading from address 0x%X' % address)
 			result += bytes.fromhex(reply)
@@ -300,7 +301,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 	def mem_write(self, address, data):
 		payload = 'M%X,%X:%s' % (address, len(data), ''.join(['%02X'%b for b in data]))
-		reply = rsp.tx_rx(self.sock, payload)
+		reply = self.rspConn.tx_rx(payload)
 		if reply != 'OK':
 			raise DebugAdapter.GeneralError('writing to address 0x%X' % address)
 			return 0
@@ -309,19 +310,19 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		# this SHOULD work, but reply is always empty "l<library-list-svr4 version="1.0"/>"
 		# and online people have the same issue
 		#if 'qXfer:libraries-svr4:read+' in self.server_capabilities:
-		#	print(rsp.tx_rx(self.sock, 'qXfer:libraries-svr4:read::0,fff'))
+		#	print(self.rspConn.tx_rx('qXfer:libraries-svr4:read::0,fff'))
 		#	...
 
 		raise NotImplementedError('mem_modules()')
 
 	# break
 	def break_into(self):
-		rsp.send_raw(self.sock, '\x03')
+		self.rspConn.send_raw('\x03')
 		# TODO: detect error
 		return True
 
 	def break_reason(self):
-		pkt_T = rsp.tx_rx(self.sock, '?')
+		pkt_T = self.rspConn.tx_rx('?')
 		#print(pkt_T)
 
 	# execution control, all return:
@@ -356,7 +357,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	def read_reg_general(self):
 		result = {}
 		id2reg = {self.reg_info[k]['id']: k for k in self.reg_info.keys()}
-		reply = rsp.tx_rx(self.sock, 'g')
+		reply = self.rspConn.tx_rx('g')
 		for id_ in range(max(id2reg.keys())+1):
 			reg = id2reg.get(id_)
 			if reg == None: continue
@@ -371,7 +372,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 	def read_reg_specific(self, name):
 		id_ = self.reg_info[name]['id']
-		reply = rsp.tx_rx(self.sock, 'p%02x' % id_)
+		reply = self.rspConn.tx_rx('p%02x' % id_)
 		if reply != '':
 			val = int(''.join(reversed([reply[i:i+2] for i in range(0,len(reply),2)])), 16)
 			return val
@@ -381,7 +382,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			DebugAdapter.STOP_REASON.UNKNOWN, DebugAdapter.STOP_REASON.BACKEND_DISCONNECTED]:
 			return
 
-		reply = rsp.tx_rx(self.sock, '?')
+		reply = self.rspConn.tx_rx('?')
 		context = rsp.packet_T_to_dict(reply)
 		if not 'thread' in context:
 			raise DebugAdapter.GeneralError('determing thread responsible for stop')
@@ -393,18 +394,18 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		#traceback.print_stack()
 
 		# set filesystem to target's
-		(result, errno, attachment) = rsp.tx_rx(self.sock, 'vFile:setfs:0', 'host_io')
+		(result, errno, attachment) = self.rspConn.tx_rx('vFile:setfs:0', 'host_io')
 		if result != 0: raise DebugAdapter.GeneralError('could not set remote filesystem')
 
 		# open
 		(fpath, flags, mode) = (''.join(['%02X'%ord(c) for c in fpath]), 0, 0)
-		(result, errno, attachment) = rsp.tx_rx(self.sock, 'vFile:open:%s,%X,%X' % (fpath, flags, mode), 'host_io')
+		(result, errno, attachment) = self.rspConn.tx_rx('vFile:open:%s,%X,%X' % (fpath, flags, mode), 'host_io')
 		if result < 0: raise Exception('unable to open file with host I/O')
 		fd = result
 
 		# fstat
 		# NOTE: /proc/pid/maps is reported 0 length
-		#(result, errno, attachment) = rsp.tx_rx(self.sock, 'vFile:fstat:%X'%fd, 'host_io')
+		#(result, errno, attachment) = self.rspConn.tx_rx('vFile:fstat:%X'%fd, 'host_io')
 		#if result != 0x40: raise Exception('expected 0x40 host io fstat return value')
 		#if len(attachment) != 0x40:
 		#	raise Exception('returned struct stat is %d bytes, expected 64' % len(attachment))
@@ -415,7 +416,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		data = b''
 		offs = 0
 		while 1:
-			(result, errno, attachment) = rsp.tx_rx(self.sock, 'vFile:pread:%X,%X,%X'%(fd,1024,offs), 'host_io')
+			(result, errno, attachment) = self.rspConn.tx_rx('vFile:pread:%X,%X,%X'%(fd,1024,offs), 'host_io')
 			if result < 0:
 				raise Exception('host i/o pread() failed, result=%d, errno=%d' % (result, errno))
 			if result == 0: # EOF
@@ -427,7 +428,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			offs += len(attachment)
 
 		# close
-		(result, errno, attachment) = rsp.tx_rx(self.sock, 'vFile:close:%d'%fd, 'host_io')
+		(result, errno, attachment) = self.rspConn.tx_rx('vFile:close:%d'%fd, 'host_io')
 		if result != 0:
 			raise Exception('host i/o close() failed, result=%d, errno=%d' % (result, errno))
 
@@ -441,7 +442,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		offs = 0
 		pktsize = int(self.server_capabilities.get('PacketSize', '1000'), 16)
 		while 1:
-			data = rsp.tx_rx(self.sock, 'qXfer:features:read:%s:%X,%X' % (fname, offs, pktsize), 'ack_then_reply')
+			data = self.rspConn.tx_rx('qXfer:features:read:%s:%X,%X' % (fname, offs, pktsize), 'ack_then_reply')
 			if not data[0] in ['l', 'm']:
 				raise DebugAdapter.GeneralError('acquiring register description xml')
 			if data[1:]:
@@ -574,7 +575,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		try:
 			if handler_async_pkt is None:
 				handler_async_pkt = self.handler_async_pkt
-			reply = rsp.tx_rx(self.sock, gotype, 'mixed_output_ack_then_reply', handler_async_pkt)
+			reply = self.rspConn.tx_rx(gotype, 'mixed_output_ack_then_reply', handler_async_pkt)
 			(reason, reason_data) = (None, None)
 
 			# thread info
@@ -601,7 +602,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			return (DebugAdapter.STOP_REASON.BACKEND_DISCONNECTED, None)
 
 	def raw(self, data):
-		return rsp.tx_rx(self.sock, data)
+		return self.rspConn.tx_rx(data)
 
 	# asynchronously called when inside a "go" to inform us of stdout (and
 	# possibly other stuff)

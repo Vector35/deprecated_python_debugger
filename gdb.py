@@ -98,6 +98,7 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 	def __init__(self, **kwargs):
 		gdblike.DebugAdapterGdbLike.__init__(self, **kwargs)
 		self.os_sig_to_reason = linux_signal_to_debugadapter_reason
+		self.rsp = None
 
 	#--------------------------------------------------------------------------
 	# API
@@ -129,27 +130,20 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 	def connect(self, address, port):
 		# connect to gdbserver
 		self.sock = gdblike.connect(address, port)
+		self.rspConn = rsp.RspConnection(self.sock)
 
 		# initial commands
-		rsp.tx_rx(self.sock, 'Hg0')
+		self.rspConn.tx_rx('Hg0')
 		# if 'multiprocess+' in list here, thread reply is like 'pX.Y' where X is core id, Y is thread id
 		# negotiate server capabilities
-		reply = rsp.tx_rx(self.sock, 'qSupported:swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;xmlRegisters=i386')
-		for line in reply.split(';'):
-			if '=' in line:
-				(name, val) = line.split('=')
-				self.server_capabilities[name] = val
-			else:
-				self.server_capabilities[line] = None
-		#for (name,val) in self.server_capabilities.items():
-		#	print('%s = %s' % (name,val))
-
-		self.pktlen = int(self.server_capabilities.get('PacketSize', '0xfff'), 16)
+		# TODO: replace these with something sensible, not something copied from a packet dump
+		capabilities = 'qSupported:swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;xmlRegisters=i386'
+		self.rspConn.negotiate(capabilities)
 
 		self.reg_info_load()
 
 		# acquire pid as first tid
-		reply = rsp.tx_rx(self.sock, '?')
+		reply = self.rspConn.tx_rx('?')
 		tdict = rsp.packet_T_to_dict(reply)
 		self.tid = tdict['thread']
 		self.target_pid_ = self.tid

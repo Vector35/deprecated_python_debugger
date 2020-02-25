@@ -11,175 +11,165 @@ class RspExpectedStartOfPacket(Exception):
 class RspGeneralError(Exception):
 	pass
 
-def send_raw(sock, data):
-	sock.send(data.encode('utf-8'))
+# rsp connection class
+class RspConnection():
+	def __init__(self, sock):
+		self.sock = sock
+		self.acks_enabled = True
+		self.server_capabilities = {}
+		self.pktlen = 0xfff
 
-def send_packet_data(sock, data):
-	# packet is exactly "$<data>#<checksum>"
-	checksum = sum(map(ord, data))
-	packet = '$' + data + '#' + ("%02x" % (checksum % 256))
-	send_raw(sock, packet)
+	def acks_enable(self):
+		self.acks_enabled = True
 
-def recv_packet_data(sock, decode=True):
-	hexes = b'abcdefABCDEF0123456789'
+	def acks_disable(self):
+		self.acks_enabled = False
 
-	# consume ack's
-	tmp = b'+'
-	while tmp == b'+':
-		tmp = sock.recv(1)
-		if tmp == b'':
-			raise RspDisconnected('disconnection while receiving packet')
+	def ack_expect(self):
+		if not self.acks_enabled: return
 
-	# start packet
-	pkt = tmp
-	if pkt != b'$':
-		raise RspExpectedStartOfPacket('got instead: %s' % str(pkt))
+		resp = self.sock.recv(1)
+		if resp == b'':
+			raise RspDisconnected('disconnection while waiting for ack')
+		if resp != b'+':
+			raise RspAckMissing('got instead: %s' % str(resp))
+		return b'+'
 
-	# consume until '#' and checksum bytes
-	while not (len(pkt)>=3 and pkt[-3] == ord('#') and pkt[-2] in hexes and pkt[-1] in hexes):
-		tmp = sock.recv(1)
-		if tmp == b'':
-			raise RspDisconnected('disconnection while receiving packet')
-		pkt = pkt + tmp
+	def ack_send(self):
+		if not self.acks_enabled: return
+		self.sock.send(b'+')
 
-	# acknowledge
-	send_raw(sock, '+')
-
-	result = pkt[1:-3].decode('utf-8') if decode else pkt[1:-3]
-	return result
-
-def consume_ack(sock):
-	resp = sock.recv(1)
-	if resp == b'':
-		raise RspDisconnected('disconnection while waiting for ack')
-	if resp != b'+':
-		raise RspAckMissing('got instead: %s' % str(resp))
-	return b'+'
-
-#def is_connected(sock):
-#	print('testing RSP connection')
-#	result = None
-#	try:
-#		sock.setblocking(0)
-#		resp = sock.recv(1, socket.MSG_PEEK)
-#		sock.setblocking(1)
-#		result = (resp != '')
-#	except Exception:
-#		result = False
-#
-#	print('RSP connection status: %s' % str(result))
-
-def tx_rx(sock, data, expect='ack_then_reply', handler_async_pkt=None):
-	try:
-		send_packet_data(sock, data)
-
-		reply = None
-
-		if expect == 'nothing':
-			reply = ''
-		elif expect == 'ack_then_reply':
-			consume_ack(sock)
-			reply = recv_packet_data(sock)
-		elif expect == 'host_io':
-			consume_ack(sock)
-			reply = recv_packet_data(sock, False)
-			if reply[0:1] != b'F':
-				raise RspGeneralError('host i/o packet did not start with F: ' + str(reply))
-			(result_errno, result, errno, attachment) = (None, None, None, None)
-			# split off attachment
-			if b';' in reply:
-				(result_errno, attachment) = reply.split(b';', 1)
-				attachment = binary_decode(attachment)
+	def negotiate(self, client_capabilities):
+		# collect all server capabilities as a reply to our client abilities
+		reply = self.tx_rx(client_capabilities)
+		for line in reply.split(';'):
+			if '=' in line:
+				(name, val) = line.split('=')
+				self.server_capabilities[name] = val
 			else:
-				result_errno = reply
-			# split off errno
-			result_errno = result_errno[1:].decode('utf-8')
-			if ',' in result_errno:
-				(result, errno) = result_errno.split(',')
-				errno = int(errno, 16)
-			else:
-				result = result_errno
-			# return result
-			result = int(result, 16)
-			return(result, errno, attachment)
+				self.server_capabilities[line] = None
+		#for (name,val) in self.server_capabilities.items():
+		#	print('%s = %s' % (name,val))
 
-		elif expect == 'mixed_output_ack_then_reply':
-			ack_received = False
-			while 1:
-				peek1 = sock.recv(1, socket.MSG_PEEK)
-				if peek1 == b'+':
-					if ack_received:
-						raise RspGeneralError('received two acks, somethings wrong')
-					sock.recv(1)
-					ack_received = True
-					continue
+		# store the maximum packet length
+		self.pktlen = int(self.server_capabilities.get('PacketSize', '0xfff'), 16)
 
-				if peek1 != b'$':
-					raise RspExpectedStartOfPacket('got: %s' % sock.recv(16))
-				reply = recv_packet_data(sock)
-				if reply[0] == 'O':
-					if handler_async_pkt:
-						handler_async_pkt(reply)
+		# turn off acks if supported
+		if 'QStartNoAckMode+' in self.server_capabilities:
+			reply = self.tx_rx('QStartNoAckMode')
+			if reply == 'OK':
+				self.acks_enabled = False
+
+	def send_raw(self, data: bytes):
+		self.sock.send(data.encode('utf-8'))
+
+	def send_payload(self, data: str):
+		# packet is "$<data>#<checksum>"
+		checksum = sum(map(ord, data)) % 256
+		packet = '$' + data + '#' + ("%02x" % checksum)
+		self.send_raw(packet)
+
+	def recv_packet_data(self, decode=True):
+		hexes = b'abcdefABCDEF0123456789'
+
+		# start packet
+		pkt = self.sock.recv(1)
+		if pkt != b'$':
+			raise RspExpectedStartOfPacket('got instead: %s' % str(pkt))
+
+		# consume until '#' and checksum bytes
+		while not (len(pkt)>=3 and pkt[-3] == ord('#') and pkt[-2] in hexes and pkt[-1] in hexes):
+			tmp = self.sock.recv(1)
+			if tmp == b'':
+				raise RspDisconnected('disconnection while receiving packet')
+			pkt = pkt + tmp
+
+		# acknowledge
+		self.ack_send()
+
+		result = pkt[1:-3].decode('utf-8') if decode else pkt[1:-3]
+		return result
+
+	def tx_rx(self, data, expect='ack_then_reply', handler_async_pkt=None):
+		try:
+			self.send_payload(data)
+
+			reply = None
+
+			if expect == 'nothing':
+				reply = ''
+			elif expect == 'ack_then_reply':
+				self.ack_expect()
+				reply = self.recv_packet_data()
+			elif expect == 'host_io':
+				self.ack_expect()
+				reply = self.recv_packet_data(False)
+				if reply[0:1] != b'F':
+					raise RspGeneralError('host i/o packet did not start with F: ' + str(reply))
+				(result_errno, result, errno, attachment) = (None, None, None, None)
+				# split off attachment
+				if b';' in reply:
+					(result_errno, attachment) = reply.split(b';', 1)
+					attachment = binary_decode(attachment)
 				else:
-					# return first non-output packet
-					break
-			if not ack_received:
-				raise RspGeneralError('expected ack, none received')
-			result = reply
-		elif expect == 'ack_then_ok':
-			consume_ack(sock)
-			reply = recv_packet_data(sock)
-			if reply != 'OK':
-				raise RspGeneralError('expected OK, got: %s' % reply)
-		elif expect == 'ack_then_empty':
-			consume_ack(sock)
-			reply = recv_packet_data(sock)
-			if reply != '':
-				raise RspGeneralError('expected empty, got: %s' % reply)
-		else:
-			print('dunno how to expect %s' % expect)
+					result_errno = reply
+				# split off errno
+				result_errno = result_errno[1:].decode('utf-8')
+				if ',' in result_errno:
+					(result, errno) = result_errno.split(',')
+					errno = int(errno, 16)
+				else:
+					result = result_errno
+				# return result
+				result = int(result, 16)
+				return(result, errno, attachment)
+			elif expect == 'mixed_output_ack_then_reply':
+				ack_received = False
+				while 1:
+					peek1 = self.sock.recv(1, socket.MSG_PEEK)
+					if peek1 == b'+':
+						if ack_received:
+							raise RspGeneralError('received two acks, somethings wrong')
+						self.sock.recv(1)
+						ack_received = True
+						continue
 
-		if '*' in reply:
-			reply = un_rle(reply)
+					if peek1 != b'$':
+						raise RspExpectedStartOfPacket('got: %s' % self.sock.recv(16))
+					reply = self.recv_packet_data()
+					if reply[0] == 'O':
+						if handler_async_pkt:
+							handler_async_pkt(reply)
+					else:
+						# return first non-output packet
+						break
+				if not ack_received and self.acks_enabled:
+					raise RspGeneralError('expected ack, none received')
+				result = reply
+			elif expect == 'ack_then_ok':
+				self.ack_expect()
+				reply = self.recv_packet_data()
+				if reply != 'OK':
+					raise RspGeneralError('expected OK, got: %s' % reply)
+			elif expect == 'ack_then_empty':
+				self.ack_expect()
+				reply = self.recv_packet_data()
+				if reply != '':
+					raise RspGeneralError('expected empty, got: %s' % reply)
+			else:
+				print('dunno how to expect %s' % expect)
 
-		return reply
+			if '*' in reply:
+				reply = un_rle(reply)
 
-	except OSError:
-		raise RspDisconnected('disconnection while transmitting')
+			return reply
 
-def send_ack(sock):
-	packet = '+'
-	sock.send(packet)
-	print(packet.decode('utf-8'), '->')
+		except OSError:
+			raise RspDisconnected('disconnection while transmitting')
 
 #--------------------------------------------------------------------------
 # GDB RSP FUNCTIONS (HIGHER LEVEL)
 #--------------------------------------------------------------------------
-
-def register_scan(sock):
-	result = [None]*256
-
-	for i in range(256):
-		reply = tx_rx(sock, 'qRegisterInfo%02X' % i, 'ack_then_reply')
-		if not reply.startswith('name:'):
-			break
-
-		info = {}
-		for key_vals in reply.split(';'):
-			if not key_vals:
-				continue
-
-			if not ':' in key_vals:
-				raise RspGeneralError('expected \':\' in qRegisterInfo reply: %s' % key_vals)
-
-			(key, val) = key_vals.split(':')
-
-			info[key] = val
-
-		#print('reg %d is %s' % (i, name))
-		result[i] = info
-
-	return result
 
 # https://sourceware.org/gdb/current/onlinedocs/gdb/Overview.html#Binary-Data
 # see "The binary data representation uses..."
