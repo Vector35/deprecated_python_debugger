@@ -138,6 +138,11 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		self.sock = gdblike.connect(address, port)
 		self.rspConn = rsp.RspConnection(self.sock)
 
+		# negotiate capabilities
+		# TODO: get some capabilities
+		capabilities = 'swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;xmlRegisters=i386'
+		self.rspConn.negotiate(capabilities)
+
 		# learn initial registers
 		self.reg_info_load()
 

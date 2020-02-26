@@ -137,7 +137,7 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		# if 'multiprocess+' in list here, thread reply is like 'pX.Y' where X is core id, Y is thread id
 		# negotiate server capabilities
 		# TODO: replace these with something sensible, not something copied from a packet dump
-		capabilities = 'qSupported:swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;xmlRegisters=i386'
+		capabilities = 'swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;xmlRegisters=i386'
 		self.rspConn.negotiate(capabilities)
 
 		self.reg_info_load()

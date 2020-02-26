@@ -41,7 +41,7 @@ class RspConnection():
 
 	def negotiate(self, client_capabilities):
 		# collect all server capabilities as a reply to our client abilities
-		reply = self.tx_rx(client_capabilities)
+		reply = self.tx_rx('qSupported:' + client_capabilities)
 		for line in reply.split(';'):
 			if '=' in line:
 				(name, val) = line.split('=')
@@ -55,10 +55,11 @@ class RspConnection():
 		self.pktlen = int(self.server_capabilities.get('PacketSize', '0xfff'), 16)
 
 		# turn off acks if supported
-		if 'QStartNoAckMode+' in self.server_capabilities:
-			reply = self.tx_rx('QStartNoAckMode')
-			if reply == 'OK':
-				self.acks_enabled = False
+		# (lldb appears to support this without advertising it in their capabilities list)
+		#if 'QStartNoAckMode+' in self.server_capabilities:
+		reply = self.tx_rx('QStartNoAckMode')
+		if reply == 'OK':
+			self.acks_enabled = False
 
 	def send_raw(self, data: bytes):
 		self.sock.send(data.encode('utf-8'))
