@@ -138,10 +138,9 @@ class DebugView(QWidget, View):
 	def updateTimerEvent(self):
 		if self.needs_update:
 			self.needs_update = False
-			adapter = self.debug_state.adapter
 
 			# Refresh the editor
-			if adapter is None:
+			if not self.debug_state.connected:
 				self.memory_editor.navigate(0)
 				return
 

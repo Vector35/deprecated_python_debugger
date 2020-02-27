@@ -152,7 +152,7 @@ class DebugControlsWidget(QToolBar):
 		def perform_run_error(e):
 			self.state_error(e)
 
-		self.state_inactive('STARTING')
+		self.state_starting('STARTING')
 		threading.Thread(target=perform_run_thread).start()
 
 
@@ -175,7 +175,7 @@ class DebugControlsWidget(QToolBar):
 		def perform_restart_error(e):
 			self.state_error(e)
 
-		self.state_inactive('RESTARTING')
+		self.state_starting('RESTARTING')
 		threading.Thread(target=perform_restart_thread).start()
 
 	def perform_quit(self):
@@ -191,6 +191,8 @@ class DebugControlsWidget(QToolBar):
 				execute_on_main_thread_and_wait(perform_attach_after)
 			except ConnectionRefusedError:
 				execute_on_main_thread_and_wait(lambda: perform_attach_error('ERROR: Connection Refused'))
+			except TimeoutError:
+				execute_on_main_thread_and_wait(lambda: perform_attach_error('ERROR: Connection Refused'))
 			except Exception as e:
 				execute_on_main_thread_and_wait(lambda: perform_attach_error('ERROR: ' + ' '.join(e.args)))
 				traceback.print_exc(file=sys.stderr)
@@ -202,7 +204,7 @@ class DebugControlsWidget(QToolBar):
 		def perform_attach_error(e):
 			self.state_error(e)
 
-		self.state_inactive('ATTACHING')
+		self.state_starting('ATTACHING')
 		threading.Thread(target=perform_attach_thread).start()
 
 
@@ -215,7 +217,7 @@ class DebugControlsWidget(QToolBar):
 		def settings_finished():
 			if self.debug_state.running:
 				self.state_running()
-			elif self.debug_state.adapter is not None:
+			elif self.debug_state.connected:
 				local_rip = self.debug_state.local_ip
 				if self.debug_state.bv.read(local_rip, 1) and len(self.debug_state.bv.get_functions_containing(local_rip)) > 0:
 					self.state_stopped()
@@ -398,6 +400,13 @@ class DebugControlsWidget(QToolBar):
 			defaultThreadAction = self.threadMenu.addAction("Thread List")
 			defaultThreadAction.setEnabled(False)
 			self.btnThreads.setDefaultAction(defaultThreadAction)
+
+	def state_starting(self, msg=None):
+		self.editStatus.setText(msg or 'INACTIVE')
+		self.set_actions_enabled(Starting=False, Stopping=False, Stepping=False, Pause=False, Resume=False, Threads=False)
+		self.set_default_process_action("Attach" if self.can_connect() else "Run")
+		self.set_thread_list([])
+		self.set_resume_pause_action("Pause")
 
 	def state_inactive(self, msg=None):
 		self.editStatus.setText(msg or 'INACTIVE')

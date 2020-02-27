@@ -38,10 +38,9 @@ class DebugMemoryWidget(QWidget, DockContextHandler):
 
 	def notifyMemoryChanged(self):
 		debug_state = binjaplug.get_state(self.bv)
-		adapter = debug_state.adapter
 
 		# Refresh the editor
-		if adapter is None:
+		if not debug_state.connected:
 			self.editor.navigate(0)
 			return
 

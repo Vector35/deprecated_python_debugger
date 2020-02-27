@@ -27,7 +27,7 @@ class DebuggerUI:
 		threads_widget = self.widget('Threads')
 		stack_widget = self.widget('Stack')
 
-		if self.state.adapter is None:
+		if not self.state.connected:
 			# Disconnected
 			registers_widget.notifyRegistersChanged([])
 			modules_widget.notifyModulesChanged([])
@@ -43,7 +43,7 @@ class DebuggerUI:
 		#----------------------------------------------------------------------
 		regs = []
 		for (register, value) in self.state.registers:
-			bits = self.state.adapter.reg_bits(register)
+			bits = self.state.registers.bits(register)
 			regs.append({
 				'name': register,
 				'bits': bits,
@@ -170,7 +170,7 @@ class DebuggerUI:
 			raise NotImplementedError('todo: evaluate llil for %s' % llil.operation)
 
 	def detect_new_code(self):
-		if self.state.adapter is None:
+		if not self.state.connected:
 			return
 
 		remote_rip = self.state.ip
@@ -243,7 +243,7 @@ class DebuggerUI:
 							funcs[0].set_user_indirect_branches(local_rip, [(self.state.bv.arch, local_target)])
 
 	def navigate_to_rip(self):
-		if self.state.adapter is None:
+		if not self.state.connected:
 			local_rip = self.state.bv.entry_point
 		else:
 			local_rip = self.state.local_ip
@@ -269,7 +269,7 @@ class DebuggerUI:
 			for func in self.state.bv.get_functions_containing(bp):
 				func.set_auto_instr_highlight(bp, HighlightStandardColor.RedHighlightColor)
 
-		if self.state.adapter is not None:
+		if self.state.connected:
 			remote_rip = self.state.ip
 			local_rip = self.state.memory_view.remote_addr_to_local(remote_rip)
 
@@ -278,7 +278,8 @@ class DebuggerUI:
 
 	def update_modules(self):
 		mods = []
-		for (modpath, address) in self.state.adapter.mem_modules(False).items():
+		self.state.modules.mark_dirty()
+		for (modpath, address) in self.state.modules.items():
 			mods.append({
 				'address': address,
 				'modpath': modpath
@@ -360,13 +361,13 @@ class DebuggerUI:
 
 	def update_breakpoints(self):
 		bps = []
-		if self.state.adapter is None:
+		if not self.state.connected:
 			remote_list = []
 		else:
 			remote_list = self.state.adapter.breakpoint_list()
 
 		for (module, offset) in self.state.breakpoints:
-			if self.state.adapter is None:
+			if not self.state.connected:
 				address = 0
 				enabled = False
 			else:

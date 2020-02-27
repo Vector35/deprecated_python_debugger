@@ -72,6 +72,9 @@ class DebuggerRegisters:
 	def __repr__(self):
 		return '<debugger registers for {}>'.format(self.state.adapter)
 
+	def bits(self, reg):
+		return self.state.adapter.reg_bits(reg)
+
 
 class DebuggerThreads:
 	def __init__(self, state):
@@ -298,6 +301,7 @@ class DebuggerState:
 	def __init__(self, bv):
 		self.bv = bv
 		self.adapter = None
+		self.connecting = False
 		self.running = False
 		# address -> adapter id
 		self.memory_view = ProcessView.DebugProcessView(bv)
@@ -373,6 +377,10 @@ class DebuggerState:
 			return self.registers['sp']
 		else:
 			raise NotImplementedError('unimplemented architecture %s' % self.bv.arch.name)
+
+	@property
+	def connected(self):
+		return self.adapter is not None and not self.connecting
 
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):
@@ -467,20 +475,27 @@ class DebuggerState:
 			raise Exception("don't know how to connect to adapter of type %s" % self.adapter_type)
 
 	def exec(self):
+		if self.connected or self.connecting:
+			raise Exception("Tried to exec but already debugging")
+
+		self.connecting = True
 		fpath = self.bv.file.original_filename
 
 		if not os.path.exists(fpath):
 			raise Exception('cannot find debug target: ' + fpath)
 
-		self.adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
+		adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
 
 		if DebugAdapter.ADAPTER_TYPE.use_exec(self.adapter_type):
 			try:
-				self.adapter.exec(fpath, self.command_line_args)
+				adapter.exec(fpath, self.command_line_args)
+				self.adapter = adapter
+				self.connecting = False
 			except Exception as e:
-				self.adapter = None
+				self.connecting = False
 				raise e
 		else:
+			self.connecting = False
 			raise Exception("cannot exec adapter of type %s" % self.adapter_type)
 
 		self.memory_view.update_base()
@@ -488,14 +503,21 @@ class DebuggerState:
 		self.memory_dirty()
 
 	def attach(self):
-		self.adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
+		if self.connected or self.connecting:
+			raise Exception("Tried to attach but already debugging")
+
+		self.connecting = True
+		adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
 		if DebugAdapter.ADAPTER_TYPE.use_connect(self.adapter_type):
 			try:
-				self.adapter.connect(self.remote_host, self.remote_port)
+				adapter.connect(self.remote_host, self.remote_port)
+				self.adapter = adapter
+				self.connecting = False
 			except Exception as e:
-				self.adapter = None
+				self.connecting = False
 				raise e
 		else:
+			self.connecting = False
 			raise Exception("cannot connect to adapter of type %s" % self.adapter_type)
 
 		self.memory_view.update_base()
@@ -509,7 +531,7 @@ class DebuggerState:
 		self.memory_dirty()
 
 	def quit(self):
-		if self.adapter is not None:
+		if self.connected:
 			try:
 				self.adapter.quit()
 			except BrokenPipeError:
@@ -528,7 +550,7 @@ class DebuggerState:
 		self.run() # sets state
 
 	def detach(self):
-		if self.adapter is not None:
+		if self.connected:
 			try:
 				self.adapter.detach()
 			except BrokenPipeError:
@@ -542,14 +564,14 @@ class DebuggerState:
 		self.memory_dirty()
 
 	def pause(self):
-		if not self.adapter:
+		if not self.connected:
 			raise Exception('missing adapter')
 		result = self.adapter.break_into()
 		self.memory_dirty()
 		return result
 
 	def go(self):
-		if not self.adapter:
+		if not self.connected:
 			raise Exception('missing adapter')
 
 		remote_rip = self.ip
@@ -574,7 +596,7 @@ class DebuggerState:
 
 	# Continue until one of any given remote addresses
 	def step_to(self, remote_addresses=[]):
-		if not self.adapter:
+		if not self.connected:
 			raise Exception('missing adapter')
 		# Make sure this is an iterable
 		if not hasattr(remote_addresses, '__iter__'):
@@ -614,7 +636,7 @@ class DebuggerState:
 
 	# Step once in the disassembly / il, potentially into a function call
 	def step_into(self, il=FunctionGraphType.NormalFunctionGraph):
-		if not self.adapter:
+		if not self.connected:
 			raise Exception('missing adapter')
 
 		remote_rip = self.ip
@@ -684,7 +706,7 @@ class DebuggerState:
 
 	# Step until reaching the next line in the disassembly / il
 	def step_over(self, il=FunctionGraphType.NormalFunctionGraph):
-		if not self.adapter:
+		if not self.connected:
 			raise Exception('missing adapter')
 
 		try:
@@ -768,7 +790,7 @@ class DebuggerState:
 			return self.step_to(targets)
 
 	def step_return(self):
-		if not self.adapter:
+		if not self.connected:
 			raise Exception('missing adapter')
 
 		remote_rip = self.ip
