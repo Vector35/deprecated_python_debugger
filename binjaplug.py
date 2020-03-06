@@ -724,21 +724,22 @@ class DebuggerState:
 		if il == FunctionGraphType.NormalFunctionGraph:
 			# TODO: be more platform agnostic
 			arch_dis = self.bv.arch
-			if arch.dis.name == 'armv7':
-				if self.state.adapter.reg_read('cpsr') & 0x20:
+			if arch_dis.name == 'armv7':
+				if self.adapter.reg_read('cpsr') & 0x20:
 					arch_dis = binaryninja.Architecture['thumb2']
 
-			inslen = 0
-			sample = None
-			for addr in [local_rip, remote_rip]:
-				sample = self.bv.read(addr, arch_dis.max_instr_length)
-				if sample:
-					info = self.bv.arch.get_instruction_info(data, addr)
-					inslen = info.length
-					break
+			addr = local_rip
+			sample = self.bv.read(addr, arch_dis.max_instr_length)
+			if not sample:
+				addr = remote_rip
+				sample = self.adapter.mem_read(addr, arch_dis.max_instr_length)
+			if not sample:
+				raise Exception('mem read at 0x%X failed, step over failed' % addr)
 
-			if not sample or inslen == 0:
-				raise Exception('disassembly at 0x%X failed, step over failed', )
+			info = arch_dis.get_instruction_info(sample, addr)
+			inslen = info.length if info else 0
+			if not info or inslen == 0:
+				raise Exception('disassembly at 0x%X failed, step over failed' % addr)
 
 			local_ripnext = local_rip + inslen
 			remote_ripnext = remote_rip + inslen

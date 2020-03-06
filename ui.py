@@ -2,6 +2,7 @@ from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
 from binaryninja.plugin import PluginCommand
+import binaryninja
 from binaryninja import Endianness, HighlightStandardColor, LinearDisassemblyLine, LinearDisassemblyLineType, DisassemblyTextLine, InstructionTextToken, InstructionTextTokenType, execute_on_main_thread_and_wait, LowLevelILOperation, BinaryReader
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
 from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, ConsoleWidget, ModulesWidget, widget
@@ -297,8 +298,13 @@ class DebuggerUI:
 		inst_count = 50
 
 		rip = self.state.ip
+		arch_dis = self.state.bv.arch
+		if arch_dis.name == 'armv7':
+			if self.state.adapter.reg_read('cpsr') & 0x20:
+				arch_dis = binaryninja.Architecture['thumb2']
+
 		# Assume the worst, just in case
-		read_length = self.state.bv.arch.max_instr_length * inst_count
+		read_length = arch_dis.max_instr_length * inst_count
 		data = self.state.memory_view.read(rip, read_length)
 
 		lines = []
@@ -312,11 +318,11 @@ class DebuggerUI:
 		total_read = 0
 		for i in range(inst_count):
 			line_addr = rip + total_read
-			(insn_tokens, length) = self.state.bv.arch.get_instruction_text(data[total_read:], line_addr)
+			(insn_tokens, length) = arch_dis.get_instruction_text(data[total_read:], line_addr)
 
 			if insn_tokens is None:
 				insn_tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "??")]
-				length = self.state.bv.arch.instr_alignment
+				length = arch_dis.instr_alignment
 				if length == 0:
 					length = 1
 
