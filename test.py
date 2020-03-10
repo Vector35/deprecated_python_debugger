@@ -8,6 +8,7 @@ import sys
 import time
 import platform
 import threading
+import subprocess
 
 from struct import unpack
 
@@ -26,7 +27,7 @@ adapter = None
 #--------------------------------------------------------------------------
 
 def shellout(cmd):
-    process = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     (stdout, stderr) = process.communicate()
     stdout = stdout.decode("utf-8")
     stderr = stderr.decode("utf-8")
@@ -93,7 +94,7 @@ def parse_image(fpath):
 		assert data[e_lfanew:e_lfanew+6] == b'\x50\x45\x00\x00\x64\x86'
 		entryoff = unpack('<I', data[e_lfanew+0x28:e_lfanew+0x2C])[0]
 		vmaddr = unpack('<Q', data[e_lfanew+0x30:e_lfanew+0x38])[0]
-		
+
 		load_addr = vmaddr
 		entry_offs = entryoff
 
@@ -188,6 +189,15 @@ def break_into(adapter):
 	print('sending break')
 	adapter.break_into()
 
+def invoke_adb_gdb_listen(testbin, port=31337):
+	args = []
+	args.append('adb')
+	args.append('shell')
+	args.append('/data/local/tmp/gdbserver :%d /data/local/tmp/%s' % (port, testbin))
+	print('invoke_adb() executing: %s' % ' '.join(args))
+	shellout(args)
+	print('invoke_adb() done')
+
 def assert_general_error(func):
 	raised = False
 	try:
@@ -196,17 +206,18 @@ def assert_general_error(func):
 		raised = True
 	assert raised
 
-# determines the entrypoint from the 
+# determines the entrypoint from the
 def confirm_initial_module(adapter, testbin):
 	fpath = testbin_to_fpath(testbin)
 	mpath = testbin_to_mpath(testbin)
 
 	module2addr = adapter.mem_modules()
-	print('module2addr: ', module2addr)
+	print('module2addr: ', ' '.join(['%s:%X' % (i[0],i[1]) for i in module2addr.items()]))
 	print('      mpath: ', mpath)
 	assert mpath in module2addr
 
 	(load_addr, entry_offs) = parse_image(fpath)
+	print('  load_addr: 0x%X' % load_addr)
 	if '_pie' in testbin:
 		# pie: override file's load address with runtime load address
 		load_addr = module2addr[mpath]
@@ -385,6 +396,9 @@ if __name__ == '__main__':
 		adapter.quit()
 		adapter = None
 
+	#
+	# helloworlds x64 with threads
+	#
 	for testbin in testbins:
 		if not testbin.startswith('helloworld_thread'): continue
 		if not '_x64-' in testbin: continue
@@ -448,5 +462,107 @@ if __name__ == '__main__':
 			assert False
 		print('done')
 		adapter.quit()
+
+	#
+	# helloworld armv7, no threads
+	#
+	for testbin in testbins:
+		if not testbin.startswith('helloworld_'): continue
+		if not '_armv7-' in testbin: continue
+		if '_thread' in testbin: continue
+
+		utils.green('testing %s' % testbin)
+
+		# send file to phone
+		fpath = testbin_to_fpath(testbin)
+		shellout(['adb', 'push', fpath, '/data/local/tmp'])
+
+		# launch adb
+		threading.Thread(target=invoke_adb_gdb_listen, args=[testbin]).start()
+
+		# connect to adb
+		time.sleep(.25)
+		adapter = gdb.DebugAdapterGdb()
+		adapter.connect('localhost', 31337)
+
+		entry = confirm_initial_module(adapter, testbin)
+
+		print('pc: 0x%X' % adapter.reg_read('pc'))
+
+		# breakpoint set/clear should fail at 0
+		print('breakpoint failures')
+		try:
+			adapter.breakpoint_clear(0)
+		except DebugAdapter.BreakpointClearError:
+			pass
+
+		try:
+			adapter.breakpoint_set(0)
+		except DebugAdapter.BreakpointSetError:
+			pass
+
+		# breakpoint set/clear should succeed at entrypoint
+		print('setting breakpoint at 0x%X' % entry)
+		adapter.breakpoint_set(entry)
+		print('clearing breakpoint at 0x%X' % entry)
+		adapter.breakpoint_clear(entry)
+		print('setting breakpoint at 0x%X' % entry)
+		adapter.breakpoint_set(entry)
+
+		# proceed to breakpoint
+		print('going')
+		(reason, info) = adapter.go()
+		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		pc = adapter.reg_read('pc')
+		print('pc: 0x%X' % pc)
+		assert pc == entry
+
+		# single step
+		data = adapter.mem_read(pc, 15)
+		assert len(data) == 15
+		(asmstr, asmlen) = utils.disasm1(data, 0, 'armv7')
+		adapter.breakpoint_clear(entry)
+		(reason, info) = adapter.step_into()
+		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		pc2 = adapter.reg_read('pc')
+		print('pc2: 0x%X' % pc2)
+		assert pc + asmlen == pc2
+
+		print('registers')
+		for (ridx,rname) in enumerate(adapter.reg_list()):
+			width = adapter.reg_bits(rname)
+			#print('%d: %s (%d bits)' % (ridx, rname, width))
+		assert adapter.reg_bits('r0') == 32
+		assert adapter.reg_bits('r4') == 32
+		assert_general_error(lambda: adapter.reg_bits('rzx'))
+
+		print('registers read/write')
+		r0 = adapter.reg_read('r0')
+		r4 = adapter.reg_read('r4')
+		assert_general_error(lambda: adapter.reg_read('rzx'))
+		adapter.reg_write('r0', 0xDEADBEEF)
+		assert adapter.reg_read('r0') == 0xDEADBEEF
+		adapter.reg_write('r4', 0xCAFEBABE)
+		assert_general_error(lambda: adapter.reg_read('rzx'))
+		assert adapter.reg_read('r4') == 0xCAFEBABE
+		adapter.reg_write('r0', r0)
+		assert adapter.reg_read('r0') == r0
+		adapter.reg_write('r4', r4)
+		assert adapter.reg_read('r4') == r4
+
+		print('mem read/write')
+		addr = adapter.reg_read('pc')
+		data = adapter.mem_read(addr, 256)
+		assert_general_error(lambda: adapter.mem_write(0, b'heheHAHAherherHARHAR'))
+		data2 = b'\xAA' * 256
+		adapter.mem_write(addr, data2)
+		assert_general_error(lambda: adapter.mem_read(0, 256))
+		assert adapter.mem_read(addr, 256) == data2
+		adapter.mem_write(addr, data)
+		assert adapter.mem_read(addr, 256) == data
+
+		print('quiting')
+		adapter.quit()
+		adapter = None
 
 	utils.green('TESTS PASSED!')

@@ -1,0 +1,31 @@
+# make -f Makefile-android to cross-compile on linux/macos
+
+# you can override this with environment variable, depending on where your NDK is installed
+
+# the naming convention here is <prog_name>_<target_triplet>
+# where <target_triplet> is standard <machine>-<vendor>-<os>
+# and vendor is omitted
+
+# Android 5.0 and later only support position-independent executables (-fPIE)
+# see also: -fPIC
+
+NDK ?= $(HOME)/android-ndk-r15c
+
+SYSR = $(NDK)/platforms/android-23/arch-arm
+GCC = $(NDK)/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64/bin/arm-linux-androideabi-gcc
+
+all: helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android
+
+helloworld_pie_armv7-android: helloworld.c
+	$(GCC) -march=armv7-a --sysroot=$(SYSR) -pie -DOS_IS_ANDROID helloworld.c -o helloworld_pie_armv7-android
+
+helloworld_loop_pie_armv7-android: helloworld_loop.c
+	$(GCC) -march=armv7-a --sysroot=$(SYSR) -pie -DOS_IS_ANDROID helloworld_loop.c -o helloworld_loop_pie_armv7-android
+
+helloworld_thread_pie_armv7-android: helloworld_thread.c
+	$(GCC) -march=armv7-a --sysroot=$(SYSR) -pie -DOS_IS_ANDROID -std=c11 helloworld_thread.c -o helloworld_thread_pie_armv7-android
+
+push:
+	adb push helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android /data/local/tmp
+clean:
+	rm -rf helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android
