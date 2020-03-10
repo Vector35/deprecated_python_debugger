@@ -99,7 +99,35 @@ def parse_image(fpath):
 
 	# ELF
 	elif data[0:4] == b'\x7FELF':
-		if data[4] == 2: # EI_CLASS 64-bit
+		if data[4] == 1: # EI_CLASS 32-bit
+			assert data[5] == 1 # EI_DATA little endian
+
+			assert data[0x10:0x12] in [b'\x02\x00', b'\x03\x00'] # e_type ET_EXEC or ET_DYN (pie)
+			#assert data[0x12:0x14] == b'\x3E\x00' # e_machine EM_X86_64
+			e_entry = unpack('<I', data[0x18:0x1C])[0]
+			e_phoff = unpack('<I', data[0x1C:0x20])[0]
+			e_phentsize = unpack('<H', data[0x2A:0x2C])[0]
+			e_phnum = unpack('<H', data[0x2C:0x2E])[0]
+			print('e_entry:0x%X e_phoff:0x%X e_phentsize:0x%X e_phnum:0x%X' %
+				(e_entry, e_phoff, e_phentsize, e_phnum))
+
+			# find first PT_LOAD
+			p_vaddr = None
+			offs = e_phoff
+			for i in range(e_phnum):
+				p_type = unpack('<I', data[offs:offs+4])[0]
+				#print('at offset 0x%X p_type:0x%X' % (offs, p_type))
+				if p_type == 1:
+					p_vaddr = unpack('<I', data[offs+8:offs+12])[0]
+					break
+				offs += e_phentsize
+			if p_vaddr == None:
+				raise Exception('couldnt locate a single PT_LOAD program header')
+
+			load_addr = p_vaddr
+			entry_offs = e_entry - p_vaddr
+
+		elif data[4] == 2: # EI_CLASS 64-bit
 			assert data[5] == 1 # EI_DATA little endian
 
 			assert data[0x10:0x12] in [b'\x02\x00', b'\x03\x00'] # e_type ET_EXEC or ET_DYN (pie)
@@ -128,7 +156,7 @@ def parse_image(fpath):
 			entry_offs = e_entry - p_vaddr
 
 		else:
-			raise Exception('expected e_ident[EI_CLASS] to 2, got: %d' % data[4])
+			raise Exception('expected e_ident[EI_CLASS] to be 1 or 2, got: %d' % data[4])
 	else:
 		raise Exception('unrecognized file type')
 
