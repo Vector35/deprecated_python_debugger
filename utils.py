@@ -8,6 +8,9 @@ GREEN = '\x1B[32m'
 BROWN = '\x1B[33m'
 NORMAL = '\x1B[0m'
 
+def green(msg):
+	print(GREEN + msg + NORMAL)
+
 def hex_dump(data, addr=0, grouping=1, endian='little'):
 	result = ''
 

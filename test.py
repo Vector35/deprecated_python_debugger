@@ -3,6 +3,7 @@
 # unit tests for debugger
 
 import os
+import re
 import sys
 import time
 import platform
@@ -14,6 +15,7 @@ sys.path.append('..')
 import debugger.lldb as lldb
 import debugger.dbgeng as dbgeng
 import debugger.DebugAdapter as DebugAdapter
+import debugger.gdb as gdb
 import debugger.utils as utils
 
 # globals
@@ -23,7 +25,20 @@ adapter = None
 # UTILITIES
 #--------------------------------------------------------------------------
 
+def shellout(cmd):
+    process = Popen(cmd, stdout=PIPE, stderr=PIPE)
+    (stdout, stderr) = process.communicate()
+    stdout = stdout.decode("utf-8")
+    stderr = stderr.decode("utf-8")
+    #print('stdout: -%s-' % stdout)
+    #print('stderr: -%s-' % stderr)
+    process.wait()
+    return (stdout, stderr)
+
 def parse_image(fpath):
+	load_addr = None
+	entry_offs = None
+
 	print('finding entrypoint for %s' % fpath)
 	with open(fpath, 'rb') as fp:
 		data = fp.read()
@@ -69,60 +84,77 @@ def parse_image(fpath):
 		if entryoff1 == None and entryoff2 == None:
 			raise Exception('couldn\'t locate entry_point_command in macho (where main is)' % fpath)
 
-		entryoff = entryoff1 or entryoff2
-		return (vmaddr, entryoff)
+		load_addr = vmaddr
+		entry_offs = entryoff1 or entryoff2
 
 	# PE
-	if data[0:2] == b'\x4d\x5a':
+	elif data[0:2] == b'\x4d\x5a':
 		e_lfanew = unpack('<I', data[0x3C:0x40])[0]
 		assert data[e_lfanew:e_lfanew+6] == b'\x50\x45\x00\x00\x64\x86'
 		entryoff = unpack('<I', data[e_lfanew+0x28:e_lfanew+0x2C])[0]
 		vmaddr = unpack('<Q', data[e_lfanew+0x30:e_lfanew+0x38])[0]
-		return (vmaddr, entryoff)
+		
+		load_addr = vmaddr
+		entry_offs = entryoff
 
 	# ELF
-	if data[0:4] == b'\x7FELF':
-		assert data[4] == 2 # EI_CLASS 64-bit
-		assert data[5] == 1 # EI_DATA little endian
+	elif data[0:4] == b'\x7FELF':
+		if data[4] == 2: # EI_CLASS 64-bit
+			assert data[5] == 1 # EI_DATA little endian
 
-		assert data[0x10:0x12] in [b'\x02\x00', b'\x03\x00'] # e_type ET_EXEC or ET_DYN (pie)
-		assert data[0x12:0x14] == b'\x3E\x00' # e_machine EM_X86_64
-		e_entry = unpack('<Q', data[0x18:0x20])[0]
-		e_phoff = unpack('<Q', data[0x20:0x28])[0]
-		e_phentsize = unpack('<H', data[0x36:0x38])[0]
-		e_phnum = unpack('<H', data[0x38:0x3a])[0]
-		print('e_entry:0x%X e_phoff:0x%X e_phentsize:0x%X e_phnum:0x%X' %
-			(e_entry, e_phoff, e_phentsize, e_phnum))
+			assert data[0x10:0x12] in [b'\x02\x00', b'\x03\x00'] # e_type ET_EXEC or ET_DYN (pie)
+			#assert data[0x12:0x14] == b'\x3E\x00' # e_machine EM_X86_64
+			e_entry = unpack('<Q', data[0x18:0x20])[0]
+			e_phoff = unpack('<Q', data[0x20:0x28])[0]
+			e_phentsize = unpack('<H', data[0x36:0x38])[0]
+			e_phnum = unpack('<H', data[0x38:0x3a])[0]
+			print('e_entry:0x%X e_phoff:0x%X e_phentsize:0x%X e_phnum:0x%X' %
+				(e_entry, e_phoff, e_phentsize, e_phnum))
 
-		# find first PT_LOAD
-		p_vaddr = None
-		offs = e_phoff
-		for i in range(e_phnum):
-			p_type = unpack('<I', data[offs:offs+4])[0]
-			#print('at offset 0x%X p_type:0x%X' % (offs, p_type))
-			if p_type == 1:
-				p_vaddr = unpack('<Q', data[offs+16:offs+24])[0]
-				break
-			offs += e_phentsize
+			# find first PT_LOAD
+			p_vaddr = None
+			offs = e_phoff
+			for i in range(e_phnum):
+				p_type = unpack('<I', data[offs:offs+4])[0]
+				#print('at offset 0x%X p_type:0x%X' % (offs, p_type))
+				if p_type == 1:
+					p_vaddr = unpack('<Q', data[offs+16:offs+24])[0]
+					break
+				offs += e_phentsize
+			if p_vaddr == None:
+				raise Exception('couldnt locate a single PT_LOAD program header')
 
-		if p_vaddr == None:
-			raise Exception('couldnt locate a single PT_LOAD program header')
+			load_addr = p_vaddr
+			entry_offs = e_entry - p_vaddr
 
-		return (p_vaddr, e_entry-p_vaddr)
+		else:
+			raise Exception('expected e_ident[EI_CLASS] to 2, got: %d' % data[4])
+	else:
+		raise Exception('unrecognized file type')
 
-	raise Exception('unrecognized file type')
+	print('(file) load addr: 0x%X' % load_addr)
+	print('(file) entry offset: 0x%X' % entry_offs)
+	return (load_addr, entry_offs)
 
-# 'helloworld' -> '.\testbins\helloworld.exe'
-# or
-# 'helloworld' -> './testbins/helloworld
-def test_prog_to_fpath(prog):
-	if platform.system() == 'Windows':
-		prog = prog + '.exe'
-	tmp =  os.path.join('testbins', prog)
+# 'helloworld' -> '.\testbins\helloworld.exe' (windows)
+# 'helloworld' -> './testbins/helloworld' (linux, android)
+def testbin_to_fpath(testbin):
+	if testbin.endswith('-win') or testbin.endswith('-windows'):
+		testbin = testbin + '.exe'
+	tmp =  os.path.join('testbins', testbin)
 	if '~' in tmp:
 		tmp = os.expanduser(tmp)
 	tmp = os.path.abspath(tmp)
 	return tmp
+
+# 'helloworld_armv7-android' -> '/data/local/tmp/helloworld_armv7-android'
+def testbin_to_mpath(testbin):
+	m = re.match(r'^.*_(.*)-(.*)$', testbin)
+	(mach, os_) = m.group(1, 2)
+	if os_ == 'android':
+		return '/data/local/tmp/' + testbin
+	else:
+		return testbin_to_fpath(testbin)
 
 def break_into(adapter):
 	print('sending break')
@@ -136,42 +168,25 @@ def assert_general_error(func):
 		raised = True
 	assert raised
 
-def test_prologue(prog, testtype):
-	fpath = test_prog_to_fpath(prog)
+# determines the entrypoint from the 
+def confirm_initial_module(adapter, testbin):
+	fpath = testbin_to_fpath(testbin)
+	mpath = testbin_to_mpath(testbin)
 
-	print('----------------------------------------------------------------')
-	print('%s test on %s' % (testtype.upper(), fpath))
-	print('----------------------------------------------------------------')
+	module2addr = adapter.mem_modules()
+	print('module2addr: ', module2addr)
+	print('      mpath: ', mpath)
+	assert mpath in module2addr
 
 	(load_addr, entry_offs) = parse_image(fpath)
-	entry = load_addr + entry_offs
-	print('(file) load addr: 0x%X' % load_addr)
-	print('(file) entry offset: 0x%X' % entry_offs)
-
-	print('launching')
-	adapter = DebugAdapter.get_adapter_for_current_system()
-	adapter.exec(fpath, '')
-
-	# learn load address, entrypoint
-	#
-	module2addr = adapter.mem_modules()
-	if not fpath in module2addr:
-		print('module2addr: ', module2addr)
-		print('fpath: ', fpath)
-		assert fpath in module2addr
-
-	if '_pie' in prog:
-		load_addr = module2addr[fpath]
-		print('pie module, file load 0x%X overridden with 0x%X, new entry 0x%X' %
-			(load_addr, module2addr[fpath], module2addr[fpath]+entry_offs))
-		entry = load_addr + entry_offs
+	if '_pie' in testbin:
+		# pie: override file's load address with runtime load address
+		load_addr = module2addr[mpath]
 	else:
-		print('non-pie module should hold file\'s specified load and entry')
-		print('load_addr: 0x%X' % load_addr)
-		print('module2addr[fpath]: 0x%X' % module2addr[fpath])
-		assert module2addr[fpath] == load_addr
+		# non-pie: file's load address should match runtime load address
+		assert module2addr[mpath] == load_addr
 
-	return (adapter, entry)
+	return load_addr + entry_offs
 
 #------------------------------------------------------------------------------
 # MAIN
@@ -182,25 +197,32 @@ if __name__ == '__main__':
 
 	# one-off tests
 	if arg == 'oneoff':
-		fpath = test_prog_to_fpath('helloworld_thread')
+		fpath = testbin_to_fpath('helloworld_thread')
 		adapter = DebugAdapter.get_adapter_for_current_system()
 		adapter.exec(fpath)
 		print(adapter.mem_modules())
 		print(type(adapter) == dbgeng.DebugAdapterDbgeng)
 		sys.exit(0)
 
-	tests = []
-	if arg in ['asm', 'assembly', 'assembler', 'asmtest']:
-		tests = ['assembly']
-	elif arg in ['thread', 'threads', 'threading']:
-		tests = ['thread']
-	elif arg in ['basic']:
-		tests = ['basic']
-	else:
-		tests = ['assembly', 'thread', 'basic']
+	# otherwise test all executables built in the testbins dir
+	testbins = [f for f in os.listdir('testbins') \
+		if f.endswith('.exe') or os.access(os.path.join('testbins',f), os.X_OK)]
+	print('collected the following tests:\n', testbins)
 
-	if 'assembly' in tests:
-		(adapter, entry) = test_prologue('asmtest', 'ASSEMBLY')
+	#
+	# assembler x64 tests
+	#
+	for testbin in filter(lambda x: x.startswith('asmtest_x64'), testbins):
+		utils.green('testing %s' % testbin)
+
+		# parse entrypoint information
+		fpath = os.path.join('testbins', testbin)
+		(load_addr, entry_offs) = parse_image(fpath)
+		entry = load_addr + entry_offs
+
+		# for x64 machine, tester and testee run on same machine
+		adapter = DebugAdapter.get_adapter_for_current_system()
+		adapter.exec(fpath, '')
 
 		loader = adapter.reg_read('rip') != entry
 		if loader:
@@ -211,9 +233,6 @@ if __name__ == '__main__':
 		# a few steps in the loader
 		if loader:
 			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
 
 		# set bp entry
 		print('setting entry breakpoint at 0x%X' % entry)
@@ -221,9 +240,6 @@ if __name__ == '__main__':
 
 		# few more steps
 		if loader:
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
 			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
 
 		# go to entry
@@ -247,94 +263,111 @@ if __name__ == '__main__':
 
 		adapter.quit()
 
-	if 'basic' in tests:
-		for prog in ['helloworld', 'helloworld_loop', 'helloworld_thread',
-			'helloworld_func', 'helloworld_pie', 'helloworld_thread_pie',
-			'helloworld_loop_pie', 'helloworld_func_pie',
-			]:
+	#
+	# helloworld x64, no threads
+	#
+	for testbin in testbins:
+		if not testbin.startswith('helloworld_'): continue
+		if not '_x64-' in testbin: continue
+		if '_thread' in testbin: continue
 
-			(adapter, entry) = test_prologue(prog, 'BASIC')
+		utils.green('testing %s' % testbin)
 
-			print('rip: 0x%X' % adapter.reg_read('rip'))
+		# for x64 machine, tester and testee run on same machine
+		adapter = DebugAdapter.get_adapter_for_current_system()
+		fpath = testbin_to_fpath(testbin)
+		adapter.exec(fpath, '')
+		entry = confirm_initial_module(adapter, testbin)
 
-			# breakpoint set/clear should fail at 0
-			print('breakpoint failures')
-			try:
-				adapter.breakpoint_clear(0)
-			except DebugAdapter.BreakpointClearError:
-				pass
+		print('rip: 0x%X' % adapter.reg_read('rip'))
 
-			try:
-				adapter.breakpoint_set(0)
-			except DebugAdapter.BreakpointSetError:
-				pass
+		# breakpoint set/clear should fail at 0
+		print('breakpoint failures')
+		try:
+			adapter.breakpoint_clear(0)
+		except DebugAdapter.BreakpointClearError:
+			pass
 
-			# breakpoint set/clear should succeed at entrypoint
-			print('setting breakpoint at 0x%X' % entry)
-			adapter.breakpoint_set(entry)
-			print('clearing breakpoint at 0x%X' % entry)
-			adapter.breakpoint_clear(entry)
-			print('setting breakpoint at 0x%X' % entry)
-			adapter.breakpoint_set(entry)
+		try:
+			adapter.breakpoint_set(0)
+		except DebugAdapter.BreakpointSetError:
+			pass
 
-			# proceed to breakpoint
-			print('going')
-			(reason, info) = adapter.go()
-			assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-			rip = adapter.reg_read('rip')
-			print('rip: 0x%X' % rip)
-			assert rip == entry
+		# breakpoint set/clear should succeed at entrypoint
+		print('setting breakpoint at 0x%X' % entry)
+		adapter.breakpoint_set(entry)
+		print('clearing breakpoint at 0x%X' % entry)
+		adapter.breakpoint_clear(entry)
+		print('setting breakpoint at 0x%X' % entry)
+		adapter.breakpoint_set(entry)
 
-			# single step
-			data = adapter.mem_read(rip, 15)
-			assert len(data) == 15
-			(asmstr, asmlen) = utils.disasm1(data, 0)
-			adapter.breakpoint_clear(entry)
-			(reason, info) = adapter.step_into()
-			assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-			rip2 = adapter.reg_read('rip')
-			print('rip2: 0x%X' % rip2)
-			assert rip + asmlen == rip2
+		# proceed to breakpoint
+		print('going')
+		(reason, info) = adapter.go()
+		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		rip = adapter.reg_read('rip')
+		print('rip: 0x%X' % rip)
+		assert rip == entry
 
-			print('registers')
-			for (ridx,rname) in enumerate(adapter.reg_list()):
-				width = adapter.reg_bits(rname)
-				#print('%d: %s (%d bits)' % (ridx, rname, width))
-			assert adapter.reg_bits('rax') == 64
-			assert adapter.reg_bits('rbx') == 64
-			assert_general_error(lambda: adapter.reg_bits('rzx'))
+		# single step
+		data = adapter.mem_read(rip, 15)
+		assert len(data) == 15
+		(asmstr, asmlen) = utils.disasm1(data, 0)
+		adapter.breakpoint_clear(entry)
+		(reason, info) = adapter.step_into()
+		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		rip2 = adapter.reg_read('rip')
+		print('rip2: 0x%X' % rip2)
+		assert rip + asmlen == rip2
 
-			print('registers read/write')
-			rax = adapter.reg_read('rax')
-			rbx = adapter.reg_read('rbx')
-			assert_general_error(lambda: adapter.reg_read('rzx'))
-			adapter.reg_write('rax', 0xDEADBEEFAAAAAAAA)
-			assert adapter.reg_read('rax') == 0xDEADBEEFAAAAAAAA
-			adapter.reg_write('rbx', 0xCAFEBABEBBBBBBBB)
-			assert_general_error(lambda: adapter.reg_read('rzx'))
-			assert adapter.reg_read('rbx') == 0xCAFEBABEBBBBBBBB
-			adapter.reg_write('rax', rax)
-			assert adapter.reg_read('rax') == rax
-			adapter.reg_write('rbx', rbx)
-			assert adapter.reg_read('rbx') == rbx
+		print('registers')
+		for (ridx,rname) in enumerate(adapter.reg_list()):
+			width = adapter.reg_bits(rname)
+			#print('%d: %s (%d bits)' % (ridx, rname, width))
+		assert adapter.reg_bits('rax') == 64
+		assert adapter.reg_bits('rbx') == 64
+		assert_general_error(lambda: adapter.reg_bits('rzx'))
 
-			print('mem read/write')
-			addr = adapter.reg_read('rip')
-			data = adapter.mem_read(addr, 256)
-			assert_general_error(lambda: adapter.mem_write(0, b'heheHAHAherherHARHAR'))
-			data2 = b'\xAA' * 256
-			adapter.mem_write(addr, data2)
-			assert_general_error(lambda: adapter.mem_read(0, 256))
-			assert adapter.mem_read(addr, 256) == data2
-			adapter.mem_write(addr, data)
-			assert adapter.mem_read(addr, 256) == data
+		print('registers read/write')
+		rax = adapter.reg_read('rax')
+		rbx = adapter.reg_read('rbx')
+		assert_general_error(lambda: adapter.reg_read('rzx'))
+		adapter.reg_write('rax', 0xDEADBEEFAAAAAAAA)
+		assert adapter.reg_read('rax') == 0xDEADBEEFAAAAAAAA
+		adapter.reg_write('rbx', 0xCAFEBABEBBBBBBBB)
+		assert_general_error(lambda: adapter.reg_read('rzx'))
+		assert adapter.reg_read('rbx') == 0xCAFEBABEBBBBBBBB
+		adapter.reg_write('rax', rax)
+		assert adapter.reg_read('rax') == rax
+		adapter.reg_write('rbx', rbx)
+		assert adapter.reg_read('rbx') == rbx
 
-			print('quiting')
-			adapter.quit()
-			adapter = None
+		print('mem read/write')
+		addr = adapter.reg_read('rip')
+		data = adapter.mem_read(addr, 256)
+		assert_general_error(lambda: adapter.mem_write(0, b'heheHAHAherherHARHAR'))
+		data2 = b'\xAA' * 256
+		adapter.mem_write(addr, data2)
+		assert_general_error(lambda: adapter.mem_read(0, 256))
+		assert adapter.mem_read(addr, 256) == data2
+		adapter.mem_write(addr, data)
+		assert adapter.mem_read(addr, 256) == data
 
-	if 'thread' in tests:
-		(adapter, entry) = test_prologue('helloworld_thread', 'THREAD')
+		print('quiting')
+		adapter.quit()
+		adapter = None
+
+	for testbin in testbins:
+		if not testbin.startswith('helloworld_thread'): continue
+		if not '_x64-' in testbin: continue
+
+		utils.green('testing %s' % testbin)
+
+		# for x64 machine, tester and testee run on same machine
+		adapter = DebugAdapter.get_adapter_for_current_system()
+		fpath = testbin_to_fpath(testbin)
+		adapter.exec(fpath, '')
+		entry = confirm_initial_module(adapter, testbin)
 
 		print('scheduling break in .5 seconds')
 		threading.Timer(.5, break_into, [adapter]).start()
@@ -388,4 +421,4 @@ if __name__ == '__main__':
 		print('done')
 		adapter.quit()
 
-	print('TESTS PASSED!')
+	utils.green('TESTS PASSED!')
