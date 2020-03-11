@@ -13,8 +13,10 @@ NDK ?= $(HOME)/android-ndk-r15c
 
 SYSR = $(NDK)/platforms/android-23/arch-arm
 GCC = $(NDK)/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64/bin/arm-linux-androideabi-gcc
+AS = $(NDK)/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64/bin/arm-linux-androideabi-as
+LD = $(NDK)/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64/bin/arm-linux-androideabi-ld
 
-all: helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android
+all: helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android asmtest_armv7-android
 
 helloworld_pie_armv7-android: helloworld.c
 	$(GCC) -march=armv7-a --sysroot=$(SYSR) -pie -DOS_IS_ANDROID helloworld.c -o helloworld_pie_armv7-android
@@ -25,7 +27,14 @@ helloworld_loop_pie_armv7-android: helloworld_loop.c
 helloworld_thread_pie_armv7-android: helloworld_thread.c
 	$(GCC) -march=armv7-a --sysroot=$(SYSR) -pie -DOS_IS_ANDROID -std=c11 helloworld_thread.c -o helloworld_thread_pie_armv7-android
 
+asmtest_armv7-android: asmtest_armv7-android.o
+	$(LD) -m elf32-littlearm asmtest_armv7-android.o -o asmtest_armv7-android
+
+asmtest_armv7-android.s: asmtest_armv7-android.s
+	$(AS) asmtest_armv7-android.s -o asmtest_armv7-android.o
+
 push:
-	adb push helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android /data/local/tmp
+	adb push helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android asmtest_armv7-android /data/local/tmp
+
 clean:
-	rm -rf helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android
+	rm -rf helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android asmtest_armv7-android.o asmtest_armv7-android

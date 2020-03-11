@@ -227,6 +227,22 @@ def confirm_initial_module(adapter, testbin):
 
 	return load_addr + entry_offs
 
+def android_test_setup(testbin):
+	# send file to phone
+	fpath = testbin_to_fpath(testbin)
+	shellout(['adb', 'push', fpath, '/data/local/tmp'])
+
+	# launch adb
+	threading.Thread(target=invoke_adb_gdb_listen, args=[testbin]).start()
+
+	# connect to adb
+	time.sleep(.25)
+	adapter = gdb.DebugAdapterGdb()
+	adapter.connect('localhost', 31337)
+	entry = confirm_initial_module(adapter, testbin)
+
+	return (adapter, entry)
+
 #------------------------------------------------------------------------------
 # MAIN
 #------------------------------------------------------------------------------
@@ -463,9 +479,11 @@ if __name__ == '__main__':
 		print('done')
 		adapter.quit()
 
-	#
+	#--------------------------------------------------------------------------
+	# ARMV7-ANDROID TESTS
+	#--------------------------------------------------------------------------
+
 	# helloworld armv7, no threads
-	#
 	for testbin in testbins:
 		if not testbin.startswith('helloworld_'): continue
 		if not '_armv7-' in testbin: continue
@@ -473,19 +491,7 @@ if __name__ == '__main__':
 
 		utils.green('testing %s' % testbin)
 
-		# send file to phone
-		fpath = testbin_to_fpath(testbin)
-		shellout(['adb', 'push', fpath, '/data/local/tmp'])
-
-		# launch adb
-		threading.Thread(target=invoke_adb_gdb_listen, args=[testbin]).start()
-
-		# connect to adb
-		time.sleep(.25)
-		adapter = gdb.DebugAdapterGdb()
-		adapter.connect('localhost', 31337)
-
-		entry = confirm_initial_module(adapter, testbin)
+		(adapter, entry) = android_test_setup(testbin)
 
 		print('pc: 0x%X' % adapter.reg_read('pc'))
 
@@ -565,26 +571,12 @@ if __name__ == '__main__':
 		adapter.quit()
 		adapter = None
 
-	#
 	# helloworld armv7, with threads
-	#
 	for testbin in testbins:
 		if not testbin.startswith('helloworld_thread_'): continue
 		if not '_armv7-' in testbin: continue
 
-		# send file to phone
-		fpath = testbin_to_fpath(testbin)
-		shellout(['adb', 'push', fpath, '/data/local/tmp'])
-
-		# launch adb
-		threading.Thread(target=invoke_adb_gdb_listen, args=[testbin]).start()
-
-		# connect to adb
-		time.sleep(.25)
-		adapter = gdb.DebugAdapterGdb()
-		adapter.connect('localhost', 31337)
-
-		entry = confirm_initial_module(adapter, testbin)
+		(adapter, entry) = android_test_setup(testbin)
 
 		print('pc: 0x%X' % adapter.reg_read('pc'))
 		print('scheduling break in .5 seconds')
@@ -630,6 +622,54 @@ if __name__ == '__main__':
 			print('pcs2:  ', pcs2)
 			assert False
 		print('done')
+		adapter.quit()
+
+	# assembler armv7 test
+	for testbin in filter(lambda x: x.startswith('asmtest_armv7'), testbins):
+		utils.green('testing %s' % testbin)
+
+		(adapter, entry) = android_test_setup(testbin)
+
+		loader = adapter.reg_read('pc') != entry
+		if loader:
+			print('entrypoint is the program, no library or loader')
+		else:
+			print('loader detected, gonna step a few times for fun')
+
+		# a few steps in the loader
+		if loader:
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+
+		# set bp entry
+		print('setting entry breakpoint at 0x%X' % entry)
+		adapter.breakpoint_set(entry)
+
+		# few more steps
+		if loader:
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+
+		# go to entry
+		adapter.go()
+		assert adapter.reg_read('pc') == entry
+		adapter.breakpoint_clear(entry)
+		# step into nop
+		adapter.step_into()
+		assert adapter.reg_read('pc') == entry+4
+		# step into call, return
+		adapter.step_into()
+		adapter.step_into()
+		# back
+		assert adapter.reg_read('pc') == entry+8
+		adapter.step_into()
+		# step into call, return
+		adapter.step_into()
+		adapter.step_into()
+		# back
+		assert adapter.reg_read('pc') == entry+16
+
+		(reason, extra) = adapter.go()
+		assert reason == DebugAdapter.STOP_REASON.PROCESS_EXITED
+
 		adapter.quit()
 
 	utils.green('TESTS PASSED!')
