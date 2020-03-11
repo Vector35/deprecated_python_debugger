@@ -485,7 +485,7 @@ if __name__ == '__main__':
 		adapter.quit()
 
 	#--------------------------------------------------------------------------
-	# ARMV7-ANDROID TESTS
+	# {ARMV7,AARCH64}-ANDROID TESTS
 	#--------------------------------------------------------------------------
 
 	# helloworld armv7, no threads
@@ -628,8 +628,9 @@ if __name__ == '__main__':
 		print('done')
 		adapter.quit()
 
-	# assembler armv7 test
-	for testbin in filter(lambda x: x.startswith('asmtest_armv7'), testbins):
+	# assembler test
+	# architectures: armv7, aarch64
+	for testbin in filter(lambda x: x.startswith('asmtest_armv7') or x.startswith('asmtest_aarch64'), testbins):
 		(adapter, entry) = android_test_setup(testbin)
 
 		loader = adapter.reg_read('pc') != entry
@@ -673,10 +674,6 @@ if __name__ == '__main__':
 		assert reason == DebugAdapter.STOP_REASON.PROCESS_EXITED
 
 		adapter.quit()
-
-	#--------------------------------------------------------------------------
-	# ARMV7-AARCH64 TESTS
-	#--------------------------------------------------------------------------
 
 	# helloworld aarch64, no threads
 	for testbin in testbins:
@@ -768,6 +765,5 @@ if __name__ == '__main__':
 		print('quiting')
 		adapter.quit()
 		adapter = None
-
 
 	utils.green('TESTS PASSED!')
