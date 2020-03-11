@@ -565,4 +565,71 @@ if __name__ == '__main__':
 		adapter.quit()
 		adapter = None
 
+	#
+	# helloworld armv7, with threads
+	#
+	for testbin in testbins:
+		if not testbin.startswith('helloworld_thread_'): continue
+		if not '_armv7-' in testbin: continue
+
+		# send file to phone
+		fpath = testbin_to_fpath(testbin)
+		shellout(['adb', 'push', fpath, '/data/local/tmp'])
+
+		# launch adb
+		threading.Thread(target=invoke_adb_gdb_listen, args=[testbin]).start()
+
+		# connect to adb
+		time.sleep(.25)
+		adapter = gdb.DebugAdapterGdb()
+		adapter.connect('localhost', 31337)
+
+		entry = confirm_initial_module(adapter, testbin)
+
+		print('pc: 0x%X' % adapter.reg_read('pc'))
+		print('scheduling break in .5 seconds')
+		threading.Timer(.5, break_into, [adapter]).start()
+		print('going')
+		adapter.go()
+		print('back')
+		print('switching to bad thread')
+		assert_general_error(lambda: adapter.thread_select(999))
+		print('asking for threads')
+		tids = adapter.thread_list()
+		assert len(tids) == 5
+		tid_active = adapter.thread_selected()
+		pcs = []
+		for tid in tids:
+			adapter.thread_select(tid)
+			pc = adapter.reg_read('pc')
+			pcs.append(pc)
+			seltxt = '<--' if tid == tid_active else ''
+			print('thread %02d: pc=0x%016X %s' % (tid, pc, seltxt))
+		assert pcs[0] != pcs[1] # thread at WaitForMultipleObjects()/pthread_join() should be different
+		print('switching to bad thread')
+		assert_general_error(lambda: adapter.thread_select(999))
+		secs = .5
+		print('scheduling break in %d second(s)' % secs)
+		threading.Timer(secs, break_into, [adapter]).start()
+		print('going')
+		adapter.go()
+		print('back')
+		print('checking for %d threads' % 5)
+		assert len(adapter.thread_list()) == 5
+		# ensure the pc's are in different locations (that the continue actually continued)
+		pcs2 = []
+		for tid in tids:
+			adapter.thread_select(tid)
+			pcs2.append(adapter.reg_read('pc'))
+		print('checking that at least one thread progressed')
+		#print(' pcs: ', pcs)
+		#print('pcs2: ', pcs2)
+		if list(filter(lambda x: not x, [pcs[i]==pcs2[i] for i in range(len(pcs))])) == []:
+			print('did any threads progress?')
+			print(' pcs:  ', pcs)
+			print('pcs2:  ', pcs2)
+			assert False
+		print('done')
+		adapter.quit()
+
 	utils.green('TESTS PASSED!')
