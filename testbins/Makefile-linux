@@ -1,33 +1,36 @@
 # make -f Makefile-linux
-all: helloworld helloworld_loop helloworld_thread helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie asmtest
 
-helloworld: helloworld.c
-	gcc -W -no-pie helloworld.c -o helloworld
+TARGETS_ALL = helloworld_x64-linux helloworld_loop_x64-linux helloworld_thread_x64-linux helloworld_func_x64-linux helloworld_pie_x64-linux helloworld_thread_pie_x64-linux helloworld_loop_pie_x64-linux helloworld_func_pie_x64-linux asmtest_x64-linux
 
-helloworld_thread: helloworld_thread.c
-	gcc -W -no-pie helloworld_thread.c -lpthread -o helloworld_thread
+all: $(TARGETS_ALL)
 
-helloworld_loop: helloworld_loop.c
-	gcc -W -no-pie helloworld_loop.c -o helloworld_loop
+helloworld_x64-linux: helloworld.c
+	gcc -W -no-pie helloworld.c -o helloworld_x64-linux
 
-helloworld_func: helloworld_func.c
-	gcc -W -no-pie helloworld_func.c -o helloworld_func
+helloworld_thread_x64-linux: helloworld_thread.c
+	gcc -W -no-pie helloworld_thread.c -lpthread -o helloworld_thread_x64-linux
 
-helloworld_pie: helloworld.c
-	gcc -W -pie helloworld.c -o helloworld_pie
+helloworld_loop_x64-linux: helloworld_loop.c
+	gcc -W -no-pie helloworld_loop.c -o helloworld_loop_x64-linux
 
-helloworld_thread_pie: helloworld_thread.c
-	gcc -W -pie helloworld_thread.c -lpthread -o helloworld_thread_pie
+helloworld_func_x64-linux: helloworld_func.c
+	gcc -W -no-pie helloworld_func.c -o helloworld_func_x64-linux
 
-helloworld_loop_pie: helloworld_loop.c
-	gcc -W -pie helloworld_loop.c -o helloworld_loop_pie
+helloworld_pie_x64-linux: helloworld.c
+	gcc -W -pie helloworld.c -o helloworld_pie_x64-linux
 
-helloworld_func_pie: helloworld_func.c
-	gcc -W -pie helloworld_func.c -o helloworld_func_pie
+helloworld_thread_pie_x64-linux: helloworld_thread.c
+	gcc -W -pie helloworld_thread.c -lpthread -o helloworld_thread_pie_x64-linux
 
-asmtest: asmtest.asm
-	nasm asmtest.asm -f elf64 -DOS_IS_LINUX -o asmtest.o
-	ld -m elf_x86_64 asmtest.o -o asmtest
+helloworld_loop_pie_x64-linux: helloworld_loop.c
+	gcc -W -pie helloworld_loop.c -o helloworld_loop_pie_x64-linux
+
+helloworld_func_pie_x64-linux: helloworld_func.c
+	gcc -W -pie helloworld_func.c -o helloworld_func_pie_x64-linux
+
+asmtest_x64-linux: asmtest.asm
+	nasm asmtest.asm -f elf64 -DOS_IS_LINUX -o asmtest_x64-linux.o
+	ld -m elf_x86_64 asmtest_x64-linux.o -o asmtest_x64-linux
 
 clean:
-	rm -rf helloworld helloworld_thread helloworld_loop helloworld_func helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie asmtest
+	rm -rf $(TARGETS_ALL) *.o
