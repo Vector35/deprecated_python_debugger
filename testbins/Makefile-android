@@ -21,8 +21,21 @@ GCC_64 = $(NDK)/toolchains/aarch64-linux-android-4.9/prebuilt/darwin-x86_64/bin/
 AS_64 = $(NDK)/toolchains/aarch64-linux-android-4.9/prebuilt/darwin-x86_64/bin/aarch64-linux-android-as
 LD_64 = $(NDK)/toolchains/aarch64-linux-android-4.9/prebuilt/darwin-x86_64/bin/aarch64-linux-android-ld
 
-all: helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android asmtest_armv7-android \
-	helloworld_pie_aarch64-android
+TARGETS_ARMV7 = helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android asmtest_armv7-android
+TARGETS_AARCH64 = helloworld_pie_aarch64-android helloworld_loop_pie_aarch64-android helloworld_thread_pie_aarch64-android
+TARGETS_ALL = $(TARGETS_ARMV7) $(TARGETS_AARCH64)
+
+armv7: $(TARGETS_ARMV7)
+
+aarch64: $(TARGETS_AARCH64)
+
+all: $(TARGETS_ALL)
+
+push:
+	adb push $(TARGETS_ALL)
+
+clean:
+	rm -rf $(TARGETS_ALL) *.o
 
 #------------------------------------------------------------------------------
 # armv7
@@ -48,8 +61,10 @@ asmtest_armv7-android.o: asmtest_armv7-android.s
 helloworld_pie_aarch64-android: helloworld.c
 	$(GCC_64) --sysroot=$(SYSR_64) -pie -DOS_IS_ANDROID helloworld.c -o helloworld_pie_aarch64-android
 
-push:
-	adb push helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android asmtest_armv7-android /data/local/tmp
+helloworld_loop_pie_aarch64-android: helloworld_loop.c
+	$(GCC_64) --sysroot=$(SYSR_64) -pie -DOS_IS_ANDROID helloworld_loop.c -o helloworld_loop_pie_aarch64-android
 
-clean:
-	rm -rf helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android asmtest_armv7-android.o asmtest_armv7-android
+helloworld_thread_pie_aarch64-android: helloworld_thread.c
+	$(GCC_64) --sysroot=$(SYSR_64) -pie -DOS_IS_ANDROID -std=c11 helloworld_thread.c -o helloworld_thread_pie_aarch64-android
+
+

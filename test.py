@@ -191,7 +191,7 @@ def break_into(adapter):
 
 def invoke_adb_gdb_listen(testbin, port=31337):
 	if '_armv7-' in testbin: gdbserver = 'gdbserver_armv7'
-	elif '_aarch64-' in testbin: gdbserver = 'gdbserver_arch64'
+	elif '_aarch64-' in testbin: gdbserver = 'gdbserver_aarch64'
 	else: raise Exception('cannot determine gdbserver architecture from %s' % testbin)
 
 	args = []
@@ -574,10 +574,11 @@ if __name__ == '__main__':
 		adapter.quit()
 		adapter = None
 
-	# helloworld armv7, with threads
+	# helloworld with threads
+	# architectures: armv7, aarch64
 	for testbin in testbins:
 		if not testbin.startswith('helloworld_thread_'): continue
-		if not '_armv7-' in testbin: continue
+		if not (('_armv7-' in testbin) or ('_aarch64-' in testbin)): continue
 
 		(adapter, entry) = android_test_setup(testbin)
 
@@ -672,5 +673,101 @@ if __name__ == '__main__':
 		assert reason == DebugAdapter.STOP_REASON.PROCESS_EXITED
 
 		adapter.quit()
+
+	#--------------------------------------------------------------------------
+	# ARMV7-AARCH64 TESTS
+	#--------------------------------------------------------------------------
+
+	# helloworld aarch64, no threads
+	for testbin in testbins:
+		if not testbin.startswith('helloworld_'): continue
+		if not '_aarch64-' in testbin: continue
+		if '_thread' in testbin: continue
+
+		(adapter, entry) = android_test_setup(testbin)
+
+		print('pc: 0x%X' % adapter.reg_read('pc'))
+
+		# breakpoint set/clear should fail at 0
+		print('breakpoint failures')
+		try:
+			adapter.breakpoint_clear(0)
+		except DebugAdapter.BreakpointClearError:
+			pass
+
+		try:
+			adapter.breakpoint_set(0)
+		except DebugAdapter.BreakpointSetError:
+			pass
+
+		# breakpoint set/clear should succeed at entrypoint
+		print('setting breakpoint at 0x%X' % entry)
+		adapter.breakpoint_set(entry)
+		print('clearing breakpoint at 0x%X' % entry)
+		adapter.breakpoint_clear(entry)
+		print('setting breakpoint at 0x%X' % entry)
+		adapter.breakpoint_set(entry)
+
+		# proceed to breakpoint
+		print('going')
+		(reason, info) = adapter.go()
+		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		pc = adapter.reg_read('pc')
+		print('pc: 0x%X' % pc)
+		assert pc == entry
+
+		# single step
+		data = adapter.mem_read(pc, 15)
+		assert len(data) == 15
+		(asmstr, asmlen) = utils.disasm1(data, 0, 'armv7')
+		adapter.breakpoint_clear(entry)
+		(reason, info) = adapter.step_into()
+		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		pc2 = adapter.reg_read('pc')
+		print('pc2: 0x%X' % pc2)
+		assert pc + asmlen == pc2
+
+		print('registers')
+		for (ridx,rname) in enumerate(adapter.reg_list()):
+			width = adapter.reg_bits(rname)
+			#print('%d: %s (%d bits)' % (ridx, rname, width))
+		assert adapter.reg_bits('x0') == 64
+		assert adapter.reg_bits('x4') == 64
+		assert_general_error(lambda: adapter.reg_bits('rzx'))
+
+		print('registers read/write')
+		x0 = adapter.reg_read('x0')
+		x4 = adapter.reg_read('x4')
+		assert_general_error(lambda: adapter.reg_read('rzx'))
+		adapter.reg_write('x0', 0xDEADBEEF)
+		assert adapter.reg_read('x0') == 0xDEADBEEF
+		adapter.reg_write('x4', 0xCAFEBABE)
+		assert_general_error(lambda: adapter.reg_read('rzx'))
+		assert adapter.reg_read('x4') == 0xCAFEBABE
+		adapter.reg_write('x0', x0)
+		assert adapter.reg_read('x0') == x0
+		adapter.reg_write('x4', x4)
+		assert adapter.reg_read('x4') == x4
+
+		print('mem read/write')
+		addr = adapter.reg_read('pc')
+		data = adapter.mem_read(addr, 256)
+		assert_general_error(lambda: adapter.mem_write(0, b'heheHAHAherherHARHAR'))
+		data2 = b'\xAA' * 256
+		adapter.mem_write(addr, data2)
+		assert_general_error(lambda: adapter.mem_read(0, 256))
+		assert adapter.mem_read(addr, 256) == data2
+		adapter.mem_write(addr, data)
+		assert adapter.mem_read(addr, 256) == data
+
+		if not '_loop' in testbin:
+			print('going')
+			(reason, extra) = adapter.go()
+			assert reason == DebugAdapter.STOP_REASON.PROCESS_EXITED
+
+		print('quiting')
+		adapter.quit()
+		adapter = None
+
 
 	utils.green('TESTS PASSED!')
