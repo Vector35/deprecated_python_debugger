@@ -556,16 +556,22 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		# calculate bit offset per register within a concatenated registers blob
 		id2name = {self.reg_info[k]['id']: k for k in self.reg_info.keys()}
 		id2width = {v['id']: v['width'] for v in self.reg_info.values()}
-		id_max = max(id2width.keys())
 
-		offset = 0
-		for i in range(id_max):
-			if not i in id2width: # non-sequential id, can't know offset
-				break
+		if id2width:
+			id_max = max(id2width.keys())
 
-			name = id2name[i]
-			self.reg_info[name]['offset'] = offset
-			offset += id2width[i]
+			offset = 0
+			for i in range(id_max):
+				if not i in id2width: # non-sequential id, can't know offset
+					break
+
+				name = id2name[i]
+				self.reg_info[name]['offset'] = offset
+				offset += id2width[i]
+		else:
+			pass
+			# consider raising exception, not reg info in returned xml, something is wrong
+			# observed this with gdbserver-armv7 paired with aarch64 inferior
 
 		#for reg in sorted(self.reg_info, key=lambda x: self.reg_info[x]['id']):
 		#	print('%s id=%d width=%d' % (reg, self.reg_info[reg]['id'], self.reg_info[reg]['width']))

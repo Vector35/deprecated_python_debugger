@@ -79,11 +79,16 @@ The various pieces of the plugin are organized under the `DebugState` class. Whe
 
 ## Android
 
-Connect your local machine's 31337 to the phone's 31337 with `adb forward tcp:1337 tcp:1337`.
+Get gdbservers onto the phone, pushing both architectures. Mine came from the NDK version r15c:
 
-Get gdbserver onto the phone. Mine came from the NDK, eg: `adb push ~/android-ndk-r17c/prebuilt/android-arm64/gdbserver /data/local/tmp`.
+```
+adb push ~/android-ndk-r15c/prebuilt/android-arm64/gdbserver/gdbserver /data/local/tmp/gdbserver_aarch64
+adb push ~/android-ndk-r15c/prebuilt/android-arm/gdbserver/gdbserver /data/local/tmp/gdbserver_armv7
+```
 
-Run gdbserver on the binary, telling it to listen on 31337, eg: `./gdbserver :31337 ./hello`.
+Connect your local machine's 31337 to the phone's 31337 with `adb forward tcp:31337 tcp:31337`.
+
+Run the appropriate gdbserver on the binary, telling it to listen on 31337, eg: `./gdbserver_aarch64 :31337 ./hello_aarch64-android`.
 
 ## testing
 

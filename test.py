@@ -190,10 +190,15 @@ def break_into(adapter):
 	adapter.break_into()
 
 def invoke_adb_gdb_listen(testbin, port=31337):
+	if '_armv7-' in testbin: gdbserver = 'gdbserver_armv7'
+	elif '_aarch64-' in testbin: gdbserver = 'gdbserver_arch64'
+	else: raise Exception('cannot determine gdbserver architecture from %s' % testbin)
+
 	args = []
 	args.append('adb')
 	args.append('shell')
-	args.append('/data/local/tmp/gdbserver :%d /data/local/tmp/%s' % (port, testbin))
+	args.append('/data/local/tmp/%s :%d /data/local/tmp/%s' % (gdbserver, port, testbin))
+
 	print('invoke_adb() executing: %s' % ' '.join(args))
 	shellout(args)
 	print('invoke_adb() done')
@@ -228,6 +233,8 @@ def confirm_initial_module(adapter, testbin):
 	return load_addr + entry_offs
 
 def android_test_setup(testbin):
+	utils.green('testing %s' % testbin)
+
 	# send file to phone
 	fpath = testbin_to_fpath(testbin)
 	shellout(['adb', 'push', fpath, '/data/local/tmp'])
@@ -264,9 +271,11 @@ if __name__ == '__main__':
 		if f.endswith('.exe') or os.access(os.path.join('testbins',f), os.X_OK)]
 	print('collected the following tests:\n', testbins)
 
-	#
+	#--------------------------------------------------------------------------
+	# X64-??? TESTS
+	#--------------------------------------------------------------------------
+
 	# assembler x64 tests
-	#
 	for testbin in filter(lambda x: x.startswith('asmtest_x64'), testbins):
 		utils.green('testing %s' % testbin)
 
@@ -318,9 +327,7 @@ if __name__ == '__main__':
 
 		adapter.quit()
 
-	#
 	# helloworld x64, no threads
-	#
 	for testbin in testbins:
 		if not testbin.startswith('helloworld_'): continue
 		if not '_x64-' in testbin: continue
@@ -412,9 +419,7 @@ if __name__ == '__main__':
 		adapter.quit()
 		adapter = None
 
-	#
 	# helloworlds x64 with threads
-	#
 	for testbin in testbins:
 		if not testbin.startswith('helloworld_thread'): continue
 		if not '_x64-' in testbin: continue
@@ -488,8 +493,6 @@ if __name__ == '__main__':
 		if not testbin.startswith('helloworld_'): continue
 		if not '_armv7-' in testbin: continue
 		if '_thread' in testbin: continue
-
-		utils.green('testing %s' % testbin)
 
 		(adapter, entry) = android_test_setup(testbin)
 
@@ -626,8 +629,6 @@ if __name__ == '__main__':
 
 	# assembler armv7 test
 	for testbin in filter(lambda x: x.startswith('asmtest_armv7'), testbins):
-		utils.green('testing %s' % testbin)
-
 		(adapter, entry) = android_test_setup(testbin)
 
 		loader = adapter.reg_read('pc') != entry

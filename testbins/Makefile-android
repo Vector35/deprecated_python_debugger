@@ -16,8 +16,17 @@ GCC = $(NDK)/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64/bin/arm
 AS = $(NDK)/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64/bin/arm-linux-androideabi-as
 LD = $(NDK)/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64/bin/arm-linux-androideabi-ld
 
-all: helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android asmtest_armv7-android
+SYSR_64 = $(NDK)/platforms/android-23/arch-arm64
+GCC_64 = $(NDK)/toolchains/aarch64-linux-android-4.9/prebuilt/darwin-x86_64/bin/aarch64-linux-android-gcc
+AS_64 = $(NDK)/toolchains/aarch64-linux-android-4.9/prebuilt/darwin-x86_64/bin/aarch64-linux-android-as
+LD_64 = $(NDK)/toolchains/aarch64-linux-android-4.9/prebuilt/darwin-x86_64/bin/aarch64-linux-android-ld
 
+all: helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android asmtest_armv7-android \
+	helloworld_pie_aarch64-android
+
+#------------------------------------------------------------------------------
+# armv7
+#------------------------------------------------------------------------------
 helloworld_pie_armv7-android: helloworld.c
 	$(GCC) -march=armv7-a --sysroot=$(SYSR) -pie -DOS_IS_ANDROID helloworld.c -o helloworld_pie_armv7-android
 
@@ -30,8 +39,14 @@ helloworld_thread_pie_armv7-android: helloworld_thread.c
 asmtest_armv7-android: asmtest_armv7-android.o
 	$(LD) -m elf32-littlearm asmtest_armv7-android.o -o asmtest_armv7-android
 
-asmtest_armv7-android.s: asmtest_armv7-android.s
+asmtest_armv7-android.o: asmtest_armv7-android.s
 	$(AS) asmtest_armv7-android.s -o asmtest_armv7-android.o
+
+#------------------------------------------------------------------------------
+# aarch64
+#------------------------------------------------------------------------------
+helloworld_pie_aarch64-android: helloworld.c
+	$(GCC_64) --sysroot=$(SYSR_64) -pie -DOS_IS_ANDROID helloworld.c -o helloworld_pie_aarch64-android
 
 push:
 	adb push helloworld_pie_armv7-android helloworld_loop_pie_armv7-android helloworld_thread_pie_armv7-android asmtest_armv7-android /data/local/tmp
