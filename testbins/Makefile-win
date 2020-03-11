@@ -1,36 +1,38 @@
 # nmake -f Makefile-win
 
-all: helloworld.exe helloworld_loop.exe helloworld_thread.exe helloworld_func.exe helloworld_pie.exe helloworld_loop_pie.exe helloworld_thread_pie.exe helloworld_func_pie.exe asmtest.exe
+TARGETS_ALL = helloworld_x64-windows.exe helloworld_loop_x64-windows.exe helloworld_thread_x64-windows.exe helloworld_func_x64-windows.exe helloworld_pie_x64-windows.exe helloworld_loop_pie_x64-windows.exe helloworld_thread_pie_x64-windows.exe helloworld_func_pie_x64-windows.exe asmtest_x64-windows.exe 
 
-helloworld.exe: helloworld.c
-	cl helloworld.c /Fe:helloworld.exe /link /DYNAMICBASE:NO
+all: $(TARGETS_ALL)
 
-helloworld_thread.exe: helloworld_thread.c
-	cl helloworld_thread.c /Fe:helloworld_thread.exe /link /DYNAMICBASE:NO
+helloworld_x64-windows.exe: helloworld.c
+	cl helloworld.c /Fe:helloworld_x64-windows.exe /link /DYNAMICBASE:NO
 
-helloworld_loop.exe: helloworld_loop.c
-	cl helloworld_loop.c /Fe:helloworld_loop.exe /link /DYNAMICBASE:NO
+helloworld_thread_x64-windows.exe: helloworld_thread.c
+	cl helloworld_thread.c /Fe:helloworld_thread_x64-windows.exe /link /DYNAMICBASE:NO
 
-helloworld_func.exe: helloworld_func.c
-	cl helloworld_func.c /Fe:helloworld_func.exe /link /DYNAMICBASE:NO
+helloworld_loop_x64-windows.exe: helloworld_loop.c
+	cl helloworld_loop.c /Fe:helloworld_loop_x64-windows.exe /link /DYNAMICBASE:NO
 
-helloworld_pie.exe: helloworld.c
-	cl helloworld.c /Fe:helloworld_pie.exe /link
+helloworld_func_x64-windows.exe: helloworld_func.c
+	cl helloworld_func.c /Fe:helloworld_func_x64-windows.exe /link /DYNAMICBASE:NO
 
-helloworld_thread_pie.exe: helloworld_thread.c
-	cl helloworld_thread.c /Fe:helloworld_thread_pie.exe /link
+helloworld_pie_x64-windows.exe: helloworld.c
+	cl helloworld.c /Fe:helloworld_pie_x64-windows.exe /link
 
-helloworld_loop_pie.exe: helloworld_loop.c
-	cl helloworld_loop.c /Fe:helloworld_loop_pie.exe /link
+helloworld_thread_pie_x64-windows.exe: helloworld_thread.c
+	cl helloworld_thread.c /Fe:helloworld_thread_pie_x64-windows.exe /link
 
-helloworld_func_pie.exe: helloworld_func.c
-	cl helloworld_func.c /Fe:helloworld_func_pie.exe /link
+helloworld_loop_pie_x64-windows.exe: helloworld_loop.c
+	cl helloworld_loop.c /Fe:helloworld_loop_pie_x64-windows.exe /link
 
-asmtest.exe: asmtest.obj
-	link asmtest.obj /ENTRY:WinMain /SUBSYSTEM:CONSOLE /LARGEADDRESSAWARE:NO /DYNAMICBASE:NO /OUT:asmtest.exe kernel32.lib
+helloworld_func_pie_x64-windows.exe: helloworld_func.c
+	cl helloworld_func.c /Fe:helloworld_func_pie_x64-windows.exe /link
 
-asmtest.obj: asmtest.asm
-	nasm -f win64 -DOS_IS_WINDOWS asmtest.asm -o asmtest.obj
+asmtest_x64-windows.exe: asmtest_x64-windows.obj
+	link asmtest_x64-windows.obj /ENTRY:WinMain /SUBSYSTEM:CONSOLE /LARGEADDRESSAWARE:NO /DYNAMICBASE:NO /OUT:asmtest_x64-windows.exe kernel32.lib
+
+asmtest_x64-windows.obj: asmtest.asm
+	nasm -f win64 -DOS_IS_WINDOWS asmtest.asm -o asmtest_x64-windows.obj
 
 clean:
-	del /Q helloworld.exe helloworld_thread.exe helloworld_loop.exe helloworld_func.exe helloworld_pie.exe helloworld_thread_pie.exe helloworld_loop_pie.exe helloworld_func_pie.exe asmtest.exe asmtest.obj
+	del /Q $(TARGETS_ALL) *.obj

@@ -267,8 +267,14 @@ if __name__ == '__main__':
 		sys.exit(0)
 
 	# otherwise test all executables built in the testbins dir
-	testbins = [f for f in os.listdir('testbins') \
-		if f.endswith('.exe') or os.access(os.path.join('testbins',f), os.X_OK)]
+	testbins = []
+	for fname in os.listdir('testbins'):
+		fpath = os.path.join('testbins', fname)
+		if platform.system() == 'Windows':
+			if fpath.endswith('.exe'):
+				testbins.append(fname)
+		elif os.access(fpath, os.X_OK):
+			testbins.append(fname)
 	print('collected the following tests:\n', testbins)
 
 	#--------------------------------------------------------------------------
