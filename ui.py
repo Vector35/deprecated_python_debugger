@@ -137,6 +137,7 @@ class DebuggerUI:
 		self.navigate_to_rip()
 
 	def evaluate_llil(self, state, llil):
+		# Interpreter for LLIL instructions, using data from state
 		if llil.operation == LowLevelILOperation.LLIL_CONST:
 			return llil.operands[0]
 		elif llil.operation == LowLevelILOperation.LLIL_CONST_PTR:
@@ -146,13 +147,31 @@ class DebuggerUI:
 			return state.registers[reg]
 		elif llil.operation == LowLevelILOperation.LLIL_LOAD:
 			addr = self.evaluate_llil(state, llil.operands[0])
+			# Have to read from addr llil.size bytes
 			reader = BinaryReader(state.memory_view)
 			reader.seek(addr)
-			# TODO: 32-bit
-			deref = reader.read64()
+
+			if llil.size == 1:
+				deref = reader.read8()
+			elif llil.size == 2:
+				deref = reader.read16()
+			elif llil.size == 4:
+				deref = reader.read32()
+			else:
+				deref = reader.read64()
+			# Unimplemented: 128-bit, etc
+
 			return deref
 		elif llil.operation == LowLevelILOperation.LLIL_ADD:
-			return sum(self.evaluate_llil(state, op) for op in llil.operands)
+			return self.evaluate_llil(state, llil.operands[0]) + self.evaluate_llil(state, llil.operands[1])
+		elif llil.operation == LowLevelILOperation.LLIL_SUB:
+			return self.evaluate_llil(state, llil.operands[0]) - self.evaluate_llil(state, llil.operands[1])
+		elif llil.operation == LowLevelILOperation.LLIL_MUL:
+			return self.evaluate_llil(state, llil.operands[0]) * self.evaluate_llil(state, llil.operands[1])
+		elif llil.operation == LowLevelILOperation.LLIL_LSL:
+			return self.evaluate_llil(state, llil.operands[0]) << self.evaluate_llil(state, llil.operands[1])
+		elif llil.operation == LowLevelILOperation.LLIL_LSR:
+			return self.evaluate_llil(state, llil.operands[0]) >> self.evaluate_llil(state, llil.operands[1])
 		else:
 			raise NotImplementedError('todo: evaluate llil for %s' % llil.operation)
 
