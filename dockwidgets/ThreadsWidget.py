@@ -212,13 +212,13 @@ class DebugThreadsWidget(QWidget, DockContextHandler):
 		tid_str = self.model.data(index, Qt.DisplayRole)
 		#print('clicked to change to thread %s' % tid_str)
 		stateObj = binjaplug.get_state(self.bv)
-		if stateObj.state == 'STOPPED':
-			adapter = stateObj.adapter
+		if stateObj.connected and not stateObj.running:
 			tid = int(tid_str, 16)
-			adapter.thread_select(tid)
+			stateObj.threads.current = tid
 			stateObj.ui.context_display()
+			stateObj.ui.on_step()
 		else:
-			print('cannot set thread in state %s' % stateObj.state)
+			print('cannot set thread in current state')
 
 	# called from plugin's context_display() function
 	def notifyThreadsChanged(self, new_threads):

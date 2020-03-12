@@ -79,12 +79,45 @@ class DebuggerRegisters:
 class DebuggerThreads:
 	def __init__(self, state):
 		self.state = state
+		self.mark_dirty()
+
+	def mark_dirty(self):
+		self.thread_cache = None
+
+	def update(self):
+		if self.state.adapter is None:
+			raise Exception('Cannot update threads when disconnected')
+		tid_selected = self.state.adapter.thread_selected()
+		last_thread = tid_selected
+		self.thread_cache = []
+		for tid in self.state.adapter.thread_list():
+			if last_thread != tid:
+				self.state.adapter.thread_select(tid)
+				last_thread = tid
+			ip = self.state.ip
+
+			self.thread_cache.append({
+				'tid': tid,
+				'ip': ip,
+				'selected': (tid == tid_selected)
+			})
+		if last_thread != tid_selected:
+			self.state.adapter.thread_select(tid_selected)
+
+	@property
+	def current(self):
+		return self.state.adapter.thread_selected()
+
+	@current.setter
+	def current(self, tid):
+		self.state.adapter.thread_select(tid)
 
 	def __iter__(self):
-		if self.state.adapter is None:
-			return None
-		for tid in self.state.adapter.thread_list():
-			yield tid
+		if self.thread_cache is None:
+			self.update()
+
+		for thread in self.thread_cache:
+			yield thread
 
 	def __repr__(self):
 		return '<debugger threads for {}>'.format(self.state.adapter)
@@ -126,11 +159,14 @@ class DebuggerModules:
 
 		raise Exception("Cannot find current module! Is the loaded bndb pointing to a different file?")
 
-	def __iter__(self):
+	def update(self):
 		if self.state.adapter is None:
-			return None
+			raise Exception('Cannot update modules when disconnected')
+		self.module_cache = self.state.adapter.mem_modules().items()
+
+	def __iter__(self):
 		if self.module_cache is None:
-			self.module_cache = self.state.adapter.mem_modules().items()
+			self.update()
 		for (module, modbase) in self.module_cache:
 			if module in self.translations:
 				yield (self.translations[module], modbase)
@@ -386,6 +422,7 @@ class DebuggerState:
 	def memory_dirty(self):
 		self.memory_view.mark_dirty()
 		self.modules.mark_dirty()
+		self.threads.mark_dirty()
 
 	# Create symbols and variables for the memory view
 	def update_memory_view(self):
@@ -498,9 +535,9 @@ class DebuggerState:
 			self.connecting = False
 			raise Exception("cannot exec adapter of type %s" % self.adapter_type)
 
+		self.memory_dirty()
 		self.memory_view.update_base()
 		self.breakpoints.apply()
-		self.memory_dirty()
 
 	def attach(self):
 		if self.connected or self.connecting:
@@ -527,8 +564,8 @@ class DebuggerState:
 			print("Detected remote process running at different path: {}".format(current_module))
 			self.modules.translations[current_module] = self.bv.file.original_filename
 
-		self.breakpoints.apply()
 		self.memory_dirty()
+		self.breakpoints.apply()
 
 	def quit(self):
 		if self.connected:

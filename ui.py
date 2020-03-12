@@ -64,21 +64,7 @@ class DebuggerUI:
 		# Update Threads
 		#----------------------------------------------------------------------
 
-		threads = []
-		tid_selected = self.state.adapter.thread_selected()
-		last_thread = tid_selected
-		for tid in self.state.adapter.thread_list():
-			if last_thread != tid:
-				self.state.adapter.thread_select(tid)
-				last_thread = tid
-			reg_ip_val = self.state.ip
-			threads.append({
-				'tid': tid,
-				'ip': reg_ip_val,
-				'selected': (tid == tid_selected)
-			})
-		if last_thread != tid_selected:
-			self.state.adapter.thread_select(tid_selected)
+		threads = list(self.state.threads)
 		threads_widget.notifyThreadsChanged(threads)
 		if self.debug_view is not None:
 			self.debug_view.controls.set_thread_list(threads)
@@ -280,7 +266,7 @@ class DebuggerUI:
 	def update_modules(self):
 		mods = []
 		self.state.modules.mark_dirty()
-		for (modpath, address) in self.state.modules.items():
+		for (modpath, address) in self.state.modules:
 			mods.append({
 				'address': address,
 				'modpath': modpath

@@ -380,12 +380,12 @@ class DebugControlsWidget(QToolBar):
 		def select_thread_fn(tid):
 			def select_thread(tid):
 				stateObj = binjaplug.get_state(self.bv)
-				if stateObj.state == 'STOPPED':
-					adapter = stateObj.adapter
-					adapter.thread_select(tid)
-					self.debug_state.ui.context_display()
+				if stateObj.connected and not stateObj.running:
+					stateObj.threads.current = tid
+					stateObj.ui.context_display()
+					stateObj.ui.on_step()
 				else:
-					print('cannot set thread in state %s' % stateObj.state)
+					print('cannot set thread in current state')
 
 			return lambda: select_thread(tid)
 
