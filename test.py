@@ -12,6 +12,8 @@ import subprocess
 
 from struct import unpack
 
+import colorama
+
 sys.path.append('..')
 import debugger.lldb as lldb
 import debugger.dbgeng as dbgeng
@@ -91,9 +93,14 @@ def parse_image(fpath):
 	# PE
 	elif data[0:2] == b'\x4d\x5a':
 		e_lfanew = unpack('<I', data[0x3C:0x40])[0]
-		assert data[e_lfanew:e_lfanew+6] == b'\x50\x45\x00\x00\x64\x86'
-		entryoff = unpack('<I', data[e_lfanew+0x28:e_lfanew+0x2C])[0]
-		vmaddr = unpack('<Q', data[e_lfanew+0x30:e_lfanew+0x38])[0]
+		if data[e_lfanew:e_lfanew+6] == b'\x50\x45\x00\x00\x64\x86':
+			# x86_64
+			entryoff = unpack('<I', data[e_lfanew+0x28:e_lfanew+0x2C])[0]
+			vmaddr = unpack('<Q', data[e_lfanew+0x30:e_lfanew+0x38])[0]
+		elif data[e_lfanew:e_lfanew+6] == b'\x50\x45\x00\x00\x4c\x01':
+			# x86
+			entryoff = unpack('<I', data[e_lfanew+0x28:e_lfanew+0x2C])[0]
+			vmaddr = unpack('<I', data[e_lfanew+0x34:e_lfanew+0x38])[0]
 
 		load_addr = vmaddr
 		entry_offs = entryoff
@@ -203,6 +210,17 @@ def invoke_adb_gdb_listen(testbin, port=31337):
 	shellout(args)
 	print('invoke_adb() done')
 
+def is_wow64(testbin):
+	if not 'x86' in testbin: return False
+	(a,b) = platform.architecture()
+	return a=='64bit' and b.startswith('Windows')
+
+def skip_possible_second_initial_break(adapter, testbin):
+	if not is_wow64(testbin): return
+	print('detected wow64, attempting to skip second ntdll!LdrPDoDebuggerBreak()')
+	(reason, info) = adapter.go()
+	assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+
 def assert_general_error(func):
 	raised = False
 	try:
@@ -219,7 +237,10 @@ def confirm_initial_module(adapter, testbin):
 	module2addr = adapter.mem_modules()
 	print('module2addr: ', ' '.join(['%s:%X' % (i[0],i[1]) for i in module2addr.items()]))
 	print('      mpath: ', mpath)
-	assert mpath in module2addr
+
+	if not mpath in module2addr:
+		mpath = os.path.basename(mpath)
+		assert mpath in module2addr
 
 	(load_addr, entry_offs) = parse_image(fpath)
 	print('  load_addr: 0x%X' % load_addr)
@@ -255,6 +276,7 @@ def android_test_setup(testbin):
 #------------------------------------------------------------------------------
 
 if __name__ == '__main__':
+	colorama.init()
 	arg = sys.argv[1] if sys.argv[1:] else None
 
 	# one-off tests
@@ -317,6 +339,7 @@ if __name__ == '__main__':
 
 		# go to entry
 		adapter.go()
+		skip_possible_second_initial_break(adapter, testbin)
 		assert adapter.reg_read(xip) == entry
 		adapter.breakpoint_clear(entry)
 		# step into nop
@@ -387,17 +410,25 @@ if __name__ == '__main__':
 		print('going')
 		(reason, info) = adapter.go()
 		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-		addr = adapter.reg_read(xip)
-		print('%s: 0x%X' % (xip, addr))
-		assert adapter.reg_read(xip) == entry
+		skip_possible_second_initial_break(adapter, testbin)
 
-		# single step
-		data = adapter.mem_read(addr, 15)
-		assert len(data) == 15
-		(asmstr, asmlen) = utils.disasm1(data, 0)
+		assert adapter.reg_read(xip) == entry
 		adapter.breakpoint_clear(entry)
-		(reason, info) = adapter.step_into()
-		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+
+		# single step until it wasn't over a call
+		while 1:
+			addr = adapter.reg_read(xip)
+			data = adapter.mem_read(addr, 15)
+			assert len(data) == 15
+			(asmstr, asmlen) = utils.disasm1(data, 0)
+			print('%s: 0x%X %s' % (xip, addr, asmstr))
+
+			(reason, info) = adapter.step_into()
+			assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+			if asmstr.startswith('call'): continue
+			if asmstr.startswith('jmp'): continue
+			break
+
 		addr2 = adapter.reg_read(xip)
 		print('%s: 0x%X' % (xip, addr2))
 		assert addr + asmlen == addr2
@@ -455,10 +486,11 @@ if __name__ == '__main__':
 		if '_x86-' in testbin: xip = 'eip'
 		else: xip = 'rip'
 
-		print('scheduling break in .5 seconds')
+		print('scheduling break in .5 second')
 		threading.Timer(.5, break_into, [adapter]).start()
 		print('going')
 		adapter.go()
+		skip_possible_second_initial_break(adapter, testbin)
 		print('back')
 		print('switching to bad thread')
 		assert_general_error(lambda: adapter.thread_select(999))
@@ -470,7 +502,9 @@ if __name__ == '__main__':
 			# main thread at pthread_join() + 4 created threads
 			nthreads_expected = 5
 		tids = adapter.thread_list()
-		assert len(tids) == nthreads_expected
+		if len(tids) != nthreads_expected:
+			print('expected %d threads, but len(tids) is %d' % (nthreads_expected, len(tids)))
+			assert False
 		tid_active = adapter.thread_selected()
 		addrs = []
 		for tid in tids:
@@ -479,10 +513,13 @@ if __name__ == '__main__':
 			addrs.append(addr)
 			seltxt = '<--' if tid == tid_active else ''
 			print('thread %02d: %s=0x%016X %s' % (tid, xip, addr, seltxt))
-		assert addrs[0] != addrs[1] # thread at WaitForMultipleObjects()/pthread_join() should be different
+
+		if not is_wow64(testbin):
+			# on wow64, wow64cpu!TurboDispatchJumpAddressEnd+0x544 becomes common thread jump from point
+			assert addrs[0] != addrs[1] # thread at WaitForMultipleObjects()/pthread_join() should be different
 		print('switching to bad thread')
 		assert_general_error(lambda: adapter.thread_select(999))
-		secs = .5
+		secs = 1
 		print('scheduling break in %d second(s)' % secs)
 		threading.Timer(secs, break_into, [adapter]).start()
 		print('going')
@@ -496,12 +533,13 @@ if __name__ == '__main__':
 			adapter.thread_select(tid)
 			addr2 = adapter.reg_read(xip)
 			addrs2.append(addr2)
-		print('checking that at least one thread progressed')
-		if list(filter(lambda x: not x, [addrs[i]==addrs2[i] for i in range(len(addrs))])) == []:
-			print('did any threads progress?')
-			print('addrs:   ', addrs)
-			print('addrs2:  ', addrs2)
-			assert False
+		if not is_wow64(testbin):
+			print('checking that at least one thread progressed')
+			if list(filter(lambda x: not x, [addrs[i]==addrs2[i] for i in range(len(addrs))])) == []:
+				print('did any threads progress?')
+				print('addrs:   ', addrs)
+				print('addrs2:  ', addrs2)
+				assert False
 		print('done')
 		adapter.quit()
 
@@ -625,7 +663,7 @@ if __name__ == '__main__':
 		assert pcs[0] != pcs[1] # thread at WaitForMultipleObjects()/pthread_join() should be different
 		print('switching to bad thread')
 		assert_general_error(lambda: adapter.thread_select(999))
-		secs = .5
+		secs = 1
 		print('scheduling break in %d second(s)' % secs)
 		threading.Timer(secs, break_into, [adapter]).start()
 		print('going')

@@ -1,8 +1,11 @@
-# nmake -f Makefile-win
+# nmake -f Makefile-win64 from within "x64 Native Tools Command Prompt"
 
 TARGETS_ALL = helloworld_x64-windows.exe helloworld_loop_x64-windows.exe helloworld_thread_x64-windows.exe helloworld_func_x64-windows.exe helloworld_pie_x64-windows.exe helloworld_loop_pie_x64-windows.exe helloworld_thread_pie_x64-windows.exe helloworld_func_pie_x64-windows.exe asmtest_x64-windows.exe 
 
 all: $(TARGETS_ALL)
+
+clean:
+	del /Q $(TARGETS_ALL) *.obj *.pdb
 
 helloworld_x64-windows.exe: helloworld.c
 	cl helloworld.c /Fe:helloworld_x64-windows.exe /link /DYNAMICBASE:NO
@@ -31,8 +34,5 @@ helloworld_func_pie_x64-windows.exe: helloworld_func.c
 asmtest_x64-windows.exe: asmtest_x64-windows.obj
 	link asmtest_x64-windows.obj /ENTRY:WinMain /SUBSYSTEM:CONSOLE /LARGEADDRESSAWARE:NO /DYNAMICBASE:NO /OUT:asmtest_x64-windows.exe kernel32.lib
 
-asmtest_x64-windows.obj: asmtest.asm
-	nasm -f win64 -DOS_IS_WINDOWS asmtest.asm -o asmtest_x64-windows.obj
-
-clean:
-	del /Q $(TARGETS_ALL) *.obj
+asmtest_x64-windows.obj: asmtest_x64.asm
+	nasm -f win64 -DOS_IS_WINDOWS asmtest_x64.asm -o asmtest_x64-windows.obj
