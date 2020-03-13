@@ -52,28 +52,70 @@ def delete_state(bv):
 class DebuggerRegisters:
 	def __init__(self, state):
 		self.state = state
+		self.mark_dirty()
+
+	def mark_dirty(self):
+		self.reg_cache = None
+
+	def update(self):
+		if self.state.adapter is None:
+			raise Exception('Cannot update registers when disconnected')
+		self.reg_cache = {}
+		self.reg_cache['list'] = self.state.adapter.reg_list()
+		self.reg_cache['regs'] = {}
+		self.reg_cache['bits'] = {}
+
+		for reg in self.reg_cache['list']:
+			# TODO: Only read "general purpose" registers
+			# If the user wants the special ones later they incur the cost then
+			self.reg_cache['regs'][reg] = self.state.adapter.reg_read(reg)
+			self.reg_cache['bits'][reg] = self.state.adapter.reg_bits(reg)
 
 	def __getitem__(self, reg):
 		if self.state.adapter is None:
 			return None
-		return self.state.adapter.reg_read(reg)
+		if self.reg_cache is None:
+			self.update()
+		if reg in self.reg_cache['regs']:
+			return self.reg_cache['regs'][reg]
+		else:
+			# Commit new value
+			value = self.state.adapter.reg_read(reg)
+			self.reg_cache['regs'][reg] = value
+			return value
 
 	def __setitem__(self, reg, value):
 		if self.state.adapter is None:
 			return None
 		self.state.adapter.reg_write(reg, value)
+		self.mark_dirty()
 
 	def __iter__(self):
 		if self.state.adapter is None:
 			return None
-		for reg in self.state.adapter.reg_list():
-			yield (reg, self.state.adapter.reg_read(reg))
+		if self.reg_cache is None:
+			self.update()
+		for reg in self.reg_cache['list']:
+			# TODO: Only "general purpose" registers? I assume __iter__ should
+			# give everything but then we have to wait to read the special regs
+			yield (reg, self[reg])
 
 	def __repr__(self):
 		return '<debugger registers for {}>'.format(self.state.adapter)
 
 	def bits(self, reg):
-		return self.state.adapter.reg_bits(reg)
+		# TODO: Can be cached for the lifetime of the process
+		if self.state.adapter is None:
+			return None
+		if self.reg_cache is None:
+			self.update()
+		if reg in self.reg_cache['bits']:
+			return self.reg_cache['bits'][reg]
+		else:
+			# Commit new value
+			value = self.state.adapter.reg_bits(reg)
+			self.reg_cache['bits'][reg] = value
+			return value
 
 
 class DebuggerThreads:
@@ -423,6 +465,7 @@ class DebuggerState:
 		self.memory_view.mark_dirty()
 		self.modules.mark_dirty()
 		self.threads.mark_dirty()
+		self.registers.mark_dirty()
 
 	# Create symbols and variables for the memory view
 	def update_memory_view(self):

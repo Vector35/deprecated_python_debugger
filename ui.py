@@ -7,6 +7,7 @@ from binaryninja import Endianness, HighlightStandardColor, LinearDisassemblyLin
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
 from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, ConsoleWidget, ModulesWidget, widget
 from . import binjaplug
+import traceback
 
 class DebuggerUI:
 	def __init__(self, state):
@@ -87,19 +88,20 @@ class DebuggerUI:
 			value_int = int(value_int.hex(), 16)
 
 			refs = []
-			for (register, reg_value) in self.state.registers:
-				if reg_value == address:
+			# regs from above
+			for reg in regs:
+				if reg['value'] == address:
 					refs.append({
 						'source': 'register',
 						'dest': 'address',
-						'register': register
+						'register': reg['name']
 					})
 				# Ignore zeroes because most registers start at zero and give false data
-				if value_int != 0 and reg_value == value_int:
+				if value_int != 0 and reg['value'] == value_int:
 					refs.append({
 						'source': 'register',
 						'dest': 'value',
-						'register': register
+						'register': reg['name']
 					})
 
 			stack.append({
