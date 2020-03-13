@@ -1,8 +1,49 @@
 # make -f Makefile-linux
 
-TARGETS_ALL = helloworld_x64-linux helloworld_loop_x64-linux helloworld_thread_x64-linux helloworld_func_x64-linux helloworld_pie_x64-linux helloworld_thread_pie_x64-linux helloworld_loop_pie_x64-linux helloworld_func_pie_x64-linux asmtest_x64-linux
+TARGETS_X86 = helloworld_x86-linux helloworld_loop_x86-linux helloworld_thread_x86-linux helloworld_func_x86-linux helloworld_pie_x86-linux helloworld_thread_pie_x86-linux helloworld_loop_pie_x86-linux helloworld_func_pie_x86-linux asmtest_x86-linux
+TARGETS_X64 = helloworld_x64-linux helloworld_loop_x64-linux helloworld_thread_x64-linux helloworld_func_x64-linux helloworld_pie_x64-linux helloworld_thread_pie_x64-linux helloworld_loop_pie_x64-linux helloworld_func_pie_x64-linux asmtest_x64-linux
+TARGETS_ALL = $(TARGETS_X86) $(TARGETS_X64)
 
 all: $(TARGETS_ALL)
+
+clean:
+	rm -rf $(TARGETS_ALL) *.o
+
+#------------------------------------------------------------------------------
+# 32-bit
+#------------------------------------------------------------------------------
+
+helloworld_x86-linux: helloworld.c
+	gcc -W -m32 -no-pie helloworld.c -o helloworld_x86-linux
+
+helloworld_thread_x86-linux: helloworld_thread.c
+	gcc -W -m32 -no-pie helloworld_thread.c -lpthread -o helloworld_thread_x86-linux
+
+helloworld_loop_x86-linux: helloworld_loop.c
+	gcc -W -m32 -no-pie helloworld_loop.c -o helloworld_loop_x86-linux
+
+helloworld_func_x86-linux: helloworld_func.c
+	gcc -W -m32 -no-pie helloworld_func.c -o helloworld_func_x86-linux
+
+helloworld_pie_x86-linux: helloworld.c
+	gcc -W -m32 -pie helloworld.c -o helloworld_pie_x86-linux
+
+helloworld_thread_pie_x86-linux: helloworld_thread.c
+	gcc -W -m32 -pie helloworld_thread.c -lpthread -o helloworld_thread_pie_x86-linux
+
+helloworld_loop_pie_x86-linux: helloworld_loop.c
+	gcc -W -m32 -pie helloworld_loop.c -o helloworld_loop_pie_x86-linux
+
+helloworld_func_pie_x86-linux: helloworld_func.c
+	gcc -W -m32 -pie helloworld_func.c -o helloworld_func_pie_x86-linux
+
+asmtest_x86-linux: asmtest_x86.asm
+	nasm asmtest_x86.asm -f elf32 -DOS_IS_LINUX -o asmtest_x86-linux.o
+	ld -m elf_i386 asmtest_x86-linux.o -o asmtest_x86-linux
+
+#------------------------------------------------------------------------------
+# 64-bit
+#------------------------------------------------------------------------------
 
 helloworld_x64-linux: helloworld.c
 	gcc -W -no-pie helloworld.c -o helloworld_x64-linux
@@ -28,9 +69,8 @@ helloworld_loop_pie_x64-linux: helloworld_loop.c
 helloworld_func_pie_x64-linux: helloworld_func.c
 	gcc -W -pie helloworld_func.c -o helloworld_func_pie_x64-linux
 
-asmtest_x64-linux: asmtest.asm
-	nasm asmtest.asm -f elf64 -DOS_IS_LINUX -o asmtest_x64-linux.o
+asmtest_x64-linux: asmtest_x64.asm
+	nasm asmtest_x64.asm -f elf64 -DOS_IS_LINUX -o asmtest_x64-linux.o
 	ld -m elf_x86_64 asmtest_x64-linux.o -o asmtest_x64-linux
 
-clean:
-	rm -rf $(TARGETS_ALL) *.o
+

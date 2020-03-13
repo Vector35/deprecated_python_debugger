@@ -1,10 +1,3 @@
-; MAC:
-;   nasm -f macho64 challenge.asm -o challenge.o
-;   ld -macosx_version_min 10.7.0 -lSystem challenge.o -o challenge
-;   otool -t -v -j ./asmtest
-; WIN:
-;   nasm -f win64 asmtest.asm -o asmtest.obj
-
 default rel
 
 %ifdef OS_IS_WINDOWS

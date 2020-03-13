@@ -278,11 +278,12 @@ if __name__ == '__main__':
 	print('collected the following tests:\n', testbins)
 
 	#--------------------------------------------------------------------------
-	# X64-??? TESTS
+	# x86/x64 TESTS
 	#--------------------------------------------------------------------------
 
-	# assembler x64 tests
-	for testbin in filter(lambda x: x.startswith('asmtest_x64'), testbins):
+	# assembler x86/x64 tests
+	for testbin in testbins:
+		if not (testbin.startswith('asmtest_x64') or testbin.startswith('asmtest_x86')): continue
 		utils.green('testing %s' % testbin)
 
 		# parse entrypoint information
@@ -290,11 +291,13 @@ if __name__ == '__main__':
 		(load_addr, entry_offs) = parse_image(fpath)
 		entry = load_addr + entry_offs
 
-		# for x64 machine, tester and testee run on same machine
+		# tester and testee run on same machine
 		adapter = DebugAdapter.get_adapter_for_current_system()
 		adapter.exec(fpath, '')
 
-		loader = adapter.reg_read('rip') != entry
+		xip = 'eip' if 'x86' in testbin else 'rip'
+
+		loader = adapter.reg_read(xip) != entry
 		if loader:
 			print('entrypoint is the program, no library or loader')
 		else:
@@ -314,40 +317,51 @@ if __name__ == '__main__':
 
 		# go to entry
 		adapter.go()
-		assert adapter.reg_read('rip') == entry
+		assert adapter.reg_read(xip) == entry
 		adapter.breakpoint_clear(entry)
 		# step into nop
 		adapter.step_into()
-		assert adapter.reg_read('rip') == entry+1
+		assert adapter.reg_read(xip) == entry+1
 		# step into call, return
 		adapter.step_into()
 		adapter.step_into()
 		# back
-		assert adapter.reg_read('rip') == entry+6
+		assert adapter.reg_read(xip) == entry+6
 		adapter.step_into()
 		# step into call, return
 		adapter.step_into()
 		adapter.step_into()
 		# back
-		assert adapter.reg_read('rip') == entry+12
+		assert adapter.reg_read(xip) == entry+12
+
+		(reason, extra) = adapter.go()
+		assert reason == DebugAdapter.STOP_REASON.PROCESS_EXITED
 
 		adapter.quit()
+		print('PASS!')
 
-	# helloworld x64, no threads
+	# helloworld x86/x64, no threads
 	for testbin in testbins:
 		if not testbin.startswith('helloworld_'): continue
-		if not '_x64-' in testbin: continue
+		if not ('_x64-' in testbin or '_x86-' in testbin): continue
 		if '_thread' in testbin: continue
 
 		utils.green('testing %s' % testbin)
 
-		# for x64 machine, tester and testee run on same machine
+		# tester and testee run on same machine
 		adapter = DebugAdapter.get_adapter_for_current_system()
 		fpath = testbin_to_fpath(testbin)
 		adapter.exec(fpath, '')
 		entry = confirm_initial_module(adapter, testbin)
 
-		print('rip: 0x%X' % adapter.reg_read('rip'))
+		if '_x86-' in testbin:
+			(bits, xip, xax, xbx) = (32, 'eip', 'eax', 'ebx')
+			(testval_a, testval_b) = (0xDEADBEEF, 0xCAFEBABE)
+		else:
+			(bits, xip, xax, xbx) = (64, 'rip', 'rax', 'rbx')
+			(testval_a, testval_b) = (0xAAAAAAAADEADBEEF, 0xBBBBBBBBCAFEBABE)
+
+		print('%s: 0x%X' % (xip, adapter.reg_read(xip)))
 
 		# breakpoint set/clear should fail at 0
 		print('breakpoint failures')
@@ -373,45 +387,45 @@ if __name__ == '__main__':
 		print('going')
 		(reason, info) = adapter.go()
 		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-		rip = adapter.reg_read('rip')
-		print('rip: 0x%X' % rip)
-		assert rip == entry
+		addr = adapter.reg_read(xip)
+		print('%s: 0x%X' % (xip, addr))
+		assert adapter.reg_read(xip) == entry
 
 		# single step
-		data = adapter.mem_read(rip, 15)
+		data = adapter.mem_read(addr, 15)
 		assert len(data) == 15
 		(asmstr, asmlen) = utils.disasm1(data, 0)
 		adapter.breakpoint_clear(entry)
 		(reason, info) = adapter.step_into()
 		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-		rip2 = adapter.reg_read('rip')
-		print('rip2: 0x%X' % rip2)
-		assert rip + asmlen == rip2
+		addr2 = adapter.reg_read(xip)
+		print('%s: 0x%X' % (xip, addr2))
+		assert addr + asmlen == addr2
 
 		print('registers')
 		for (ridx,rname) in enumerate(adapter.reg_list()):
 			width = adapter.reg_bits(rname)
 			#print('%d: %s (%d bits)' % (ridx, rname, width))
-		assert adapter.reg_bits('rax') == 64
-		assert adapter.reg_bits('rbx') == 64
+		assert adapter.reg_bits(xax) == bits
+		assert adapter.reg_bits(xbx) == bits
 		assert_general_error(lambda: adapter.reg_bits('rzx'))
 
 		print('registers read/write')
-		rax = adapter.reg_read('rax')
-		rbx = adapter.reg_read('rbx')
+		rax = adapter.reg_read(xax)
+		rbx = adapter.reg_read(xbx)
 		assert_general_error(lambda: adapter.reg_read('rzx'))
-		adapter.reg_write('rax', 0xDEADBEEFAAAAAAAA)
-		assert adapter.reg_read('rax') == 0xDEADBEEFAAAAAAAA
-		adapter.reg_write('rbx', 0xCAFEBABEBBBBBBBB)
+		adapter.reg_write(xax, testval_a)
+		assert adapter.reg_read(xax) == testval_a
+		adapter.reg_write(xbx, testval_b)
 		assert_general_error(lambda: adapter.reg_read('rzx'))
-		assert adapter.reg_read('rbx') == 0xCAFEBABEBBBBBBBB
-		adapter.reg_write('rax', rax)
-		assert adapter.reg_read('rax') == rax
-		adapter.reg_write('rbx', rbx)
-		assert adapter.reg_read('rbx') == rbx
+		assert adapter.reg_read(xbx) == testval_b
+		adapter.reg_write(xax, rax)
+		assert adapter.reg_read(xax) == rax
+		adapter.reg_write(xbx, rbx)
+		assert adapter.reg_read(xbx) == rbx
 
 		print('mem read/write')
-		addr = adapter.reg_read('rip')
+		addr = adapter.reg_read(xip)
 		data = adapter.mem_read(addr, 256)
 		assert_general_error(lambda: adapter.mem_write(0, b'heheHAHAherherHARHAR'))
 		data2 = b'\xAA' * 256
@@ -425,10 +439,10 @@ if __name__ == '__main__':
 		adapter.quit()
 		adapter = None
 
-	# helloworlds x64 with threads
+	# helloworlds x86/x64 with threads
 	for testbin in testbins:
 		if not testbin.startswith('helloworld_thread'): continue
-		if not '_x64-' in testbin: continue
+		if not ('_x86-' in testbin or '_x64-' in testbin): continue
 
 		utils.green('testing %s' % testbin)
 
@@ -437,6 +451,9 @@ if __name__ == '__main__':
 		fpath = testbin_to_fpath(testbin)
 		adapter.exec(fpath, '')
 		entry = confirm_initial_module(adapter, testbin)
+
+		if '_x86-' in testbin: xip = 'eip'
+		else: xip = 'rip'
 
 		print('scheduling break in .5 seconds')
 		threading.Timer(.5, break_into, [adapter]).start()
@@ -455,14 +472,14 @@ if __name__ == '__main__':
 		tids = adapter.thread_list()
 		assert len(tids) == nthreads_expected
 		tid_active = adapter.thread_selected()
-		rips = []
+		addrs = []
 		for tid in tids:
 			adapter.thread_select(tid)
-			rip = adapter.reg_read('rip')
-			rips.append(rip)
+			addr = adapter.reg_read(xip)
+			addrs.append(addr)
 			seltxt = '<--' if tid == tid_active else ''
-			print('thread %02d: rip=0x%016X %s' % (tid, rip, seltxt))
-		assert rips[0] != rips[1] # thread at WaitForMultipleObjects()/pthread_join() should be different
+			print('thread %02d: %s=0x%016X %s' % (tid, xip, addr, seltxt))
+		assert addrs[0] != addrs[1] # thread at WaitForMultipleObjects()/pthread_join() should be different
 		print('switching to bad thread')
 		assert_general_error(lambda: adapter.thread_select(999))
 		secs = .5
@@ -473,19 +490,17 @@ if __name__ == '__main__':
 		print('back')
 		print('checking for %d threads' % nthreads_expected)
 		assert len(adapter.thread_list()) == nthreads_expected
-		# ensure the rip's are in different locations (that the continue actually continued)
-		rips2 = []
+		# ensure the eip/rip are in different locations (that the continue actually continued)
+		addrs2 = []
 		for tid in tids:
 			adapter.thread_select(tid)
-			rip = adapter.reg_read('rip')
-			rips2.append(rip)
+			addr2 = adapter.reg_read(xip)
+			addrs2.append(addr2)
 		print('checking that at least one thread progressed')
-		#print(' rips: ', rips)
-		#print('rips2: ', rips2)
-		if list(filter(lambda x: not x, [rips[i]==rips2[i] for i in range(len(rips))])) == []:
+		if list(filter(lambda x: not x, [addrs[i]==addrs2[i] for i in range(len(addrs))])) == []:
 			print('did any threads progress?')
-			print('rips:   ', rips)
-			print('rips2:  ', rips2)
+			print('addrs:   ', addrs)
+			print('addrs2:  ', addrs2)
 			assert False
 		print('done')
 		adapter.quit()
