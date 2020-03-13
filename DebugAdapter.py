@@ -172,7 +172,7 @@ class DebugAdapter:
 	def thread_list(self):
 		''' return a list of thread information '''
 		raise NotImplementedError('')
-	def thread_get_active(self):
+	def thread_selected(self):
 		''' return thread id that is active '''
 		raise NotImplementedError('')
 	def thread_select(self, tidx):
@@ -213,7 +213,7 @@ class DebugAdapter:
 		raise NotImplementedError('')
 
 	# execution control
-	def go():
+	def go(self):
 		raise NotImplementedError('')
 	def step_into(self):
 		raise NotImplementedError('')

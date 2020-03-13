@@ -195,7 +195,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	#def mem_read(self, address, length):
 	#def mem_write(self, address, data):
 
-	def mem_modules(self):
+	def mem_modules(self, cache_ok=True):
 		if not self.p_dyld_all_image_infos:
 			self.module_cache = {}
 			return self.mem_modules_slow()

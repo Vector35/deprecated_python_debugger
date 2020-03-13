@@ -201,7 +201,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 		return 0
 
-	def mem_modules(self):
+	def mem_modules(self, cache_ok=True):
 		module2addr = {}
 
 		modules_n = c_int()

@@ -306,7 +306,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			raise DebugAdapter.GeneralError('writing to address 0x%X' % address)
 			return 0
 
-	def mem_modules(self):
+	def mem_modules(self, cache_ok=True):
 		# this SHOULD work, but reply is always empty "l<library-list-svr4 version="1.0"/>"
 		# and online people have the same issue
 		#if 'qXfer:libraries-svr4:read+' in self.server_capabilities:
