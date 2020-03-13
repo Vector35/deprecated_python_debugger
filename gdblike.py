@@ -279,7 +279,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			raise DebugAdapter.GeneralError('setting register %s' % name)
 
 	def reg_list(self):
-		return self.reg_info.keys()
+		return list(self.reg_info.keys())
 
 	def reg_bits(self, name):
 		if not name in self.reg_info:

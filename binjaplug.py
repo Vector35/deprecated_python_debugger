@@ -5,7 +5,7 @@ import time
 import binaryninja
 from binaryninja import BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation
 
-from . import DebugAdapter, ProcessView, dbgeng
+from . import DebugAdapter, ProcessView, dbgeng, QueuedAdapter
 
 try:
 	# create the widgets, debugger, etc.
@@ -526,7 +526,7 @@ class DebuggerState:
 		if DebugAdapter.ADAPTER_TYPE.use_exec(self.adapter_type):
 			try:
 				adapter.exec(fpath, self.command_line_args)
-				self.adapter = adapter
+				self.adapter = QueuedAdapter.QueuedAdapter(adapter)
 				self.connecting = False
 			except Exception as e:
 				self.connecting = False
