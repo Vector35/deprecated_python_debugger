@@ -93,6 +93,8 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			self.sock = None
 		except rsp.RspDisconnected:
 			pass
+		except OSError:
+			pass
 
 	def quit(self):
 		try:
@@ -101,6 +103,10 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			self.sock.close()
 			self.sock = None
 		except rsp.RspDisconnected:
+			pass
+		except OSError:
+			# eg: [Errno 57] Socket is not connected
+			# (example: target has exited, adapter sent code, closed socket already)
 			pass
 
 	# target info

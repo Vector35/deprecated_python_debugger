@@ -1,45 +1,51 @@
 # make -f Makefile-macosos
-all: helloworld helloworld_loop helloworld_thread helloworld_func helloworld_recursion helloworld_pie helloworld_thread_pie helloworld_loop_pie helloworld_func_pie helloworld_recursion_pie asmtest nopspeed cat commandline_test helloworld_objc helloworld_virtual
 
-helloworld: helloworld.c
+TARGETS = helloworld_x64-macos helloworld_loop_x64-macos helloworld_thread_x64-macos helloworld_func_x64-macos helloworld_recursion_x64-macos helloworld_pie_x64-macos helloworld_thread_pie_x64-macos helloworld_loop_pie_x64-macos helloworld_func_pie_x64-macos helloworld_recursion_pie_x64-macos asmtest_x64-macos nopspeed_x64-macos cat_x64-macos commandline_test_x64-macos helloworld_objc_x64-macos helloworld_virtual_x64-macos
+
+all: $(TARGETS)
+
+clean:
+	rm -rf $(TARGETS) *.o
+
+helloworld_x64-macos: helloworld.c
 	gcc -Wl,-no_pie helloworld.c -o helloworld_x64-macos
 
-helloworld_thread: helloworld_thread.c
+helloworld_thread_x64-macos: helloworld_thread.c
 	gcc -Wl,-no_pie helloworld_thread.c -o helloworld_thread_x64-macos
 
-helloworld_loop: helloworld_loop.c
+helloworld_loop_x64-macos: helloworld_loop.c
 	gcc -Wl,-no_pie helloworld_loop.c -o helloworld_loop_x64-macos
 
-helloworld_func: helloworld_func.c
+helloworld_func_x64-macos: helloworld_func.c
 	gcc -Wl,-no_pie helloworld_func.c -o helloworld_func_x64-macos
 
-helloworld_recursion: helloworld_recursion.c
+helloworld_recursion_x64-macos: helloworld_recursion.c
 	gcc -Wl,-no_pie helloworld_recursion.c -o helloworld_recursion_x64-macos
 
-helloworld_pie: helloworld.c
+helloworld_pie_x64-macos: helloworld.c
 	gcc -Wl,-pie helloworld.c -o helloworld_pie_x64-macos
 
-helloworld_thread_pie: helloworld_thread.c
+helloworld_thread_pie_x64-macos: helloworld_thread.c
 	gcc -Wl,-pie helloworld_thread.c -o helloworld_thread_pie_x64-macos
 
-helloworld_loop_pie: helloworld_loop.c
+helloworld_loop_pie_x64-macos: helloworld_loop.c
 	gcc -Wl,-pie helloworld_loop.c -o helloworld_loop_pie_x64-macos
 
-helloworld_func_pie: helloworld_func.c
+helloworld_func_pie_x64-macos: helloworld_func.c
 	gcc -Wl,-pie helloworld_func.c -o helloworld_func_pie_x64-macos
 
-helloworld_recursion_pie: helloworld_recursion.c
+helloworld_recursion_pie_x64-macos: helloworld_recursion.c
 	gcc -Wl,-pie helloworld_recursion.c -o helloworld_recursion_pie_x64-macos
 
-helloworld_objc: helloworld_objc.m
+helloworld_objc_x64-macos: helloworld_objc.m
 	gcc -Wl,-no_pie helloworld_objc.m -o helloworld_objc_x64-macos -framework AppKit -framework Carbon -framework Foundation
 
-helloworld_virtual: helloworld_virtual.cpp
+helloworld_virtual_x64-macos: helloworld_virtual.cpp
 	g++ -Wl,-no_pie helloworld_virtual.cpp -o helloworld_virtual_x64-macos
 
-asmtest: asmtest.asm
-	nasm -f macho64 -DOS_IS_MACOS asmtest.asm -o asmtest.o
-	ld -macosx_version_min 10.7.0 -lSystem asmtest.o -o asmtest_x64-macos
+asmtest_x64-macos: asmtest_x64.asm
+	nasm -f macho64 -DOS_IS_MACOS asmtest_x64.asm -o asmtest_x64-macos.o
+	ld -macosx_version_min 10.7.0 -lSystem asmtest_x64-macos.o -o asmtest_x64-macos
 
 # 32-bit macos application (need to modify MacOSX Architectures.xcspec on Xcode 10+)
 sysroot := $(shell xcode-select -p)
@@ -47,14 +53,12 @@ helloworld_i386: helloworld.c
 	gcc -Wl,-pie -arch i386 -isysroot "$(sysroot)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.13.sdk" helloworld.c -o helloworld_i386-macos
 
 # Sample app with mmap and shellcode
-nopspeed: nopspeed.c
+nopspeed_x64-macos: nopspeed.c
 	gcc -Wl,-pie -O3 nopspeed.c -o nopspeed_x64-macos
 
-cat: cat.c
+cat_x64-macos: cat.c
 	gcc -Wl,-pie -O3 cat.c -o cat_x64-macos
 
-commandline_test: commandline_test.c
+commandline_test_x64-macos: commandline_test.c
 	gcc -Wl,-pie -O3 commandline_test.c -o commandline_test_x64-macos
 
-clean:
-	rm_x64-macos -rf_x64-macos helloworld_x64-macos helloworld_thread_x64-macos helloworld_loop_x64-macos helloworld_func_x64-macos helloworld_recursion_x64-macos helloworld_pie_x64-macos helloworld_thread_pie_x64-macos helloworld_loop_pie_x64-macos helloworld_func_pie_x64-macos helloworld_recursion_pie_x64-macos asmtest_x64-macos nopspeed_x64-macos cat_x64-macos commandline_test_x64-macos helloworld_objc_x64-macos helloworld_virtual_x64-macos

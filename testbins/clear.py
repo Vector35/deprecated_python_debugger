@@ -12,6 +12,8 @@ for fname in os.listdir('.'):
 		continue
 	if fname.endswith('.exe'):
 		executables.append(fname)
+	elif fname.endswith('.o'):
+		executables.append(fname)
 	elif os.access(os.path.join(fname), os.X_OK):
 		executables.append(fname)
 
