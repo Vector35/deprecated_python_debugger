@@ -5,7 +5,7 @@ from binaryninja.plugin import PluginCommand
 import binaryninja
 from binaryninja import Endianness, HighlightStandardColor, LinearDisassemblyLine, LinearDisassemblyLineType, DisassemblyTextLine, InstructionTextToken, InstructionTextTokenType, execute_on_main_thread_and_wait, LowLevelILOperation, BinaryReader
 from binaryninja.settings import Settings
-from binaryninja.log import log_warn
+from binaryninja.log import log_warn, log_error
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
 from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, ConsoleWidget, ModulesWidget, widget
 from . import binjaplug
@@ -228,64 +228,51 @@ class DebuggerUI:
 
 		if self.state.modules.get_module_for_addr(remote_rip) == self.state.bv.file.original_filename:
 			if self.state.bv.read(local_rip, 1) is None:
-				log_debug("Local address that is not local?")
+				raise Exception("Local address that is not local?")
 			else:
 				# If there's already a function here, then we have already been here
 				if len(self.state.bv.get_functions_containing(local_rip)) == 0:
-					log_debug("Discovered new code at {:x}".format(local_rip))
 					self.state.bv.add_function(local_rip)
 		if call:
 			try:
 				remote_target = self.evaluate_llil(self.state, llil.dest)
 			except e:
-				log_debug("llil eval failed: {}".format(e))
-				return
-			log_debug("call with remote target {:x}".format(remote_target))
+				raise Exception("llil eval failed: {}".format(e))
 			if self.state.modules.get_module_for_addr(remote_target) == self.state.bv.file.original_filename:
 				local_target = self.state.memory_view.remote_addr_to_local(remote_target)
-				log_debug("call with local target {:x}".format(local_target))
 				if self.state.bv.read(local_target, 1) is None:
-					log_debug("Local address that is not local?")
+					raise Exception("Local address that is not local?")
 				else:
 					# If there's already a function here, then we have already been here
 					if len(self.state.bv.get_functions_containing(local_target)) > 0:
-						log_debug("already has a function")
 						return
 
-					log_debug("Discovered new code at {:x}".format(local_target))
 					self.state.bv.add_function(local_target)
 		elif jump:
 			try:
 				remote_target = self.evaluate_llil(self.state, llil.dest)
 			except e:
-				log_debug("llil eval failed: {}".format(e))
-				return
-			log_debug("jump with remote target {:x}".format(remote_target))
+				raise Exception("llil eval failed: {}".format(e))
 			if self.state.modules.get_module_for_addr(remote_target) == self.state.bv.file.original_filename:
 				local_target = self.state.memory_view.remote_addr_to_local(remote_target)
-				log_debug("jump with local target {:x}".format(local_target))
 				if self.state.bv.read(local_target, 1) is None:
-					log_debug("Local address that is not local?")
+					raise Exception("Local address that is not local?")
 				else:
 					# If there's already a function here, then we have already been here
 					if len(self.state.bv.get_functions_containing(local_target)) > 0:
-						log_debug("already has a function")
+						# TODO: Can annotate the assembly with where we're going
 						return
-
-					log_debug("Discovered new code at {:x}".format(local_target))
 
 					# Add as a branch target to current function
 					if self.state.modules.get_module_for_addr(remote_rip) == self.state.bv.file.original_filename:
 						if self.state.bv.read(local_rip, 1) is None:
-							log_debug("Local address that is not local?")
+							raise Exception("Local address that is not local?")
 						else:
 							# If there's already a function here, then we have already been here
 							funcs = self.state.bv.get_functions_containing(local_rip)
 							if len(funcs) == 0:
-								log_debug("Local rip is not at a function?")
-								return
+								raise Exception("Local rip is not at a function?")
 
-							log_debug("Discovered new code at {:x}".format(local_rip))
 							funcs[0].set_user_indirect_branches(local_rip, [(self.state.bv.arch, local_target)])
 
 	def navigate_to_rip(self):
@@ -474,7 +461,6 @@ def cb_bp_toggle(bv, address):
 	if 'Memory' in bv.sections:
 		is_debug_view = True
 		bv = bv.parent_view.parent_view
-		log_debug("Detected debug view, using {} instead".format(bv))
 
 	debug_state = binjaplug.get_state(bv)
 	if is_debug_view:
