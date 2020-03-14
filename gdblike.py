@@ -582,21 +582,25 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		#for reg in sorted(self.reg_info, key=lambda x: self.reg_info[x]['id']):
 		#	print('%s id=%d width=%d' % (reg, self.reg_info[reg]['id'], self.reg_info[reg]['width']))
 
+	# more specific gdb's should override this
+	# for example, lldb might want to check for 'metype' and 'medata' keys
+	def thread_stop_pkt_to_reason(self, pkt_data):
+		return (DebugAdapter.STOP_REASON.UNKNOWN, None)
+
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go_generic(self, gotype, handler_async_pkt=None):
 		try:
 			if handler_async_pkt is None:
 				handler_async_pkt = self.handler_async_pkt
 			reply = self.rspConn.tx_rx(gotype, 'mixed_output_ack_then_reply', handler_async_pkt)
-			(reason, reason_data) = (None, None)
+			(reason, reason_data) = (DebugAdapter.STOP_REASON.UNKNOWN, None)
 
 			# thread info
+			# https://sourceware.org/gdb/current/onlinedocs/gdb/Stop-Reply-Packets.html#Stop-Reply-Packets
 			if reply[0] == 'T':
 				tdict = rsp.packet_T_to_dict(reply)
 				self.active_thread_tid = tdict['thread']
-				signum = tdict.get('signal', 0)
-				(reason, reason_data) = \
-					(self.os_sig_to_reason.get(signum, DebugAdapter.STOP_REASON.UNKNOWN), signum)
+				(reason, reason_data) = self.thread_stop_pkt_to_reason(tdict)
 
 			# exit status
 			elif reply[0] == 'W':
@@ -605,8 +609,8 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 				(reason, reason_data) = (DebugAdapter.STOP_REASON.PROCESS_EXITED, exit_status)
 
 			else:
+				# TODO: somehow raise concern here
 				print(reply)
-				(reason, reason_data) = (DebugAdapter.STOP_REASON.UNKNOWN, None)
 
 			return (reason, reason_data)
 

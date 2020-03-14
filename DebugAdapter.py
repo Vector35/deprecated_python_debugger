@@ -134,6 +134,7 @@ class STOP_REASON(Enum):
 	SIGNAL_STKFLT = auto()
 	SIGNAL_BUX = auto()
 	SIGNAL_POLL = auto()
+	EXC_ARITHMETIC = auto()
 
 class DebugAdapter:
 	def __init__(self, **kwargs):

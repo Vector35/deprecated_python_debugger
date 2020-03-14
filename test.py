@@ -303,6 +303,32 @@ if __name__ == '__main__':
 	# x86/x64 TESTS
 	#--------------------------------------------------------------------------
 
+	# exception test
+	for testbin in testbins:
+		if not testbin.startswith('do_exception'): continue
+		utils.green('testing %s' % testbin)
+
+		adapter = DebugAdapter.get_adapter_for_current_system()
+		fpath = os.path.join('testbins', testbin)
+
+		# breakpoint exception, then process exit
+		adapter.exec(fpath)
+		entry = confirm_initial_module(adapter, testbin)
+		print('setting breakpoint at 0x%X' % entry)
+		adapter.breakpoint_set(entry)
+		(reason, extra) = adapter.go()
+		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		print('clearing breakpoint at 0x%X' % entry)
+		adapter.breakpoint_clear(entry)
+		(reason, extra) = adapter.go()
+		assert reason == DebugAdapter.STOP_REASON.PROCESS_EXITED
+		adapter.quit()
+
+		# divzero
+		adapter.exec(fpath, ['divzero'])
+		(reason, extra) = adapter.go()
+		assert reason == DebugAdapter.STOP_REASON.EXC_ARITHMETIC
+
 	# assembler x86/x64 tests
 	for testbin in testbins:
 		if not (testbin.startswith('asmtest_x64') or testbin.startswith('asmtest_x86')): continue

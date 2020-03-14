@@ -1,6 +1,6 @@
 # make -f Makefile-macosos
 
-TARGETS = helloworld_x64-macos helloworld_loop_x64-macos helloworld_thread_x64-macos helloworld_func_x64-macos helloworld_recursion_x64-macos helloworld_pie_x64-macos helloworld_thread_pie_x64-macos helloworld_loop_pie_x64-macos helloworld_func_pie_x64-macos helloworld_recursion_pie_x64-macos asmtest_x64-macos nopspeed_x64-macos cat_x64-macos commandline_test_x64-macos helloworld_objc_x64-macos helloworld_virtual_x64-macos
+TARGETS = helloworld_x64-macos helloworld_loop_x64-macos helloworld_thread_x64-macos helloworld_func_x64-macos helloworld_recursion_x64-macos helloworld_pie_x64-macos helloworld_thread_pie_x64-macos helloworld_loop_pie_x64-macos helloworld_func_pie_x64-macos helloworld_recursion_pie_x64-macos asmtest_x64-macos nopspeed_x64-macos cat_x64-macos commandline_test_x64-macos helloworld_objc_x64-macos helloworld_virtual_x64-macos do_exception_x64-macos
 
 all: $(TARGETS)
 
@@ -46,6 +46,9 @@ helloworld_virtual_x64-macos: helloworld_virtual.cpp
 asmtest_x64-macos: asmtest_x64.asm
 	nasm -f macho64 -DOS_IS_MACOS asmtest_x64.asm -o asmtest_x64-macos.o
 	ld -macosx_version_min 10.7.0 -lSystem asmtest_x64-macos.o -o asmtest_x64-macos
+
+do_exception_x64-macos: do_exception.c
+	gcc -Wl,-no_pie do_exception.c -o do_exception_x64-macos
 
 # 32-bit macos application (need to modify MacOSX Architectures.xcspec on Xcode 10+)
 sysroot := $(shell xcode-select -p)

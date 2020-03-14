@@ -11,74 +11,6 @@ from . import rsp
 from . import gdblike
 from . import DebugAdapter
 
-macos_signal_to_name = {
-	1: 'SIGHUP',
-	2: 'SIGINT',
-	3: 'SIGQUIT',
-	4: 'SIGILL',
-	5: 'SIGTRAP',
-	6: 'SIGABRT',
-	7: 'SIGEMT',
-	8: 'SIGFPE',
-	9: 'SIGKILL',
-	10: 'SIGBUS',
-	11: 'SIGSEGV',
-	12: 'SIGSYS',
-	13: 'SIGPIPE',
-	14: 'SIGALRM',
-	15: 'SIGTERM',
-	16: 'SIGURG',
-	17: 'SIGSTOP',
-	18: 'SIGTSTP',
-	19:  'SIGCONT',
-	20: 'SIGCHLD',
-	21: 'SIGTTIN',
-	22: 'SIGTTOU',
-	23: 'SIGIO',
-	24: 'SIGXCPU',
-	25: 'SIGXFSZ',
-	26: 'SIGVTALRM',
-	27: 'SIGPROF',
-	28: 'SIGWINCH',
-	29: 'SIGINFO',
-	30: 'SIGUSR1',
-	31: 'SIGUSR2'
-}
-
-macos_signal_to_debugadapter_reason = {
-	1: DebugAdapter.STOP_REASON.SIGNAL_HUP,
-	2: DebugAdapter.STOP_REASON.SIGNAL_INT,
-	3: DebugAdapter.STOP_REASON.SIGNAL_QUIT,
-	4: DebugAdapter.STOP_REASON.SIGNAL_ILL,
-	5: DebugAdapter.STOP_REASON.SIGNAL_TRAP,
-	6: DebugAdapter.STOP_REASON.SIGNAL_ABRT,
-	7: DebugAdapter.STOP_REASON.SIGNAL_EMT,
-	8: DebugAdapter.STOP_REASON.SIGNAL_FPE,
-	9: DebugAdapter.STOP_REASON.SIGNAL_KILL,
-	10: DebugAdapter.STOP_REASON.SIGNAL_BUS,
-	11: DebugAdapter.STOP_REASON.SIGNAL_SEGV,
-	12: DebugAdapter.STOP_REASON.SIGNAL_SYS,
-	13: DebugAdapter.STOP_REASON.SIGNAL_PIPE,
-	14: DebugAdapter.STOP_REASON.SIGNAL_ALRM,
-	15: DebugAdapter.STOP_REASON.SIGNAL_TERM,
-	16: DebugAdapter.STOP_REASON.SIGNAL_URG,
-	17: DebugAdapter.STOP_REASON.SIGNAL_STOP,
-	18: DebugAdapter.STOP_REASON.SIGNAL_TSTP,
-	19: DebugAdapter.STOP_REASON.SIGNAL_CONT,
-	20: DebugAdapter.STOP_REASON.SIGNAL_CHLD,
-	21: DebugAdapter.STOP_REASON.SIGNAL_TTIN,
-	22: DebugAdapter.STOP_REASON.SIGNAL_TTOU,
-	23: DebugAdapter.STOP_REASON.SIGNAL_IO,
-	24: DebugAdapter.STOP_REASON.SIGNAL_XCPU,
-	25: DebugAdapter.STOP_REASON.SIGNAL_XFSZ,
-	26: DebugAdapter.STOP_REASON.SIGNAL_VTALRM,
-	27: DebugAdapter.STOP_REASON.SIGNAL_PROF,
-	28: DebugAdapter.STOP_REASON.SIGNAL_WINCH,
-	29: DebugAdapter.STOP_REASON.SIGNAL_INFO,
-	30: DebugAdapter.STOP_REASON.SIGNAL_USR1,
-	31: DebugAdapter.STOP_REASON.SIGNAL_USR2,
-}
-
 def first_str_from_data(data):
 	if b'\x00' in data:
 		data = data[0:data.find(b'\x00')]
@@ -87,8 +19,6 @@ def first_str_from_data(data):
 class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	def __init__(self, **kwargs):
 		gdblike.DebugAdapterGdbLike.__init__(self, **kwargs)
-
-		self.os_sig_to_reason = macos_signal_to_debugadapter_reason
 
 		# register state
 		self.reg_info = {}
@@ -125,7 +55,6 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		# invoke debugserver
 		dbg_args = [path_debugserver, 'localhost:%d'%port, path, '--']
 		dbg_args.extend(args)
-		#print('args are: ', ' '.join(dbg_args))
 		try:
 			subprocess.Popen(dbg_args, stdin=None, stdout=None, stderr=None, preexec_fn=gdblike.preexec)
 		except Exception:
@@ -259,6 +188,79 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	def test(self):
 		print('test')
 		pass
+
+	def thread_stop_pkt_to_reason(self, tdict):
+		macos_signal_to_name = { 1: 'SIGHUP', 2: 'SIGINT', 3: 'SIGQUIT', 4:
+		'SIGILL', 5: 'SIGTRAP', 6: 'SIGABRT', 7: 'SIGEMT', 8: 'SIGFPE', 9:
+		'SIGKILL', 10: 'SIGBUS', 11: 'SIGSEGV', 12: 'SIGSYS', 13: 'SIGPIPE',
+		14: 'SIGALRM', 15: 'SIGTERM', 16: 'SIGURG', 17: 'SIGSTOP', 18:
+		'SIGTSTP', 19: 'SIGCONT', 20: 'SIGCHLD', 21: 'SIGTTIN', 22: 'SIGTTOU',
+		23: 'SIGIO', 24: 'SIGXCPU', 25: 'SIGXFSZ', 26: 'SIGVTALRM', 27:
+		'SIGPROF', 28: 'SIGWINCH', 29: 'SIGINFO', 30: 'SIGUSR1', 31: 'SIGUSR2'
+		}
+
+		macos_signal_to_debugadapter_reason = {
+			1: DebugAdapter.STOP_REASON.SIGNAL_HUP,
+			2: DebugAdapter.STOP_REASON.SIGNAL_INT,
+			3: DebugAdapter.STOP_REASON.SIGNAL_QUIT,
+			4: DebugAdapter.STOP_REASON.SIGNAL_ILL,
+			5: DebugAdapter.STOP_REASON.SIGNAL_TRAP,
+			6: DebugAdapter.STOP_REASON.SIGNAL_ABRT,
+			7: DebugAdapter.STOP_REASON.SIGNAL_EMT,
+			8: DebugAdapter.STOP_REASON.SIGNAL_FPE,
+			9: DebugAdapter.STOP_REASON.SIGNAL_KILL,
+			10: DebugAdapter.STOP_REASON.SIGNAL_BUS,
+			11: DebugAdapter.STOP_REASON.SIGNAL_SEGV,
+			12: DebugAdapter.STOP_REASON.SIGNAL_SYS,
+			13: DebugAdapter.STOP_REASON.SIGNAL_PIPE,
+			14: DebugAdapter.STOP_REASON.SIGNAL_ALRM,
+			15: DebugAdapter.STOP_REASON.SIGNAL_TERM,
+			16: DebugAdapter.STOP_REASON.SIGNAL_URG,
+			17: DebugAdapter.STOP_REASON.SIGNAL_STOP,
+			18: DebugAdapter.STOP_REASON.SIGNAL_TSTP,
+			19: DebugAdapter.STOP_REASON.SIGNAL_CONT,
+			20: DebugAdapter.STOP_REASON.SIGNAL_CHLD,
+			21: DebugAdapter.STOP_REASON.SIGNAL_TTIN,
+			22: DebugAdapter.STOP_REASON.SIGNAL_TTOU,
+			23: DebugAdapter.STOP_REASON.SIGNAL_IO,
+			24: DebugAdapter.STOP_REASON.SIGNAL_XCPU,
+			25: DebugAdapter.STOP_REASON.SIGNAL_XFSZ,
+			26: DebugAdapter.STOP_REASON.SIGNAL_VTALRM,
+			27: DebugAdapter.STOP_REASON.SIGNAL_PROF,
+			28: DebugAdapter.STOP_REASON.SIGNAL_WINCH,
+			29: DebugAdapter.STOP_REASON.SIGNAL_INFO,
+			30: DebugAdapter.STOP_REASON.SIGNAL_USR1,
+			31: DebugAdapter.STOP_REASON.SIGNAL_USR2,
+		}
+
+		signal = tdict.get('signal', -1)
+		metype = tdict.get('metype', '-1')
+		mecount = tdict.get('mecount', '-1')
+		medata = tdict.get('medata', '-1')
+		print('signal=0x%X metype=%s mecount=%s medata=%s' % (signal, metype, mecount, medata))
+
+		result = (DebugAdapter.STOP_REASON.UNKNOWN, None)
+
+		if signal in macos_signal_to_debugadapter_reason:
+			result = (macos_signal_to_debugadapter_reason[signal], None)
+
+		elif signal == 147:
+	        #case 1:  exc_cstr = "EXC_BAD_ACCESS"; break;
+		    #case 2:  exc_cstr = "EXC_BAD_INSTRUCTION"; break;
+	        #case 3:  exc_cstr = "EXC_ARITHMETIC"; break;
+			if tdict['metype'] == '3':
+				result = (DebugAdapter.STOP_REASON.EXC_ARITHMETIC, None)
+	        #case 4:  exc_cstr = "EXC_EMULATION"; break;
+	        #case 5:  exc_cstr = "EXC_SOFTWARE"; break;
+	        #case 6:  exc_cstr = "EXC_BREAKPOINT"; break;
+
+	        #case 7:  exc_cstr = "EXC_SYSCALL"; break;
+	        #case 8:  exc_cstr = "EXC_MACH_SYSCALL"; break;
+	        #case 9:  exc_cstr = "EXC_RPC_ALERT"; break;
+	        #case 10: exc_cstr = "EXC_CRASH"; break;
+
+		print('returning: ', result)
+		return result
 
 	def mem_modules_slow(self):
 		module2addr = {}
