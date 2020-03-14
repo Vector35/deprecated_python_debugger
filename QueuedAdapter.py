@@ -30,12 +30,11 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 	# -------------------------------------------------------------------------
 
 	def worker(self):
-		while True:
-			# Get next job and its condition var
-			index, job = self.queue.get()
-			cond = self.results[index]
+		def perform_task(index, job):
 			# Run it!
+			cond = self.results[index]
 			try:
+				self.queue.task_done()
 				self.results[index] = (True, job())
 			except Exception as e:
 				self.results[index] = (False, e)
@@ -43,9 +42,17 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 			cond.acquire()
 			cond.notify()
 			cond.release()
-			self.queue.task_done()
 
-	def submit(self, job):
+		while True:
+			# Get next job and its condition var
+			index, block_queue, job = self.queue.get()
+
+			if block_queue:
+				perform_task(index, job)
+			else:
+				threading.Thread(target=lambda: perform_task(index, job)).start()
+
+	def submit(self, job, block_queue=True):
 		# Be sure to atomically increment the index counter
 		with self.lock:
 			index = self.next_index
@@ -58,7 +65,7 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 		self.results[index] = cond
 
 		# Don't block on put() but instead on the condition variable
-		self.queue.put((index, job), False)
+		self.queue.put((index, block_queue, job), False)
 		cond.wait()
 
 		# Condition signalled, collect results
@@ -171,7 +178,7 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 
 	def go(self):
 		self.record_stat("go")
-		return self.submit(lambda: self.adapter.go())
+		return self.submit(lambda: self.adapter.go(), block_queue=False)
 	def step_into(self):
 		self.record_stat("step_into")
 		return self.submit(lambda: self.adapter.step_into())
