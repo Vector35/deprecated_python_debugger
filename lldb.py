@@ -233,32 +233,35 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 			31: DebugAdapter.STOP_REASON.SIGNAL_USR2,
 		}
 
-		signal = tdict.get('signal', -1)
-		metype = tdict.get('metype', '-1')
+		metype2reason = {
+			1: DebugAdapter.STOP_REASON.EXC_BAD_ACCESS,
+			2: DebugAdapter.STOP_REASON.EXC_BAD_INSTRUCTION,
+			3: DebugAdapter.STOP_REASON.EXC_ARITHMETIC,
+			4: DebugAdapter.STOP_REASON.EXC_EMULATION,
+			5: DebugAdapter.STOP_REASON.EXC_SOFTWARE,
+			6: DebugAdapter.STOP_REASON.EXC_BREAKPOINT,
+			7: DebugAdapter.STOP_REASON.EXC_SYSCALL,
+			8: DebugAdapter.STOP_REASON.EXC_MACH_SYSCALL,
+			9: DebugAdapter.STOP_REASON.EXC_RPC_ALERT,
+			10: DebugAdapter.STOP_REASON.EXC_CRASH
+		}
+
+		signal = tdict.get('signal')
+		metype = tdict.get('metype')
+		if metype != None: metype = int(metype, 16)
 		mecount = tdict.get('mecount', '-1')
+		if mecount != None: mecount = int(mecount, 16)
 		medata = tdict.get('medata', '-1')
 		print('signal=0x%X metype=%s mecount=%s medata=%s' % (signal, metype, mecount, medata))
 
+		# map the packet macos/lldb "T packet" data to a DebugAdapter reason
 		result = (DebugAdapter.STOP_REASON.UNKNOWN, None)
-
-		if signal in macos_signal_to_debugadapter_reason:
+		if metype != None and metype in metype2reason:
+			result = (metype2reason[metype], None)
+		elif signal in macos_signal_to_debugadapter_reason:
 			result = (macos_signal_to_debugadapter_reason[signal], None)
 
-		elif signal == 147:
-	        #case 1:  exc_cstr = "EXC_BAD_ACCESS"; break;
-		    #case 2:  exc_cstr = "EXC_BAD_INSTRUCTION"; break;
-	        #case 3:  exc_cstr = "EXC_ARITHMETIC"; break;
-			if tdict['metype'] == '3':
-				result = (DebugAdapter.STOP_REASON.EXC_ARITHMETIC, None)
-	        #case 4:  exc_cstr = "EXC_EMULATION"; break;
-	        #case 5:  exc_cstr = "EXC_SOFTWARE"; break;
-	        #case 6:  exc_cstr = "EXC_BREAKPOINT"; break;
-
-	        #case 7:  exc_cstr = "EXC_SYSCALL"; break;
-	        #case 8:  exc_cstr = "EXC_MACH_SYSCALL"; break;
-	        #case 9:  exc_cstr = "EXC_RPC_ALERT"; break;
-	        #case 10: exc_cstr = "EXC_CRASH"; break;
-
+		# done!
 		print('returning: ', result)
 		return result
 

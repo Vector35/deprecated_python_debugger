@@ -100,6 +100,7 @@ class STOP_REASON(Enum):
 	STDOUT_MESSAGE = auto()
 	PROCESS_EXITED = auto()
 	BACKEND_DISCONNECTED = auto()
+	SINGLE_STEP = auto()
 	SIGNAL_HUP = auto()
 	SIGNAL_INT = auto()
 	SIGNAL_QUIT = auto()
@@ -134,7 +135,17 @@ class STOP_REASON(Enum):
 	SIGNAL_STKFLT = auto()
 	SIGNAL_BUX = auto()
 	SIGNAL_POLL = auto()
+	# TODO: get away from macos specific value
+	EXC_BAD_ACCESS = auto()
+	EXC_BAD_INSTRUCTION = auto()
 	EXC_ARITHMETIC = auto()
+	EXC_EMULATION = auto()
+	EXC_SOFTWARE = auto()
+	EXC_BREAKPOINT = auto()
+	EXC_SYSCALL = auto()
+	EXC_MACH_SYSCALL = auto()
+	EXC_RPC_ALERT = auto()
+	EXC_CRASH = auto()
 
 class DebugAdapter:
 	def __init__(self, **kwargs):

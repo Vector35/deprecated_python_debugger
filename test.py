@@ -311,15 +311,36 @@ if __name__ == '__main__':
 		adapter = DebugAdapter.get_adapter_for_current_system()
 		fpath = os.path.join('testbins', testbin)
 
-		# breakpoint exception, then process exit
-		adapter.exec(fpath)
+		# segfault
+		adapter.exec(fpath, ['segfault'])
+		(reason, extra) = adapter.go()
+		assert reason == DebugAdapter.STOP_REASON.EXC_BAD_ACCESS
+		adapter.quit()
+
+		# illegal instruction
+		adapter.exec(fpath, ['illegalinstr'])
+		(reason, extra) = adapter.go()
+		if platform.system() == 'Darwin':
+			# not sure why, I try many supposedly bad instructions, but lldb confirms
+			assert reason == DebugAdapter.STOP_REASON.EXC_BAD_ACCESS
+		else:
+			assert reason == DebugAdapter.STOP_REASON.EXC_BAD_INSTRUCTION
+		adapter.quit()
+
+		# breakpoint, single step, exited
+		adapter.exec(fpath, ['fakearg'])
 		entry = confirm_initial_module(adapter, testbin)
-		print('setting breakpoint at 0x%X' % entry)
 		adapter.breakpoint_set(entry)
 		(reason, extra) = adapter.go()
-		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
-		print('clearing breakpoint at 0x%X' % entry)
+		assert reason == DebugAdapter.STOP_REASON.EXC_BREAKPOINT
 		adapter.breakpoint_clear(entry)
+		#print('rip: ', adapter.reg_read('rip'))
+		(reason, extra) = adapter.step_into()
+		#print('rip: ', adapter.reg_read('rip'))
+		assert reason == DebugAdapter.STOP_REASON.EXC_BREAKPOINT
+		(reason, extra) = adapter.step_into()
+		#print('rip: ', adapter.reg_read('rip'))
+		assert reason == DebugAdapter.STOP_REASON.EXC_BREAKPOINT
 		(reason, extra) = adapter.go()
 		assert reason == DebugAdapter.STOP_REASON.PROCESS_EXITED
 		adapter.quit()
@@ -328,6 +349,7 @@ if __name__ == '__main__':
 		adapter.exec(fpath, ['divzero'])
 		(reason, extra) = adapter.go()
 		assert reason == DebugAdapter.STOP_REASON.EXC_ARITHMETIC
+		adapter.quit()
 
 	# assembler x86/x64 tests
 	for testbin in testbins:
