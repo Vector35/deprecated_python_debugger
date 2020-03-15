@@ -100,12 +100,23 @@ class STOP_REASON(Enum):
 	STDOUT_MESSAGE = auto()
 	PROCESS_EXITED = auto()
 	BACKEND_DISCONNECTED = auto()
+
+	# macos's EXC_BAD_ACCESS
+	# linux's SIGNAL_SEGV
+	ACCESS_VIOLATION = auto()
+
+	# macos's EXC_BREAKPOINT
+	# linux's SIGNAL_TRAP
 	SINGLE_STEP = auto()
+
+	# macos's EXC_ARITHMETIC
+	# linux's SIGNAL_FPE (floating point exception)
+	CALCULATION = auto()
+
 	SIGNAL_HUP = auto()
 	SIGNAL_INT = auto()
 	SIGNAL_QUIT = auto()
 	SIGNAL_ILL = auto()
-	SIGNAL_TRAP = auto()
 	SIGNAL_ABRT = auto()
 	SIGNAL_EMT = auto()
 	SIGNAL_FPE = auto()
@@ -136,9 +147,7 @@ class STOP_REASON(Enum):
 	SIGNAL_BUX = auto()
 	SIGNAL_POLL = auto()
 	# TODO: get away from macos specific value
-	EXC_BAD_ACCESS = auto()
 	EXC_BAD_INSTRUCTION = auto()
-	EXC_ARITHMETIC = auto()
 	EXC_EMULATION = auto()
 	EXC_SOFTWARE = auto()
 	EXC_BREAKPOINT = auto()

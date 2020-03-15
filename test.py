@@ -219,7 +219,7 @@ def skip_possible_second_initial_break(adapter, testbin):
 	if not is_wow64(testbin): return
 	print('detected wow64, attempting to skip second ntdll!LdrPDoDebuggerBreak()')
 	(reason, info) = adapter.go()
-	assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+	assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
 
 def assert_general_error(func):
 	raised = False
@@ -314,15 +314,15 @@ if __name__ == '__main__':
 		# segfault
 		adapter.exec(fpath, ['segfault'])
 		(reason, extra) = adapter.go()
-		assert reason == DebugAdapter.STOP_REASON.EXC_BAD_ACCESS
+		assert reason == DebugAdapter.STOP_REASON.ACCESS_VIOLATION
 		adapter.quit()
 
 		# illegal instruction
 		adapter.exec(fpath, ['illegalinstr'])
 		(reason, extra) = adapter.go()
-		if platform.system() == 'Darwin':
+		if platform.system() in ['Darwin', 'Linux']:
 			# not sure why, I try many supposedly bad instructions, but lldb confirms
-			assert reason == DebugAdapter.STOP_REASON.EXC_BAD_ACCESS
+			assert reason == DebugAdapter.STOP_REASON.ACCESS_VIOLATION
 		else:
 			assert reason == DebugAdapter.STOP_REASON.EXC_BAD_INSTRUCTION
 		adapter.quit()
@@ -332,15 +332,27 @@ if __name__ == '__main__':
 		entry = confirm_initial_module(adapter, testbin)
 		adapter.breakpoint_set(entry)
 		(reason, extra) = adapter.go()
-		assert reason == DebugAdapter.STOP_REASON.EXC_BREAKPOINT
+		if platform.system() == 'Darwin':
+			assert reason == DebugAdapter.STOP_REASON.EXC_BREAKPOINT
+		else:
+			assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
+
 		adapter.breakpoint_clear(entry)
 		#print('rip: ', adapter.reg_read('rip'))
 		(reason, extra) = adapter.step_into()
 		#print('rip: ', adapter.reg_read('rip'))
-		assert reason == DebugAdapter.STOP_REASON.EXC_BREAKPOINT
+		if platform.system() == 'Darwin':
+			assert reason == DebugAdapter.STOP_REASON.EXC_BREAKPOINT
+		else:
+			assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
+
 		(reason, extra) = adapter.step_into()
 		#print('rip: ', adapter.reg_read('rip'))
-		assert reason == DebugAdapter.STOP_REASON.EXC_BREAKPOINT
+		if platform.system() == 'Darwin':
+			assert reason == DebugAdapter.STOP_REASON.EXC_BREAKPOINT
+		else:
+			assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
+
 		(reason, extra) = adapter.go()
 		assert reason == DebugAdapter.STOP_REASON.PROCESS_EXITED
 		adapter.quit()
@@ -348,7 +360,7 @@ if __name__ == '__main__':
 		# divzero
 		adapter.exec(fpath, ['divzero'])
 		(reason, extra) = adapter.go()
-		assert reason == DebugAdapter.STOP_REASON.EXC_ARITHMETIC
+		assert reason == DebugAdapter.STOP_REASON.CALCULATION
 		adapter.quit()
 
 	# assembler x86/x64 tests
@@ -375,7 +387,7 @@ if __name__ == '__main__':
 
 		# a few steps in the loader
 		if loader:
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SINGLE_STEP
 
 		# set bp entry
 		print('setting entry breakpoint at 0x%X' % entry)
@@ -383,7 +395,7 @@ if __name__ == '__main__':
 
 		# few more steps
 		if loader:
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SINGLE_STEP
 
 		# go to entry
 		adapter.go()
@@ -457,7 +469,7 @@ if __name__ == '__main__':
 		# proceed to breakpoint
 		print('going')
 		(reason, info) = adapter.go()
-		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
 		skip_possible_second_initial_break(adapter, testbin)
 
 		assert adapter.reg_read(xip) == entry
@@ -472,7 +484,7 @@ if __name__ == '__main__':
 			print('%s: 0x%X %s' % (xip, addr, asmstr))
 
 			(reason, info) = adapter.step_into()
-			assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+			assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
 			if asmstr.startswith('call'): continue
 			if asmstr.startswith('jmp'): continue
 			break
@@ -628,7 +640,7 @@ if __name__ == '__main__':
 		# proceed to breakpoint
 		print('going')
 		(reason, info) = adapter.go()
-		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
 		pc = adapter.reg_read('pc')
 		print('pc: 0x%X' % pc)
 		assert pc == entry
@@ -639,7 +651,7 @@ if __name__ == '__main__':
 		(asmstr, asmlen) = utils.disasm1(data, 0, 'armv7')
 		adapter.breakpoint_clear(entry)
 		(reason, info) = adapter.step_into()
-		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
 		pc2 = adapter.reg_read('pc')
 		print('pc2: 0x%X' % pc2)
 		assert pc + asmlen == pc2
@@ -748,7 +760,7 @@ if __name__ == '__main__':
 
 		# a few steps in the loader
 		if loader:
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SINGLE_STEP
 
 		# set bp entry
 		print('setting entry breakpoint at 0x%X' % entry)
@@ -756,7 +768,7 @@ if __name__ == '__main__':
 
 		# few more steps
 		if loader:
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SINGLE_STEP
 
 		# go to entry
 		adapter.go()
@@ -815,7 +827,7 @@ if __name__ == '__main__':
 		# proceed to breakpoint
 		print('going')
 		(reason, info) = adapter.go()
-		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
 		pc = adapter.reg_read('pc')
 		print('pc: 0x%X' % pc)
 		assert pc == entry
@@ -826,7 +838,7 @@ if __name__ == '__main__':
 		(asmstr, asmlen) = utils.disasm1(data, 0, 'armv7')
 		adapter.breakpoint_clear(entry)
 		(reason, info) = adapter.step_into()
-		assert reason == DebugAdapter.STOP_REASON.SIGNAL_TRAP
+		assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
 		pc2 = adapter.reg_read('pc')
 		print('pc2: 0x%X' % pc2)
 		assert pc + asmlen == pc2

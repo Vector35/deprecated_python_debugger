@@ -204,7 +204,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 			2: DebugAdapter.STOP_REASON.SIGNAL_INT,
 			3: DebugAdapter.STOP_REASON.SIGNAL_QUIT,
 			4: DebugAdapter.STOP_REASON.SIGNAL_ILL,
-			5: DebugAdapter.STOP_REASON.SIGNAL_TRAP,
+			5: DebugAdapter.STOP_REASON.SINGLE_STEP,
 			6: DebugAdapter.STOP_REASON.SIGNAL_ABRT,
 			7: DebugAdapter.STOP_REASON.SIGNAL_EMT,
 			8: DebugAdapter.STOP_REASON.SIGNAL_FPE,
@@ -234,9 +234,9 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		}
 
 		metype2reason = {
-			1: DebugAdapter.STOP_REASON.EXC_BAD_ACCESS,
+			1: DebugAdapter.STOP_REASON.ACCESS_VIOLATION,
 			2: DebugAdapter.STOP_REASON.EXC_BAD_INSTRUCTION,
-			3: DebugAdapter.STOP_REASON.EXC_ARITHMETIC,
+			3: DebugAdapter.STOP_REASON.CALCULATION,
 			4: DebugAdapter.STOP_REASON.EXC_EMULATION,
 			5: DebugAdapter.STOP_REASON.EXC_SOFTWARE,
 			6: DebugAdapter.STOP_REASON.EXC_BREAKPOINT,

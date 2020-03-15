@@ -58,7 +58,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		#print('execution status = ', status)
 
 		if status == DEBUG_STATUS.BREAK:
-			return (DebugAdapter.STOP_REASON.SIGNAL_TRAP, b'')
+			return (DebugAdapter.STOP_REASON.SINGLE_STEP, b'')
 
 		if status == DEBUG_STATUS.NO_DEBUGGEE:
 			code = c_ulong()

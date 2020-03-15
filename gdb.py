@@ -12,92 +12,9 @@ from . import utils
 from . import gdblike
 from . import DebugAdapter
 
-linux_signal_to_name = {
-	# ISO C99
-	2: 'SIGINT',
-	4: 'SIGILL',
-	6: 'SIGABRT',
-	8: 'SIGFPE',
-	11: 'SIGSEGV',
-	15: 'SIGTERM',
-
-	# historical POSIX
-	1: 'SIGHUP',
-	3: 'SIGQUIT',
-	5: 'SIGTRAP',
-	9: 'SIGKILL',
-	10: 'SIGUSR1',	# differs from macos
-	12: 'SIGUSR2',	# differs from macos
-	13: 'SIGPIPE',
-	14: 'SIGALRM',
-
-	# newer POSIX
-	16: 'SIGSTKFLT',
-	17: 'SIGCHLD',	# differs from macos
-	18: 'SIGCONT',	# differs from macos
-	19: 'SIGSTOP',	# differs
-	20: 'SIGTSTP',	# differs
-	21: 'SIGTTIN',
-	22: 'SIGTTOU',
-	23: 'SIGURG', # differs from macos
-	24: 'SIGXCPU',
-	25: 'SIGXFSZ',
-	26: 'SIGVTALRM',
-	27: 'SIGPROF',
-	30: 'SIGUSR1',
-	31: 'SIGUSR2',
-
-	# nonstandard POSIX
-	28: 'SIGWINCH',
-
-	# unallocated posix
-	7: 'SIGBUX',	# differs from macos
-	29: 'SIGPOLL',
-
-	30: 'SIGSTKFLT',
-	31: 'SIGSYS'
-}
-
-linux_signal_to_debugadapter_reason = {
-	1: DebugAdapter.STOP_REASON.SIGNAL_HUP,
-	2: DebugAdapter.STOP_REASON.SIGNAL_INT,
-	4: DebugAdapter.STOP_REASON.SIGNAL_ILL,
-	6: DebugAdapter.STOP_REASON.SIGNAL_ABRT,
-	8: DebugAdapter.STOP_REASON.SIGNAL_FPE,
-	11: DebugAdapter.STOP_REASON.SIGNAL_SEGV,
-	15: DebugAdapter.STOP_REASON.SIGNAL_TERM,
-	3: DebugAdapter.STOP_REASON.SIGNAL_QUIT,
-	5: DebugAdapter.STOP_REASON.SIGNAL_TRAP,
-	9: DebugAdapter.STOP_REASON.SIGNAL_KILL,
-	10: DebugAdapter.STOP_REASON.SIGNAL_USR1,
-	12: DebugAdapter.STOP_REASON.SIGNAL_USR2,
-	13: DebugAdapter.STOP_REASON.SIGNAL_PIPE,
-	14: DebugAdapter.STOP_REASON.SIGNAL_ALRM,
-	16: DebugAdapter.STOP_REASON.SIGNAL_STKFLT,
-	17: DebugAdapter.STOP_REASON.SIGNAL_CHLD,
-	18: DebugAdapter.STOP_REASON.SIGNAL_CONT,
-	19: DebugAdapter.STOP_REASON.SIGNAL_STOP,
-	20: DebugAdapter.STOP_REASON.SIGNAL_TSTP,
-	21: DebugAdapter.STOP_REASON.SIGNAL_TTIN,
-	22: DebugAdapter.STOP_REASON.SIGNAL_TTOU,
-	23: DebugAdapter.STOP_REASON.SIGNAL_URG,
-	24: DebugAdapter.STOP_REASON.SIGNAL_XCPU,
-	25: DebugAdapter.STOP_REASON.SIGNAL_XFSZ,
-	26: DebugAdapter.STOP_REASON.SIGNAL_VTALRM,
-	27: DebugAdapter.STOP_REASON.SIGNAL_PROF,
-	30: DebugAdapter.STOP_REASON.SIGNAL_USR1,
-	31: DebugAdapter.STOP_REASON.SIGNAL_USR2,
-	28: DebugAdapter.STOP_REASON.SIGNAL_WINCH,
-	7: DebugAdapter.STOP_REASON.SIGNAL_BUX,
-	29: DebugAdapter.STOP_REASON.SIGNAL_POLL,
-	30: DebugAdapter.STOP_REASON.SIGNAL_STKFLT,
-	31: DebugAdapter.STOP_REASON.SIGNAL_SYS
-}
-
 class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 	def __init__(self, **kwargs):
 		gdblike.DebugAdapterGdbLike.__init__(self, **kwargs)
-		self.os_sig_to_reason = linux_signal_to_debugadapter_reason
 		self.rsp = None
 
 	#--------------------------------------------------------------------------
@@ -116,7 +33,7 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 			raise Exception('no available ports')
 
 		# invoke gdbserver
-		dbg_args = [path_gdbserver, '--once', '--no-startup-with-shell', 'localhost:%d'%port, path, '--']
+		dbg_args = [path_gdbserver, '--once', '--no-startup-with-shell', 'localhost:%d'%port, path]
 		dbg_args.extend(args)
 		print(' '.join(dbg_args))
 		try:
@@ -173,3 +90,103 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 			self.module2addr[module] = int(addr, 16)
 
 		return self.module2addr
+
+	#--------------------------------------------------------------------------
+	# NON-DEBUGADAPTER API
+	#--------------------------------------------------------------------------
+	def thread_stop_pkt_to_reason(self, tdict):
+		linux_signal_to_name = {
+			# ISO C99
+			2: 'SIGINT',
+			4: 'SIGILL',
+			6: 'SIGABRT',
+			8: 'SIGFPE',
+			11: 'SIGSEGV',
+			15: 'SIGTERM',
+
+			# historical POSIX
+			1: 'SIGHUP',
+			3: 'SIGQUIT',
+			5: 'SIGTRAP',
+			9: 'SIGKILL',
+			10: 'SIGUSR1',	# differs from macos
+			12: 'SIGUSR2',	# differs from macos
+			13: 'SIGPIPE',
+			14: 'SIGALRM',
+
+			# newer POSIX
+			16: 'SIGSTKFLT',
+			17: 'SIGCHLD',	# differs from macos
+			18: 'SIGCONT',	# differs from macos
+			19: 'SIGSTOP',	# differs
+			20: 'SIGTSTP',	# differs
+			21: 'SIGTTIN',
+			22: 'SIGTTOU',
+			23: 'SIGURG', # differs from macos
+			24: 'SIGXCPU',
+			25: 'SIGXFSZ',
+			26: 'SIGVTALRM',
+			27: 'SIGPROF',
+			30: 'SIGUSR1',
+			31: 'SIGUSR2',
+
+			# nonstandard POSIX
+			28: 'SIGWINCH',
+
+			# unallocated posix
+			7: 'SIGBUX',	# differs from macos
+			29: 'SIGPOLL',
+
+			30: 'SIGSTKFLT',
+			31: 'SIGSYS'
+		}
+
+		# TODO: detect OS and adjust away from hardcoded Ubuntu 4.15.0-51-generic
+		lookup = {
+			1: DebugAdapter.STOP_REASON.SIGNAL_HUP,
+			2: DebugAdapter.STOP_REASON.SIGNAL_INT,
+			4: DebugAdapter.STOP_REASON.SIGNAL_ILL,
+			6: DebugAdapter.STOP_REASON.SIGNAL_ABRT,
+			8: DebugAdapter.STOP_REASON.CALCULATION,
+			11: DebugAdapter.STOP_REASON.ACCESS_VIOLATION,
+			15: DebugAdapter.STOP_REASON.SIGNAL_TERM,
+			3: DebugAdapter.STOP_REASON.SIGNAL_QUIT,
+			5: DebugAdapter.STOP_REASON.SINGLE_STEP,
+			9: DebugAdapter.STOP_REASON.SIGNAL_KILL,
+			10: DebugAdapter.STOP_REASON.SIGNAL_USR1,
+			12: DebugAdapter.STOP_REASON.SIGNAL_USR2,
+			13: DebugAdapter.STOP_REASON.SIGNAL_PIPE,
+			14: DebugAdapter.STOP_REASON.SIGNAL_ALRM,
+			16: DebugAdapter.STOP_REASON.SIGNAL_STKFLT,
+			17: DebugAdapter.STOP_REASON.SIGNAL_CHLD,
+			18: DebugAdapter.STOP_REASON.SIGNAL_CONT,
+			19: DebugAdapter.STOP_REASON.SIGNAL_STOP,
+			20: DebugAdapter.STOP_REASON.SIGNAL_TSTP,
+			21: DebugAdapter.STOP_REASON.SIGNAL_TTIN,
+			22: DebugAdapter.STOP_REASON.SIGNAL_TTOU,
+			23: DebugAdapter.STOP_REASON.SIGNAL_URG,
+			24: DebugAdapter.STOP_REASON.SIGNAL_XCPU,
+			25: DebugAdapter.STOP_REASON.SIGNAL_XFSZ,
+			26: DebugAdapter.STOP_REASON.SIGNAL_VTALRM,
+			27: DebugAdapter.STOP_REASON.SIGNAL_PROF,
+			30: DebugAdapter.STOP_REASON.SIGNAL_USR1,
+			31: DebugAdapter.STOP_REASON.SIGNAL_USR2,
+			28: DebugAdapter.STOP_REASON.SIGNAL_WINCH,
+			7: DebugAdapter.STOP_REASON.SIGNAL_BUX,
+			29: DebugAdapter.STOP_REASON.SIGNAL_POLL,
+			30: DebugAdapter.STOP_REASON.SIGNAL_STKFLT,
+			31: DebugAdapter.STOP_REASON.SIGNAL_SYS
+		}
+
+		dreason = DebugAdapter.STOP_REASON.UNKNOWN
+		result = (dreason, None)
+
+		if 'signal' in tdict:
+			signal = tdict['signal']
+			if signal in lookup:
+				result = (lookup[signal], None)
+			else:
+				result = (dreason, signal)
+
+		print('returning: ', result)
+		return result
