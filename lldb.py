@@ -239,7 +239,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 			3: DebugAdapter.STOP_REASON.CALCULATION,
 			4: DebugAdapter.STOP_REASON.EXC_EMULATION,
 			5: DebugAdapter.STOP_REASON.EXC_SOFTWARE,
-			6: DebugAdapter.STOP_REASON.EXC_BREAKPOINT,
+			6: DebugAdapter.STOP_REASON.BREAKPOINT,
 			7: DebugAdapter.STOP_REASON.EXC_SYSCALL,
 			8: DebugAdapter.STOP_REASON.EXC_MACH_SYSCALL,
 			9: DebugAdapter.STOP_REASON.EXC_RPC_ALERT,

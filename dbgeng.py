@@ -28,6 +28,30 @@ class DEBUG_STATUS(Enum):
 	WAIT_INPUT = 16
 	TIMEOUT = 17
 
+class WINNT_STATUS(Enum):
+	STATUS_DATATYPE_MISALIGNMENT = 0x80000002
+	STATUS_BREAKPOINT = 0x80000003
+	STATUS_SINGLE_STEP = 0x80000004
+	STATUS_ACCESS_VIOLATION = 0xC0000005
+	STATUS_IN_PAGE_ERROR = 0xC0000006
+	STATUS_NO_MEMORY = 0xC0000017
+	STATUS_ILLEGAL_INSTRUCTION = 0xC000001D
+	STATUS_NONCONTINUABLE_EXCEPTION = 0xC0000025
+	STATUS_INVALID_DISPOSITION = 0xC0000026
+	STATUS_ARRAY_BOUNDS_EXCEEDED = 0xC000008C
+	STATUS_FLOAT_DENORMAL_OPERAND = 0xC000008D
+	STATUS_FLOAT_DIVIDE_BY_ZERO = 0xC000008E
+	STATUS_FLOAT_INEXACT_RESULT = 0xC000008F
+	STATUS_FLOAT_INVALID_OPERATION = 0xC0000090
+	STATUS_FLOAT_OVERFLOW = 0xC0000091
+	STATUS_FLOAT_STACK_CHECK = 0xC0000092
+	STATUS_FLOAT_UNDERFLOW = 0xC0000093
+	STATUS_INTEGER_DIVIDE_BY_ZERO = 0xC0000094
+	STATUS_INTEGER_OVERFLOW = 0xC0000095
+	STATUS_PRIVILEGED_INSTRUCTION = 0xC0000096
+	STATUS_STACK_OVERFLOW = 0xC00000FD
+	STATUS_CONTROL_C_EXIT = 0xC000013A
+
 # dll uses return values to indicate success/failure while we use exceptions
 ERROR_UNSPECIFIED = -1
 
@@ -46,19 +70,83 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		# id's (dbgeng namespace)
 		self.bp_addr_to_id = {}
 
+		#
+		self.stop_reason_fallback = DebugAdapter.STOP_REASON.UNKNOWN
+
+		#
+		self.is_64bit = None # unknown until exec()
+
 	def __del__(self):
 		#print('destructor')
 		pass
 
-	def thunk_stop_reason(self):
+	def get_last_breakpoint_address(self):
+		addr = c_ulonglong()
+		if self.dll.get_last_breakpoint_address(byref(addr)) != 0:
+			raise DebugAdapter.GeneralError("retrieving last breakpoint address")
+		return addr.value
+
+	def get_last_exception_info(self):
+		# TODO: handle 32 bit case
+		#typedef struct _EXCEPTION_RECORD64 {
+		#    DWORD    ExceptionCode;
+		#    DWORD ExceptionFlags;
+		#    DWORD64 ExceptionRecord;
+		#    DWORD64 ExceptionAddress;
+		#    DWORD NumberParameters;
+		#    DWORD __unusedAlignment;
+		#    DWORD64 ExceptionInformation[EXCEPTION_MAXIMUM_PARAMETERS];
+		#} EXCEPTION_RECORD64, *PEXCEPTION_RECORD64;
+		record = create_string_buffer(4+4+8+8+4+4+8*15)
+		self.dll.get_exception_record64(record)
+		(ExceptionCode, ExceptionFlags, ExceptionRecord, ExceptionAddress, NumberParameters) = \
+			unpack('<IIQQI', record[0:28])
+
+		#print('ExceptionCode: %X' % ExceptionCode)
+		#print('ExceptionFlags: %X' % ExceptionFlags)
+		#print('ExceptionRecord: %X' % ExceptionRecord)
+		#print('ExceptionAddress: %X' % ExceptionAddress)
+
+		return (ExceptionCode, ExceptionFlags, ExceptionRecord, ExceptionAddress, NumberParameters)
+
+	def get_exec_status(self):
 		status = c_ulong()
 		if self.dll.get_exec_status(byref(status)) != 0:
 			raise DebugAdapter.GeneralError("retrieving execution status")
-		status = DEBUG_STATUS(status.value)
+		return DEBUG_STATUS(status.value)
+
+	def thunk_stop_reason(self):
+		status = self.get_exec_status()
 		#print('execution status = ', status)
 
+		fallback = self.stop_reason_fallback
+		self.stop_reason_fallback = False
+
 		if status == DEBUG_STATUS.BREAK:
-			return (DebugAdapter.STOP_REASON.SINGLE_STEP, b'')
+			rip = self.reg_read('rip')
+
+			bpaddr = self.get_last_breakpoint_address()
+			print('bpaddr: 0x%X' % bpaddr)
+			if bpaddr == rip:
+				return (DebugAdapter.STOP_REASON.BREAKPOINT, 0)
+
+			(ExceptionCode, ExceptionFlags, ExceptionRecord, ExceptionAddress, NumberParameters) = \
+				self.get_last_exception_info()
+			print('ExceptionAddress: 0x%X' % ExceptionAddress)
+			if ExceptionAddress == rip:
+				lookup = {
+					WINNT_STATUS.STATUS_BREAKPOINT.value: DebugAdapter.STOP_REASON.BREAKPOINT,
+					WINNT_STATUS.STATUS_SINGLE_STEP.value: DebugAdapter.STOP_REASON.SINGLE_STEP,
+					WINNT_STATUS.STATUS_ACCESS_VIOLATION.value: DebugAdapter.STOP_REASON.ACCESS_VIOLATION,
+					WINNT_STATUS.STATUS_INTEGER_DIVIDE_BY_ZERO.value: DebugAdapter.STOP_REASON.CALCULATION,
+					WINNT_STATUS.STATUS_FLOAT_DIVIDE_BY_ZERO.value: DebugAdapter.STOP_REASON.CALCULATION
+				}
+				if ExceptionCode in lookup:
+					return (lookup[ExceptionCode], ExceptionCode)
+
+				return (DebugAdapter.STOP_REASON.UNKNOWN, ExceptionCode)
+
+			return (fallback, ExceptionCode)
 
 		if status == DEBUG_STATUS.NO_DEBUGGEE:
 			code = c_ulong()
@@ -69,6 +157,13 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		# otherwise just return the numeric value of the status
 		return (DebugAdapter.STOP_REASON.UNKNOWN, status.value)
 
+	def sense_64bit(self):
+		try:
+			if self.reg_width('rip') == 64:
+				self.is_64bit = True
+		except Exception:
+			self.is_64bit = False
+
 	#--------------------------------------------------------------------------
 	# API
 	#--------------------------------------------------------------------------
@@ -77,14 +172,22 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	def exec(self, fpath, args):
 		if '/' in fpath:
 			fpath = fpath.replace('/', '\\')
-		fpath = create_string_buffer(fpath.encode('utf-8'))
-		rc = self.dll.process_start(fpath)
+		cmdline = fpath
+		if args:
+			cmdline += ' ' + ' '.join(args)
+
+		cmdline = create_string_buffer(cmdline.encode('utf-8'))
+		rc = self.dll.process_start(cmdline)
 		if rc:
-			raise Exception('unable to launch %s, dbgeng adapter returned %d' % (fpath, rc))
+			raise Exception('unable to launch "%s", dbgeng adapter returned %d' % (cmdline, rc))
+
+		self.sense_64bit()
 
 	def attach(self, pid):
 		if self.dll.process_attach(target):
 			raise Exception('unable to attach to pid %d' % pid)
+
+		self.sense_64bit()
 
 	def detach(self):
 		self.dll.process_detach()
@@ -230,10 +333,12 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		return self.thunk_stop_reason()
 
 	def step_into(self):
+		self.stop_reason_fallback = DebugAdapter.STOP_REASON.SINGLE_STEP
 		self.dll.step_into()
 		return self.thunk_stop_reason()
 
 	def step_over(self):
+		self.stop_reason_fallback = DebugAdapter.STOP_REASON.SINGLE_STEP
 		self.dll.step_over()
 		return self.thunk_stop_reason()
 

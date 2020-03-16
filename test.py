@@ -235,8 +235,8 @@ def confirm_initial_module(adapter, testbin):
 	mpath = testbin_to_mpath(testbin)
 
 	module2addr = adapter.mem_modules()
-	print('module2addr: ', ' '.join(['%s:%X' % (i[0],i[1]) for i in module2addr.items()]))
-	print('      mpath: ', mpath)
+	#print('module2addr: ', ' '.join(['%s:%X' % (i[0],i[1]) for i in module2addr.items()]))
+	#print('      mpath: ', mpath)
 
 	if not mpath in module2addr:
 		mpath = os.path.basename(mpath)
@@ -314,16 +314,18 @@ if __name__ == '__main__':
 		# segfault
 		adapter.exec(fpath, ['segfault'])
 		(reason, extra) = adapter.go()
+		print(reason)
 		assert reason == DebugAdapter.STOP_REASON.ACCESS_VIOLATION
 		adapter.quit()
 
 		# illegal instruction
 		adapter.exec(fpath, ['illegalinstr'])
 		(reason, extra) = adapter.go()
-		if platform.system() in ['Darwin', 'Linux']:
+		if platform.system() in ['Darwin', 'Linux', 'Windows']:
 			# not sure why, I try many supposedly bad instructions, but lldb confirms
 			assert reason == DebugAdapter.STOP_REASON.ACCESS_VIOLATION
 		else:
+			print(reason)
 			assert reason == DebugAdapter.STOP_REASON.EXC_BAD_INSTRUCTION
 		adapter.quit()
 
@@ -332,24 +334,20 @@ if __name__ == '__main__':
 		entry = confirm_initial_module(adapter, testbin)
 		adapter.breakpoint_set(entry)
 		(reason, extra) = adapter.go()
-		if platform.system() == 'Darwin':
-			assert reason == DebugAdapter.STOP_REASON.EXC_BREAKPOINT
-		else:
-			assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
-
+		assert reason == DebugAdapter.STOP_REASON.BREAKPOINT
 		adapter.breakpoint_clear(entry)
 		#print('rip: ', adapter.reg_read('rip'))
 		(reason, extra) = adapter.step_into()
 		#print('rip: ', adapter.reg_read('rip'))
 		if platform.system() == 'Darwin':
-			assert reason == DebugAdapter.STOP_REASON.EXC_BREAKPOINT
+			assert reason == DebugAdapter.STOP_REASON.BREAKPOINT
 		else:
 			assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
 
 		(reason, extra) = adapter.step_into()
 		#print('rip: ', adapter.reg_read('rip'))
 		if platform.system() == 'Darwin':
-			assert reason == DebugAdapter.STOP_REASON.EXC_BREAKPOINT
+			assert reason == DebugAdapter.STOP_REASON.BREAKPOINT
 		else:
 			assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
 
@@ -469,7 +467,8 @@ if __name__ == '__main__':
 		# proceed to breakpoint
 		print('going')
 		(reason, info) = adapter.go()
-		assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
+		print('reason: ', reason)
+		assert reason == DebugAdapter.STOP_REASON.BREAKPOINT
 		skip_possible_second_initial_break(adapter, testbin)
 
 		assert adapter.reg_read(xip) == entry

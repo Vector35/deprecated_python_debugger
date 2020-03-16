@@ -113,6 +113,9 @@ class STOP_REASON(Enum):
 	# linux's SIGNAL_FPE (floating point exception)
 	CALCULATION = auto()
 
+	#
+	BREAKPOINT = auto()
+
 	SIGNAL_HUP = auto()
 	SIGNAL_INT = auto()
 	SIGNAL_QUIT = auto()
@@ -150,7 +153,6 @@ class STOP_REASON(Enum):
 	EXC_BAD_INSTRUCTION = auto()
 	EXC_EMULATION = auto()
 	EXC_SOFTWARE = auto()
-	EXC_BREAKPOINT = auto()
 	EXC_SYSCALL = auto()
 	EXC_MACH_SYSCALL = auto()
 	EXC_RPC_ALERT = auto()

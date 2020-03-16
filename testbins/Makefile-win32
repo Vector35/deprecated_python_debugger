@@ -1,6 +1,6 @@
 # nmake -f Makefile-win32 from within "x86 Native Tools Command Prompt"
 
-TARGETS_ALL = helloworld_x86-windows.exe helloworld_loop_x86-windows.exe helloworld_thread_x86-windows.exe helloworld_func_x86-windows.exe helloworld_pie_x86-windows.exe helloworld_loop_pie_x86-windows.exe helloworld_thread_pie_x86-windows.exe helloworld_func_pie_x86-windows.exe asmtest_x86-windows.exe 
+TARGETS_ALL = helloworld_x86-windows.exe helloworld_loop_x86-windows.exe helloworld_thread_x86-windows.exe helloworld_func_x86-windows.exe helloworld_pie_x86-windows.exe helloworld_loop_pie_x86-windows.exe helloworld_thread_pie_x86-windows.exe helloworld_func_pie_x86-windows.exe asmtest_x86-windows.exe do_exception_pie_x86-windows.exe 
 
 all: $(TARGETS_ALL)
 
@@ -30,6 +30,9 @@ helloworld_loop_pie_x86-windows.exe: helloworld_loop.c
 
 helloworld_func_pie_x86-windows.exe: helloworld_func.c
 	cl helloworld_func.c /Fe:helloworld_func_pie_x86-windows.exe /link
+
+do_exception_pie_x86-windows.exe: do_exception.c
+	cl do_exception.c /Fe:do_exception_pie_x86-windows.exe /link
 
 asmtest_x86-windows.exe: asmtest_x86-windows.obj
 	link asmtest_x86-windows.obj kernel32.lib /ENTRY:WinMain /SUBSYSTEM:CONSOLE /DYNAMICBASE:NO /OUT:asmtest_x86-windows.exe

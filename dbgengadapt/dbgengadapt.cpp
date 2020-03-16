@@ -9,11 +9,9 @@
 	proceed. For instance, after EventCallbacks::Breakpoint(), you can return DEBUG_STATUS_GO
 	to say "carry on".
 
-	If WaitForEvent() returns due to timeout, you're not forced to call it
-	again. You can treat it like a separate entity and interact with it
-	asynchronously. For example, breaking into the target with
-	control->SetInterrupt() or quering its status with
-	control->GetExecutionStatus().
+	If WaitForEvent() returns due to timeout and the target is still running, you can
+	interact with the engine with queries like control->GetExecutionStatus() and interrupt
+	the target with control->SetInterrupt().
 
 	There are a few statuses:
 	1) Session Status, reported from EventCallbacks::SessionStatus()
@@ -65,6 +63,9 @@ IDebugDataSpaces *g_Data = NULL;
 IDebugRegisters *g_Registers = NULL;
 IDebugSymbols *g_Symbols = NULL;
 IDebugSystemObjects *g_Objects = NULL;
+
+EXCEPTION_RECORD64 g_last_exception64 = {0};
+uint64_t g_last_breakpoint = 0;
 
 ULONG lastSessionStatus = DEBUG_SESSION_FAILURE;
 bool b_PROCESS_CREATED = false;
@@ -135,6 +136,15 @@ STDMETHOD(Breakpoint)(
 )
 {
 	printf_debug("EventCallbacks::Breakpoint()\n");
+
+	ULONG64 addr;
+	if(Bp->GetOffset(&addr) == S_OK) {
+		printf_debug("\taddress: 0x%016I64x\n", addr);
+		g_last_breakpoint = addr;
+	}
+	else
+		printf_debug("\t(failed to get address)\n");
+
 	return DEBUG_STATUS_NO_CHANGE;
 }
 
@@ -145,16 +155,11 @@ STDMETHOD(Exception)(
 {
 	// remember, at this point, the debugger status is at DEBUG_STATUS_BREAK
 	printf_debug("EventCallbacks::Exception()\n");
+	g_last_exception64 = *Exception;
 
-	//if(FirstChance)
-	//	printf_debug("(first chance)\n");
-	//else
-	//	printf_debug("(second chance)\n");
-
-	printf_debug("\n");
-
-	printf_debug( "EXCEPTION_RECORD64:\n"
-			"ExceptionCode: 0x%I32x (",
+	printf_debug("\tFirstChance: 0x%08I32x\n", Exception->NumberParameters);
+	printf_debug("\tEXCEPTION_RECORD64:\n"
+			"\tExceptionCode: 0x%I32x (",
 			Exception->ExceptionCode);
 
 	switch(Exception->ExceptionCode) {
@@ -212,31 +217,14 @@ STDMETHOD(Exception)(
 			printf_debug("EXCEPTION_WTF");
 	}
 
-	printf_debug(")\n"
-			"ExceptionFlags: 0x%08I32x\n"
-			"ExceptionRecord: 0x%016I64x\n"
-			"ExceptionAddress: 0x%016I64x\n"
-			"NumberParameters: 0x%08I32x\n",
-			Exception->ExceptionFlags,
-			Exception->ExceptionRecord,
-			Exception->ExceptionAddress,
-			Exception->NumberParameters
-		  );
+	printf_debug(")\n")
+	printf_debug("\tExceptionFlags: 0x%08I32x\n", Exception->ExceptionFlags);
+	printf_debug("\tExceptionRecord: 0x%016I64x\n", Exception->ExceptionRecord);
+	printf_debug("\tExceptionAddress: 0x%016I64x\n", Exception->ExceptionAddress);
+	printf_debug("\tNumberParameters: 0x%08I32x\n", Exception->NumberParameters);
 
+	/* stay default, should be DEBUG_STATUS_BREAK */
 	return DEBUG_STATUS_NO_CHANGE;
-
-	if(FirstChance)
-	{
-		/* this will bring dbgeng out of "inside a wait" state, ie: WaitForEvent() will return */
-		printf_debug("returning DEBUG_STATUS_GO_NOT_HANDLED\n");
-		return DEBUG_STATUS_GO_NOT_HANDLED;
-	}
-	else
-	{
-		printf_debug("returning DEBUG_STATUS_BREAK\n");
-		//g_EventCallbacksRequestsQuit = TRUE;
-		return DEBUG_STATUS_BREAK;
-	}
 }
 
 STDMETHOD(CreateThread)(
@@ -276,8 +264,8 @@ STDMETHOD(CreateProcess)(
 		)
 {
 	printf_debug("EventCallbacks::CreateProcess()\n");
-	printf_debug("  ImageFileHandle=0x%016I64\n", ImageFileHandle);
-	printf_debug("           Handle=0x%016I64\n", Handle);
+	printf_debug("  ImageFileHandle=0x%016I64X\n", ImageFileHandle);
+	printf_debug("           Handle=0x%016I64X\n", Handle);
 	printf_debug("       BaseOffset=0x%016I64X\n", BaseOffset);
 	printf_debug("       ModuleName=\"%s\"\n", ModuleName);
 	printf_debug("        ImageName=\"%s\"\n", ImageName);
@@ -334,7 +322,7 @@ STDMETHOD(LoadModule)(
 	HRESULT hRes;
 
 	printf_debug("EventCallbacks::LoadModule()\n");
-	printf_debug("loaded module:%s (image:%s) to address %I64x\n", ModuleName, ImageName, BaseOffset);
+	printf_debug("\tloaded module:%s (image:%s) to address %I64x\n", ModuleName, ImageName, BaseOffset);
 
 	return DEBUG_STATUS_NO_CHANGE;
 }
@@ -348,7 +336,7 @@ STDMETHOD(UnloadModule)(
 	vector<string> kill_list;
 
 	printf_debug("EventCallbacks::UnloadModule()\n");
-	printf_debug("loaded image:%s to address %I64x\n", ImageBaseName, BaseOffset);
+	printf_debug("\nloaded image:%s to address %I64x\n", ImageBaseName, BaseOffset);
 
 	return DEBUG_STATUS_NO_CHANGE;
 }
@@ -517,19 +505,19 @@ STDMETHOD(ChangeSymbolState)(
 	printf_debug("EventCallbacks::ChangeSymbolState()\n");
 
 	if(Flags & DEBUG_CSS_LOADS)
-		printf_debug("DEBUG_CSS_LOADS");
+		printf_debug("\tDEBUG_CSS_LOADS\n");
 	if(Flags & DEBUG_CSS_UNLOADS)
-		printf_debug("DEBUG_CSS_UNLOADS");
+		printf_debug("\tDEBUG_CSS_UNLOADS\n");
 	if(Flags & DEBUG_CSS_SCOPE)
-		printf_debug("DEBUG_CSS_SCOPE");
+		printf_debug("\tDEBUG_CSS_SCOPE\n");
 	if(Flags & DEBUG_CSS_PATHS)
-		printf_debug("DEBUG_CSS_PATHS");
+		printf_debug("\tDEBUG_CSS_PATHS\n");
 	if(Flags & DEBUG_CSS_SYMBOL_OPTIONS)
-		printf_debug("DEBUG_CSS_SYMBOL_OPTIONS");
+		printf_debug("\tDEBUG_CSS_SYMBOL_OPTIONS\n");
 	if(Flags & DEBUG_CSS_TYPE_OPTIONS)
-		printf_debug("DEBUG_CSS_TYPE_OPTIONS");
+		printf_debug("\tDEBUG_CSS_TYPE_OPTIONS\n");
 	if(Flags & DEBUG_CSS_COLLAPSE_CHILDREN)
-		printf_debug("DEBUG_CSS_COLLAPSE_CHILDREN");
+		printf_debug("\tDEBUG_CSS_COLLAPSE_CHILDREN\n");
 
 	return DEBUG_STATUS_NO_CHANGE;
 }
@@ -544,11 +532,16 @@ EventCallbacks g_EventCb;
 
 int wait(int timeout)
 {
+	// clear state that event listeners capture
+	g_last_breakpoint = 0;
+	memset(&g_last_exception64, '\0', sizeof(g_last_exception64));
+
+	// block
 	HRESULT hResult = g_Control->WaitForEvent(
 		0, /* flags */
 		timeout /* timeout (ms) (INFINITE == eat events until "break" event); */
 	);
-	printf_debug("WaitForEvent() returned %08I32x\n", hResult);
+	printf_debug("WaitForEvent() returned %08I32x ", hResult);
 
 	if(hResult == S_OK) {
 		printf_debug("S_OK (successful)\n");
@@ -559,10 +552,12 @@ int wait(int timeout)
 		printf_debug("S_FALSE (timeout expired)\n");
 		return ERROR_UNSPECIFIED;
 	}
+
 	if(hResult == E_PENDING) {
 		printf_debug("E_PENDING (exit interrupt issued, target unavailable)\n");
 		return ERROR_UNSPECIFIED;
 	}
+
 	if(hResult == E_UNEXPECTED) { /* 8000FFFF */
 		printf_debug("E_UNEXPECTED (outstanding input request, or no targets generate events)\n");
 		if(lastSessionStatus == DEBUG_SESSION_END) {
@@ -571,12 +566,14 @@ int wait(int timeout)
 		}
 		return ERROR_UNSPECIFIED;
 	}
+
 	if(hResult == E_FAIL) {
 		printf_debug("E_FAIL (engine already waiting for event)\n");
 		return ERROR_UNSPECIFIED;
 	}
 
-	printf_debug("unknown reply from WaitForEvent(): %d\n", hResult);
+	printf_debug("(unknown)\n");
+
 	return ERROR_UNSPECIFIED;
 }
 
@@ -682,7 +679,7 @@ int echo(char *input)
 /* calls related to starting and stopping debug sessions */
 
 EASY_CTYPES_SPEC
-int process_start(char *path)
+int process_start(char *cmdline)
 {
 	int rc = ERROR_UNSPECIFIED;
 	HRESULT hResult;
@@ -693,7 +690,7 @@ int process_start(char *path)
 
 	lastSessionStatus = DEBUG_SESSION_FAILURE;
 
-	printf_debug("starting process: %s\n", path);
+	printf_debug("executing command line: %s\n", cmdline);
 
 	if(!g_Client) {
 		printf_debug("ERROR: interfaces not initialized\n");
@@ -705,7 +702,7 @@ int process_start(char *path)
 		goto cleanup;
 	}
 
-	if(g_Client->CreateProcess(0, path, DEBUG_ONLY_THIS_PROCESS) != S_OK) {
+	if(g_Client->CreateProcess(0, cmdline, DEBUG_ONLY_THIS_PROCESS) != S_OK) {
 		printf_debug("ERROR: creating debug process\n");
 		goto cleanup;
 	}
@@ -1133,6 +1130,20 @@ int get_exit_code(unsigned long *code)
 	}
 
 	*code = process_exit_code;
+	return 0;
+}
+
+EASY_CTYPES_SPEC
+int get_exception_record64(EXCEPTION_RECORD64 *result)
+{
+	*result = g_last_exception64;
+	return 0;
+}
+
+EASY_CTYPES_SPEC
+int get_last_breakpoint_address(uint64_t *addr)
+{
+	*addr = g_last_breakpoint;
 	return 0;
 }
 
