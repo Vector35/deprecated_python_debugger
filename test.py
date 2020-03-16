@@ -221,6 +221,18 @@ def go_initial(adapter, testbin):
 		assert (reason, info) == (DebugAdapter.STOP_REASON.UNKNOWN, 0x4000001f)
 	return adapter.go()
 
+def expect_single_step(reason):
+	expected = None
+
+	if platform.system() == 'Darwin':
+		expected = DebugAdapter.STOP_REASON.BREAKPOINT
+	else:
+		expected = DebugAdapter.STOP_REASON.SINGLE_STEP
+
+	if reason != expected:
+		print('expected %s but got %s' % (expected, reason))
+		assert False
+
 def assert_general_error(func):
 	raised = False
 	try:
@@ -338,17 +350,11 @@ if __name__ == '__main__':
 		#print('rip: ', adapter.reg_read('rip'))
 		(reason, extra) = adapter.step_into()
 		#print('rip: ', adapter.reg_read('rip'))
-		if platform.system() == 'Darwin':
-			assert reason == DebugAdapter.STOP_REASON.BREAKPOINT
-		else:
-			assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
+		expect_single_step(reason)
 
 		(reason, extra) = adapter.step_into()
 		#print('rip: ', adapter.reg_read('rip'))
-		if platform.system() == 'Darwin':
-			assert reason == DebugAdapter.STOP_REASON.BREAKPOINT
-		else:
-			assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
+		expect_single_step(reason)
 
 		(reason, extra) = adapter.go()
 		assert reason == DebugAdapter.STOP_REASON.PROCESS_EXITED
@@ -378,14 +384,13 @@ if __name__ == '__main__':
 		xip = 'eip' if 'x86' in testbin else 'rip'
 
 		loader = adapter.reg_read(xip) != entry
-		if loader:
-			print('entrypoint is the program, no library or loader')
-		else:
-			print('loader detected, gonna step a few times for fun')
+		if loader: print('entrypoint is the program, no library or loader')
+		else: print('loader detected, gonna step a few times for fun')
 
 		# a few steps in the loader
 		if loader:
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SINGLE_STEP
+			(reason, extra) = adapter.step_into()
+			expect_single_step(reason)
 
 		# set bp entry
 		print('setting entry breakpoint at 0x%X' % entry)
@@ -393,7 +398,8 @@ if __name__ == '__main__':
 
 		# few more steps
 		if loader:
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SINGLE_STEP
+			(reason, extra) = adapter.step_into()
+			expect_single_step(reason)
 
 		# go to entry
 		(reason, extra) = go_initial(adapter, testbin)
@@ -480,7 +486,7 @@ if __name__ == '__main__':
 			print('%s: 0x%X %s' % (xip, addr, asmstr))
 
 			(reason, info) = adapter.step_into()
-			assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
+			expect_single_step(reason)
 			if asmstr.startswith('call'): continue
 			if asmstr.startswith('jmp'): continue
 			break
@@ -635,7 +641,7 @@ if __name__ == '__main__':
 		# proceed to breakpoint
 		print('going')
 		(reason, info) = adapter.go()
-		assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
+		assert reason == DebugAdapter.STOP_REASON.BREAKPOINT
 		pc = adapter.reg_read('pc')
 		print('pc: 0x%X' % pc)
 		assert pc == entry
@@ -755,7 +761,8 @@ if __name__ == '__main__':
 
 		# a few steps in the loader
 		if loader:
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SINGLE_STEP
+			(reason, extra) = adapter.step_into()
+			expect_single_step(reason)
 
 		# set bp entry
 		print('setting entry breakpoint at 0x%X' % entry)
@@ -763,7 +770,8 @@ if __name__ == '__main__':
 
 		# few more steps
 		if loader:
-			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SINGLE_STEP
+			(reason, extra) = adapter.step_into()
+			expect_single_step(reason)
 
 		# go to entry
 		adapter.go()
@@ -822,7 +830,7 @@ if __name__ == '__main__':
 		# proceed to breakpoint
 		print('going')
 		(reason, info) = adapter.go()
-		assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
+		assert reason == DebugAdapter.STOP_REASON.BREAKPOINT
 		pc = adapter.reg_read('pc')
 		print('pc: 0x%X' % pc)
 		assert pc == entry
@@ -833,7 +841,7 @@ if __name__ == '__main__':
 		(asmstr, asmlen) = utils.disasm1(data, 0, 'armv7')
 		adapter.breakpoint_clear(entry)
 		(reason, info) = adapter.step_into()
-		assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
+		expect_single_step(reason)
 		pc2 = adapter.reg_read('pc')
 		print('pc2: 0x%X' % pc2)
 		assert pc + asmlen == pc2
