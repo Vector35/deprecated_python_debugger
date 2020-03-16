@@ -64,7 +64,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		fpath = os.path.join(fpath, 'dbgengadapt\dbgengadapt.dll')
 		self.dll = CDLL(fpath)
 		if not self.dll:
-			raise DebugAdapter.GeneralError("loading dbgengadapt.dll")
+			raise DebugAdapter.GeneralError("loading %s" % fpath)
 
 		# keep mapping between addresses (DbgAdapter namespace) and breakpoint
 		# id's (dbgeng namespace)
@@ -72,9 +72,6 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 		#
 		self.stop_reason_fallback = DebugAdapter.STOP_REASON.UNKNOWN
-
-		#
-		self.is_64bit = None # unknown until exec()
 
 	def __del__(self):
 		#print('destructor')
@@ -123,17 +120,18 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		self.stop_reason_fallback = False
 
 		if status == DEBUG_STATUS.BREAK:
-			rip = self.reg_read('rip')
+			iptr = self.reg_read('eip' if self.arch==32 else 'rip')
 
 			bpaddr = self.get_last_breakpoint_address()
 			print('bpaddr: 0x%X' % bpaddr)
-			if bpaddr == rip:
+			if bpaddr == iptr:
 				return (DebugAdapter.STOP_REASON.BREAKPOINT, 0)
 
 			(ExceptionCode, ExceptionFlags, ExceptionRecord, ExceptionAddress, NumberParameters) = \
 				self.get_last_exception_info()
+			print('iptr: 0x%X' % iptr)
 			print('ExceptionAddress: 0x%X' % ExceptionAddress)
-			if ExceptionAddress == rip:
+			if ExceptionAddress == iptr:
 				lookup = {
 					WINNT_STATUS.STATUS_BREAKPOINT.value: DebugAdapter.STOP_REASON.BREAKPOINT,
 					WINNT_STATUS.STATUS_SINGLE_STEP.value: DebugAdapter.STOP_REASON.SINGLE_STEP,
@@ -157,12 +155,20 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		# otherwise just return the numeric value of the status
 		return (DebugAdapter.STOP_REASON.UNKNOWN, status.value)
 
-	def sense_64bit(self):
-		try:
-			if self.reg_width('rip') == 64:
-				self.is_64bit = True
-		except Exception:
-			self.is_64bit = False
+	def pe_get_arch(self, fpath):
+		with open(fpath, 'rb') as fp:
+			data = fp.read()
+
+		if data[0:2] != b'\x4d\x5a':
+			raise DebugAdapter.GeneralError('%s doesnt start with MZ, is it a PE?' % fpath)
+
+		e_lfanew = unpack('<I', data[0x3C:0x40])[0]
+		if data[e_lfanew:e_lfanew+6] == b'\x50\x45\x00\x00\x64\x86':
+			return 64
+		elif data[e_lfanew:e_lfanew+6] == b'\x50\x45\x00\x00\x4c\x01':
+			return 32
+		else:
+			raise DebugAdapter.GeneralError('%s has no 32/64 bit indicator' % fpath)
 
 	#--------------------------------------------------------------------------
 	# API
@@ -170,24 +176,28 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 	# session start/stop
 	def exec(self, fpath, args):
+		# form command line
 		if '/' in fpath:
 			fpath = fpath.replace('/', '\\')
 		cmdline = fpath
 		if args:
 			cmdline += ' ' + ' '.join(args)
 
+		# set arch
+		self.arch = self.pe_get_arch(fpath)
+
+		# ask dll to create process
 		cmdline = create_string_buffer(cmdline.encode('utf-8'))
 		rc = self.dll.process_start(cmdline)
 		if rc:
 			raise Exception('unable to launch "%s", dbgeng adapter returned %d' % (cmdline, rc))
 
-		self.sense_64bit()
-
 	def attach(self, pid):
+		# TODO: sense if PID is 32
+		self.arch = 64
+
 		if self.dll.process_attach(target):
 			raise Exception('unable to attach to pid %d' % pid)
-
-		self.sense_64bit()
 
 	def detach(self):
 		self.dll.process_detach()

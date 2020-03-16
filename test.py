@@ -215,11 +215,11 @@ def is_wow64(testbin):
 	(a,b) = platform.architecture()
 	return a=='64bit' and b.startswith('Windows')
 
-def skip_possible_second_initial_break(adapter, testbin):
-	if not is_wow64(testbin): return
-	print('detected wow64, attempting to skip second ntdll!LdrPDoDebuggerBreak()')
-	(reason, info) = adapter.go()
-	assert reason == DebugAdapter.STOP_REASON.SINGLE_STEP
+def go_initial(adapter, testbin):
+	if is_wow64(testbin):
+		(reason, info) = adapter.go()
+		assert (reason, info) == (DebugAdapter.STOP_REASON.UNKNOWN, 0x4000001f)
+	return adapter.go()
 
 def assert_general_error(func):
 	raised = False
@@ -313,19 +313,17 @@ if __name__ == '__main__':
 
 		# segfault
 		adapter.exec(fpath, ['segfault'])
-		(reason, extra) = adapter.go()
-		print(reason)
+		(reason, extra) = go_initial(adapter, testbin)
 		assert reason == DebugAdapter.STOP_REASON.ACCESS_VIOLATION
 		adapter.quit()
 
 		# illegal instruction
 		adapter.exec(fpath, ['illegalinstr'])
-		(reason, extra) = adapter.go()
+		(reason, extra) = go_initial(adapter, testbin)
 		if platform.system() in ['Darwin', 'Linux', 'Windows']:
 			# not sure why, I try many supposedly bad instructions, but lldb confirms
 			assert reason == DebugAdapter.STOP_REASON.ACCESS_VIOLATION
 		else:
-			print(reason)
 			assert reason == DebugAdapter.STOP_REASON.EXC_BAD_INSTRUCTION
 		adapter.quit()
 
@@ -333,7 +331,8 @@ if __name__ == '__main__':
 		adapter.exec(fpath, ['fakearg'])
 		entry = confirm_initial_module(adapter, testbin)
 		adapter.breakpoint_set(entry)
-		(reason, extra) = adapter.go()
+		(reason, extra) = go_initial(adapter, testbin)
+		if is_wow64(testbin) and extra == 0x4000001f: (reason, extra) = adapter.go()
 		assert reason == DebugAdapter.STOP_REASON.BREAKPOINT
 		adapter.breakpoint_clear(entry)
 		#print('rip: ', adapter.reg_read('rip'))
@@ -357,7 +356,8 @@ if __name__ == '__main__':
 
 		# divzero
 		adapter.exec(fpath, ['divzero'])
-		(reason, extra) = adapter.go()
+		(reason, extra) = go_initial(adapter, testbin)
+		if is_wow64(testbin) and extra == 0x4000001f: (reason, extra) = adapter.go()
 		assert reason == DebugAdapter.STOP_REASON.CALCULATION
 		adapter.quit()
 
@@ -396,8 +396,7 @@ if __name__ == '__main__':
 			assert adapter.step_into()[0] == DebugAdapter.STOP_REASON.SINGLE_STEP
 
 		# go to entry
-		adapter.go()
-		skip_possible_second_initial_break(adapter, testbin)
+		(reason, extra) = go_initial(adapter, testbin)
 		assert adapter.reg_read(xip) == entry
 		adapter.breakpoint_clear(entry)
 		# step into nop
@@ -466,10 +465,8 @@ if __name__ == '__main__':
 
 		# proceed to breakpoint
 		print('going')
-		(reason, info) = adapter.go()
-		print('reason: ', reason)
+		(reason, extra) = go_initial(adapter, testbin)
 		assert reason == DebugAdapter.STOP_REASON.BREAKPOINT
-		skip_possible_second_initial_break(adapter, testbin)
 
 		assert adapter.reg_read(xip) == entry
 		adapter.breakpoint_clear(entry)
@@ -548,8 +545,7 @@ if __name__ == '__main__':
 		print('scheduling break in .5 second')
 		threading.Timer(.5, break_into, [adapter]).start()
 		print('going')
-		adapter.go()
-		skip_possible_second_initial_break(adapter, testbin)
+		(reason, extra) = go_initial(adapter, testbin)
 		print('back')
 		print('switching to bad thread')
 		assert_general_error(lambda: adapter.thread_select(999))
@@ -596,8 +592,8 @@ if __name__ == '__main__':
 			print('checking that at least one thread progressed')
 			if list(filter(lambda x: not x, [addrs[i]==addrs2[i] for i in range(len(addrs))])) == []:
 				print('did any threads progress?')
-				print('addrs:   ', addrs)
-				print('addrs2:  ', addrs2)
+				print('addrs: ', map(hex,addrs))
+				print('addrs2:  ', map(hex,addrs2))
 				assert False
 		print('done')
 		adapter.quit()

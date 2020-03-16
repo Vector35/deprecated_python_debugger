@@ -7,4 +7,4 @@ dbgengadapt.obj: dbgengadapt.cpp
 	cl dbgengadapt.cpp /c /O1 /EHsc /Fo:dbgengadapt.obj
 
 clean:
-	rm *.dll *.obj
+	rm -rf *.dll *.obj *.lib *.exp *.pdb

@@ -901,6 +901,7 @@ int breakpoint_clear(ULONG id)
 }
 
 /* calls related to state */
+
 EASY_CTYPES_SPEC
 int mem_read(uint64_t addr, uint32_t length, uint8_t *result)
 {
@@ -1133,19 +1134,7 @@ int get_exit_code(unsigned long *code)
 	return 0;
 }
 
-EASY_CTYPES_SPEC
-int get_exception_record64(EXCEPTION_RECORD64 *result)
-{
-	*result = g_last_exception64;
-	return 0;
-}
-
-EASY_CTYPES_SPEC
-int get_last_breakpoint_address(uint64_t *addr)
-{
-	*addr = g_last_breakpoint;
-	return 0;
-}
+/* calls related to threads */
 
 EASY_CTYPES_SPEC
 int set_current_thread(ULONG id)
@@ -1182,6 +1171,21 @@ int get_number_threads(void)
 		return ERROR_UNSPECIFIED;
 	}
 	return Total;
+}
+
+/* misc */
+EASY_CTYPES_SPEC
+int get_exception_record64(EXCEPTION_RECORD64 *result)
+{
+	*result = g_last_exception64;
+	return 0;
+}
+
+EASY_CTYPES_SPEC
+int get_last_breakpoint_address(uint64_t *addr)
+{
+	*addr = g_last_breakpoint;
+	return 0;
 }
 
 /*****************************************************************************/
