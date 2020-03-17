@@ -399,7 +399,7 @@ if __name__ == '__main__':
 		testbin = tb
 
 		# parse entrypoint information
-		fpath = os.path.join('testbins')
+		fpath = testbin_to_fpath()
 		(load_addr, entry_offs) = parse_image(fpath)
 		entry = load_addr + entry_offs
 

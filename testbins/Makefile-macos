@@ -48,7 +48,7 @@ asmtest_x64-macos: asmtest_x64.asm
 	ld -macosx_version_min 10.7.0 -lSystem asmtest_x64-macos.o -o asmtest_x64-macos
 
 do_exception_x64-macos: do_exception.c
-	gcc -Wl,-no_pie do_exception.c -o do_exception_x64-macos
+	gcc -Wl,-no_pie -DARCH_IS_X64 do_exception.c -o do_exception_x64-macos
 
 # 32-bit macos application (need to modify MacOSX Architectures.xcspec on Xcode 10+)
 sysroot := $(shell xcode-select -p)
