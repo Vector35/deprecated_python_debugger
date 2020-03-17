@@ -152,9 +152,9 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 	def reg_read(self, reg):
 		self.record_stat("reg_read")
 		return self.submit(lambda: self.adapter.reg_read(reg))
-	def reg_write(self, reg):
+	def reg_write(self, reg, value):
 		self.record_stat("reg_write")
-		return self.submit(lambda: self.adapter.reg_write(reg))
+		return self.submit(lambda: self.adapter.reg_write(reg, value))
 	def reg_list(self):
 		self.record_stat("reg_list")
 		return self.submit(lambda: self.adapter.reg_list())

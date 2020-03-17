@@ -216,7 +216,7 @@ class DebugAdapter:
 	# register
 	def reg_read(self, reg):
 		raise NotImplementedError('')
-	def reg_write(self, reg):
+	def reg_write(self, reg, value):
 		raise NotImplementedError('')
 	def reg_list(self):
 		raise NotImplementedError('')
