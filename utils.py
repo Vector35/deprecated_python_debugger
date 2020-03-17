@@ -11,6 +11,9 @@ NORMAL = '\x1B[0m'
 def green(msg):
 	print(GREEN + msg + NORMAL)
 
+def red(msg):
+	print(RED + msg + NORMAL)
+
 def hex_dump(data, addr=0, grouping=1, endian='little'):
 	result = ''
 

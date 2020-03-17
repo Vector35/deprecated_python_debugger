@@ -183,10 +183,16 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 
 		if 'signal' in tdict:
 			signal = tdict['signal']
-			if signal in lookup:
-				result = (lookup[signal], None)
-			else:
-				result = (dreason, signal)
 
-		print('returning: ', result)
+			# breakpoint and trap flag exception are both reported as SIGTRAP
+			# use presence of 'swbreak' to differentiate, if possible
+			if linux_signal_to_name[signal] == 'SIGTRAP' and 'swbreak' in tdict:
+				result = (DebugAdapter.STOP_REASON.BREAKPOINT, 0)
+			else:
+				if signal in lookup:
+					result = (lookup[signal], None)
+				else:
+					result = (dreason, signal)
+
+		#print('returning: ', result)
 		return result

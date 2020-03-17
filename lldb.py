@@ -262,7 +262,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 			result = (macos_signal_to_debugadapter_reason[signal], None)
 
 		# done!
-		print('returning: ', result)
+		#print('returning: ', result)
 		return result
 
 	def mem_modules_slow(self):
