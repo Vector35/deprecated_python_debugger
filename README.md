@@ -1,55 +1,46 @@
-# Debugger Plugin (v0.1-alpha)
+# Debugger (v1.0-beta)
+Author: **Vector35**
 
-Author: **Vector35 Inc**
-_Debugger plugin allows Windows, Linux, and Mac binaries to be debugged from within Binary Ninja.
+_Native debugger support_
 
-## Description
+## Description:
 
-This plugin adds a new Debugger binary view which gives the user options to execute and debug the current target.
+Debug Windows, Linux, and MacOS targets from within Binary Ninja.
 
-## Screenshots
+### Screenshots
 
-![](./media/gui.png)
+![](https://github.com/Vector35/debugger/blob/master/media/gui.png?raw=true)
+![](https://github.com/Vector35/debugger/blob/master/media/cli.png?raw=true)
 
-![](./media/cli.png)
+### Developers
+
+See [DEVNOTES.md](./DEVNOTES.md).
+
 
 ## Installation Instructions
+
+### Darwin
 
 To install this manually, please see the "Using Plugins" section of the [Getting Started Guide](https://docs.binary.ninja/getting-started.html#using-plugins). Or use Binary Ninja's built in plugin manager.
 
 ### Windows
 
-(none)
+To install this manually, please see the "Using Plugins" section of the [Getting Started Guide](https://docs.binary.ninja/getting-started.html#using-plugins). Or use Binary Ninja's built in plugin manager.
 
 ### Linux
 
-(none)
-
-### Darwin
-
-(none)
+To install this manually, please see the "Using Plugins" section of the [Getting Started Guide](https://docs.binary.ninja/getting-started.html#using-plugins). Or use Binary Ninja's built in plugin manager.
 
 ## Minimum Version
 
 This plugin requires the following minimum version of Binary Ninja:
 
-* 1.3.2015
+* 2015
 
-## Required Dependencies
-
-* Python 3.3+
-* Windows debugging relies on the dbgeng dll's which should be present in default installations.
-* Linux needs gdbserver in path.
-* MacOS needs debugserver in path or in its default Xcode location: `/Library/Developer/CommandLineTools/Library/PrivateFrameworks/LLDB.framework/Versions/A/Resources/`
 
 ## License
 
 This plugin is released under a MIT license.
-
 ## Metadata Version
 
 2
-
-## Developers
-
-See [DEVNOTES.md](./DEVNOTES.md).
