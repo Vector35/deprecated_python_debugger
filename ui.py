@@ -5,7 +5,7 @@ from binaryninja.plugin import PluginCommand
 import binaryninja
 from binaryninja import Endianness, HighlightStandardColor, LinearDisassemblyLine, LinearDisassemblyLineType, DisassemblyTextLine, InstructionTextToken, InstructionTextTokenType, execute_on_main_thread_and_wait, LowLevelILOperation, BinaryReader
 from binaryninja.settings import Settings
-from binaryninja.log import log_warn, log_error
+from binaryninja.log import log_warn, log_error, log_debug
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
 from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, ConsoleWidget, ModulesWidget, widget
 from . import binjaplug
@@ -19,6 +19,18 @@ class DebuggerUI:
 		self.last_ip = 0
 		self.regs = []
 		self.stack = []
+
+		registers_widget = self.widget('Registers')
+		modules_widget = self.widget('Modules')
+		threads_widget = self.widget('Threads')
+		stack_widget = self.widget('Stack')
+		bp_widget = self.widget("Breakpoints")
+		console_widget = self.widget('Debugger Console')
+
+		if registers_widget is None or modules_widget is None or threads_widget is None or stack_widget is None or bp_widget is None or console_widget is None:
+			# One of the views failed to create, bail
+			log_debug("Creating Debugger UI for view with missing dock widgets!")
+			return
 
 		# Initial view data
 		self.context_display()
