@@ -116,6 +116,9 @@ class STOP_REASON(Enum):
 	#
 	BREAKPOINT = auto()
 
+	#
+	ILLEGAL_INSTRUCTION = auto()
+
 	SIGNAL_HUP = auto()
 	SIGNAL_INT = auto()
 	SIGNAL_QUIT = auto()
@@ -150,7 +153,6 @@ class STOP_REASON(Enum):
 	SIGNAL_BUX = auto()
 	SIGNAL_POLL = auto()
 	# TODO: get away from macos specific value
-	EXC_BAD_INSTRUCTION = auto()
 	EXC_EMULATION = auto()
 	EXC_SOFTWARE = auto()
 	EXC_SYSCALL = auto()

@@ -145,7 +145,7 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		lookup = {
 			1: DebugAdapter.STOP_REASON.SIGNAL_HUP,
 			2: DebugAdapter.STOP_REASON.SIGNAL_INT,
-			4: DebugAdapter.STOP_REASON.SIGNAL_ILL,
+			4: DebugAdapter.STOP_REASON.ILLEGAL_INSTRUCTION,
 			6: DebugAdapter.STOP_REASON.SIGNAL_ABRT,
 			8: DebugAdapter.STOP_REASON.CALCULATION,
 			11: DebugAdapter.STOP_REASON.ACCESS_VIOLATION,

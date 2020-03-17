@@ -235,7 +235,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 
 		metype2reason = {
 			1: DebugAdapter.STOP_REASON.ACCESS_VIOLATION,
-			2: DebugAdapter.STOP_REASON.EXC_BAD_INSTRUCTION,
+			2: DebugAdapter.STOP_REASON.ILLEGAL_INSTRUCTION,
 			3: DebugAdapter.STOP_REASON.CALCULATION,
 			4: DebugAdapter.STOP_REASON.EXC_EMULATION,
 			5: DebugAdapter.STOP_REASON.EXC_SOFTWARE,

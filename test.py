@@ -252,11 +252,11 @@ def expect_single_step(reason):
 def expect_bad_instruction(reason):
 	global testbin
 
-	# :/ I cannot induce a bad instruction exception ANYWHERE!
-	if 'macos' in testbin or 'linux' in testbin or 'windows' in testbin or 'android' in testbin:
+	# :/ I cannot induce a bad instruction exception on these OS's!
+	if 'macos' in testbin or 'windows' in testbin or 'android' in testbin:
 		expected = DebugAdapter.STOP_REASON.ACCESS_VIOLATION
 	else:
-		expected = DebugAdapter.STOP_REASON.EXC_BAD_INSTRUCTION
+		expected = DebugAdapter.STOP_REASON.ILLEGAL_INSTRUCTION
 
 	assert_equality(reason, expected)
 
@@ -357,7 +357,7 @@ if __name__ == '__main__':
 		# segfault
 		adapter.exec(fpath, ['segfault'])
 		(reason, extra) = go_initial(adapter)
-		expect_access_violation(reason)
+		assert_equality(reason, DebugAdapter.STOP_REASON.ACCESS_VIOLATION)
 		adapter.quit()
 
 		# illegal instruction

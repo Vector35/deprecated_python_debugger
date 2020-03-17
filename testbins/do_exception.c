@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef int (*PFOO)(void);
+
 int main(int ac, char **av)
 {
 	printf("start\n");
@@ -38,13 +40,21 @@ int main(int ac, char **av)
 		#endif
 		};
 
-		typedef int (*PFOO)(void);
 		PFOO bar = (PFOO)buf;
 		return bar();
 	}
 
 	if(!strcmp(av[1], "divzero")) {
 		printf("dividing by zero\n");
+		#if defined(ARCH_IS_X86)
+			unsigned char buf[] = {
+				0x31, 0xdb, // xor ebx, ebx
+				0xf7, 0xf3, // div ebx
+				0xc3
+			};
+			PFOO bar = (PFOO)buf;
+			bar();
+		#endif
 		float foo = 31337;
 		int i = 9;
 		while(i >= 0) {

@@ -38,7 +38,7 @@ helloworld_func_pie_x86-linux: helloworld_func.c
 	gcc -W -m32 -pie helloworld_func.c -o helloworld_func_pie_x86-linux
 
 do_exception_pie_x86-linux: do_exception.c
-	gcc -W -m32 -pie do_exception.c -o do_exception_pie_x86-linux
+	gcc -W -m32 -pie -z execstack -g -DARCH_IS_X86 do_exception.c -o do_exception_pie_x86-linux
 
 asmtest_x86-linux: asmtest_x86.asm
 	nasm asmtest_x86.asm -f elf32 -DOS_IS_LINUX -o asmtest_x86-linux.o
@@ -73,7 +73,7 @@ helloworld_func_pie_x64-linux: helloworld_func.c
 	gcc -W -pie helloworld_func.c -o helloworld_func_pie_x64-linux
 
 do_exception_pie_x64-linux: do_exception.c
-	gcc -W -pie do_exception.c -o do_exception_pie_x64-linux
+	gcc -W -pie -z execstack -DARCH_IS_X64 do_exception.c -o do_exception_pie_x64-linux
 
 asmtest_x64-linux: asmtest_x64.asm
 	nasm asmtest_x64.asm -f elf64 -DOS_IS_LINUX -o asmtest_x64-linux.o
