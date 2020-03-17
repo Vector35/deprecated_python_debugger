@@ -99,8 +99,16 @@ class DebuggerUI:
 		self.stack = []
 		for i in range(stack_range[0], stack_range[1] + 1):
 			offset = i * self.state.bv.arch.address_size
+			if offset < 0 and stack_pointer < -offset:
+				# Address < 0
+				continue
+
 			address = stack_pointer + offset
 			value = self.state.memory_view.read(address, self.state.bv.arch.address_size)
+			if len(value) < self.state.bv.arch.address_size:
+				# Cannot access this memory
+				continue
+
 			value_int = value
 			if self.state.bv.arch.endianness == Endianness.LittleEndian:
 				value_int = value_int[::-1]
