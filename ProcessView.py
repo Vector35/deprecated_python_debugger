@@ -144,24 +144,32 @@ class DebugMemoryView(BinaryView):
 		# List of 256-byte block addresses to read into the cache to fully cover this region
 		cache_blocks = range(cache_start, cache_start + cache_len, 0x100)
 
+		result = b''
+
 		for block in cache_blocks:
 			if block in self.error_cache:
 				return None
 			if block not in self.value_cache:
 				try:
 					batch = adapter.mem_read(block, cache_len)
-					# Cache storage is addr => byte for every byte
-					# Not memory efficient but very easy to reason about
-					batch = {block+offs:val.to_bytes(1,'big') for (offs,val) in enumerate(batch)}
-					self.value_cache.update(batch)
+					# Cache storage is block => data for every block
+					self.value_cache[block] = batch
 				except DebugAdapter.GeneralError as e:
 					# Probably disconnected; can't read
 					self.error_cache[block] = True
 					return None
 
-		# Now that we know we have cached every address in the region, assemble the
-		# result solely from the cache
-		return b''.join(self.value_cache[val] for val in range(addr, addr + length))
+			# Get data out of cache
+			cached = self.value_cache[block]
+			if addr + length < block + len(cached):
+				# Last block
+				cached = cached[:((addr + length) - block)]
+			if addr > block:
+				# First block
+				cached = cached[addr-block:]
+			result += cached
+
+		return result
 
 	def perform_write(self, addr, data):
 		if self.parent_view is None:
