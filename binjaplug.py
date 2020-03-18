@@ -474,18 +474,6 @@ class DebuggerState:
 		if self.memory_view == None:
 			raise Exception('missing memory_view')
 
-		addr_regs = {}
-		reg_addrs = {}
-
-		for (reg, addr) in self.registers:
-			reg_symbol_name = '$' + reg
-
-			if addr not in addr_regs.keys():
-				addr_regs[addr] = [reg_symbol_name]
-			else:
-				addr_regs[addr].append(reg_symbol_name)
-			reg_addrs[reg] = addr
-
 		for symbol in self.old_symbols:
 			# Symbols are immutable so just destroy the old one
 			self.memory_view.undefine_auto_symbol(symbol)
@@ -497,15 +485,13 @@ class DebuggerState:
 		self.old_dvs = set()
 		new_dvs = set()
 
-		for (reg, addr) in reg_addrs.items():
+		for (reg, addr) in self.registers:
+			bits = self.registers.bits(reg)
 			symbol_name = '$' + reg
 			self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, addr, symbol_name, namespace=symbol_name))
 			self.old_symbols.append(self.memory_view.get_symbol_by_raw_name(symbol_name, namespace=symbol_name))
-			new_dvs.add(addr)
-
-		for new_dv in new_dvs:
-			self.memory_view.define_data_var(new_dv, Type.int(8))
-			self.old_dvs.add(new_dv)
+			self.memory_view.define_data_var(addr, Type.int(bits // 8, sign=False))
+			self.old_dvs.add(addr)
 
 		# Special struct for stack frame
 		if self.bv.arch.name == 'x86_64':
