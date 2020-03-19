@@ -404,6 +404,7 @@ class DebuggerState:
 		self.threads = DebuggerThreads(self)
 		self.modules = DebuggerModules(self)
 		self.breakpoints = DebuggerBreakpoints(self, initial_bps)
+		self.remote_arch = None
 
 		if have_ui:
 			self.ui = ui.DebuggerUI(self)
@@ -424,16 +425,16 @@ class DebuggerState:
 
 	@property
 	def ip(self):
-		if self.bv.arch.name == 'x86_64':
+		if self.remote_arch.name == 'x86_64':
 			return self.registers['rip']
-		elif self.bv.arch.name == 'x86':
+		elif self.remote_arch.name == 'x86':
 			return self.registers['eip']
-		elif self.bv.arch.name == 'aarch64':
+		elif self.remote_arch.name == 'aarch64':
 			return self.registers['pc']
-		elif self.bv.arch.name in ['arm', 'armv7']:
+		elif self.remote_arch.name in ['arm', 'armv7']:
 			return self.registers['pc']
 		else:
-			raise NotImplementedError('unimplemented architecture %s' % self.bv.arch.name)
+			raise NotImplementedError('unimplemented architecture %s' % self.remote_arch.name)
 
 	@property
 	def local_ip(self):
@@ -445,20 +446,30 @@ class DebuggerState:
 
 	@property
 	def stack_pointer(self):
-		if self.bv.arch.name == 'x86_64':
+		if self.remote_arch.name == 'x86_64':
 			return self.registers['rsp']
-		elif self.bv.arch.name == 'x86':
+		elif self.remote_arch.name == 'x86':
 			return self.registers['esp']
-		elif self.bv.arch.name == 'aarch64':
+		elif self.remote_arch.name == 'aarch64':
 			return self.registers['sp']
-		elif self.bv.arch.name in ['arm', 'armv7']:
+		elif self.remote_arch.name in ['arm', 'armv7']:
 			return self.registers['sp']
 		else:
-			raise NotImplementedError('unimplemented architecture %s' % self.bv.arch.name)
+			raise NotImplementedError('unimplemented architecture %s' % self.remote_arch.name)
 
 	@property
 	def connected(self):
 		return self.adapter is not None and not self.connecting
+
+	# Find current architecture for remote process
+	def detect_remote_arch(self):
+		arch = self.bv.arch
+
+		# TODO: be more platform agnostic
+		if arch.name == 'armv7':
+			if self.registers['cpsr'] & 0x20:
+				arch = binaryninja.Architecture['thumb2']
+		return arch
 
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):
@@ -467,7 +478,7 @@ class DebuggerState:
 		self.threads.mark_dirty()
 		self.modules.mark_dirty()
 		if self.connected:
-			self.registers.update()
+			self.remote_arch = self.detect_remote_arch()
 
 	# Create symbols and variables for the memory view
 	def update_memory_view(self):
@@ -496,17 +507,17 @@ class DebuggerState:
 			self.old_dvs.add(addr)
 
 		# Special struct for stack frame
-		if self.bv.arch.name == 'x86_64':
-			width = self.registers['rbp'] - self.registers['rsp'] + self.bv.arch.address_size
+		if self.remote_arch.name == 'x86_64':
+			width = self.registers['rbp'] - self.registers['rsp'] + self.remote_arch.address_size
 			if width > 0:
 				if width > 0x1000:
 					width = 0x1000
 				struct = Structure()
 				struct.type = StructureType.StructStructureType
 				struct.width = width
-				for i in range(0, width, self.bv.arch.address_size):
+				for i in range(0, width, self.remote_arch.address_size):
 					var_name = "var_{:x}".format(width - i)
-					struct.insert(i, Type.pointer(self.bv.arch, Type.void()), var_name)
+					struct.insert(i, Type.pointer(self.remote_arch, Type.void()), var_name)
 				self.memory_view.define_data_var(self.registers['rsp'], Type.structure_type(struct))
 				self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, self.registers['rsp'], "$stack_frame", raw_name="$stack_frame"))
 
@@ -569,6 +580,7 @@ class DebuggerState:
 		self.memory_dirty()
 		self.memory_view.update_base()
 		self.breakpoints.apply()
+		self.remote_arch = self.detect_remote_arch()
 
 	def attach(self):
 		if self.connected or self.connecting:
@@ -597,6 +609,7 @@ class DebuggerState:
 
 		self.memory_dirty()
 		self.breakpoints.apply()
+		self.remote_arch = self.detect_remote_arch()
 
 	def quit(self):
 		if self.connected:
@@ -610,6 +623,7 @@ class DebuggerState:
 				pass
 			finally:
 				self.adapter = None
+				self.remote_arch = None
 		self.memory_dirty()
 
 	def restart(self):
@@ -629,6 +643,7 @@ class DebuggerState:
 				pass
 			finally:
 				self.adapter = None
+				self.remote_arch = None
 		self.memory_dirty()
 
 	def pause(self):
@@ -790,12 +805,7 @@ class DebuggerState:
 			il = FunctionGraphType.NormalFunctionGraph
 
 		if il == FunctionGraphType.NormalFunctionGraph:
-			# TODO: be more platform agnostic
-			arch_dis = self.bv.arch
-			if arch_dis.name == 'armv7':
-				if self.adapter.reg_read('cpsr') & 0x20:
-					arch_dis = binaryninja.Architecture['thumb2']
-
+			arch_dis = self.remote_arch
 			addr = local_rip
 			sample = self.bv.read(addr, arch_dis.max_instr_length)
 			if not sample:
@@ -812,7 +822,7 @@ class DebuggerState:
 			local_ripnext = local_rip + inslen
 			remote_ripnext = remote_rip + inslen
 
-			llil = self.memory_view.arch.get_low_level_il_from_bytes(self.memory_view.read(remote_rip, self.memory_view.arch.max_instr_length), remote_rip)
+			llil = self.remote_arch.get_low_level_il_from_bytes(self.memory_view.read(remote_rip, self.remote_arch.max_instr_length), remote_rip)
 			call = llil.operation == LowLevelILOperation.LLIL_CALL
 
 			# Optimization: just use step into if this isn't a call

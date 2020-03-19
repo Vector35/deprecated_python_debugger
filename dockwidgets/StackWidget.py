@@ -76,13 +76,14 @@ class DebugStackModel(QAbstractItemModel):
 			return None
 
 		info = self.rows[index.row()]
+		debug_state = binjaplug.get_state(self.bv)
 
 		if role == Qt.DisplayRole:
 			# Format data into displayable text
 			column = self.columns[index.column()]
 			if column == "Value":
 				conts = info['value']
-				if self.bv.arch.endianness == binaryninja.Endianness.LittleEndian:
+				if debug_state.remote_arch.endianness == binaryninja.Endianness.LittleEndian:
 					conts = conts[::-1]
 				text = conts.hex()
 			elif column == "Offset":
@@ -115,6 +116,8 @@ class DebugStackModel(QAbstractItemModel):
 			return False
 
 		info = self.rows[index.row()]
+		debug_state = binjaplug.get_state(self.bv)
+
 		old_val = info['value']
 		# Need to take string be hex and turn into bytes in the correct endianness
 		if len(value) % 2 == 1:
@@ -123,7 +126,7 @@ class DebugStackModel(QAbstractItemModel):
 			new_val = bytes.fromhex(value)
 		except:
 			return False
-		if self.bv.arch.endianness == binaryninja.Endianness.LittleEndian:
+		if debug_state.remote_arch.endianness == binaryninja.Endianness.LittleEndian:
 			new_val = new_val[::-1]
 		new_val = new_val.ljust(len(old_val), b'\x00')
 		address = info['address']
@@ -132,7 +135,7 @@ class DebugStackModel(QAbstractItemModel):
 			return False
 
 		# Tell the debugger to update
-		memory_view = binjaplug.get_state(self.bv).memory_view
+		memory_view = debug_state.memory_view
 		memory_view.write(address, new_val)
 
 		# Update internal copy to show modification

@@ -104,19 +104,19 @@ class DebuggerUI:
 		stack_range = [-8, 60] # Inclusive
 		self.stack = []
 		for i in range(stack_range[0], stack_range[1] + 1):
-			offset = i * self.state.bv.arch.address_size
+			offset = i * self.state.remote_arch.address_size
 			if offset < 0 and stack_pointer < -offset:
 				# Address < 0
 				continue
 
 			address = stack_pointer + offset
-			value = self.state.memory_view.read(address, self.state.bv.arch.address_size)
-			if len(value) < self.state.bv.arch.address_size:
+			value = self.state.memory_view.read(address, self.state.remote_arch.address_size)
+			if len(value) < self.state.remote_arch.address_size:
 				# Cannot access this memory
 				continue
 
 			value_int = value
-			if self.state.bv.arch.endianness == Endianness.LittleEndian:
+			if self.state.remote_arch.endianness == Endianness.LittleEndian:
 				value_int = value_int[::-1]
 			value_int = int(value_int.hex(), 16)
 
@@ -179,7 +179,7 @@ class DebuggerUI:
 		if not function:
 			return
 		annotation = "At {}:\n\n".format(datetime.datetime.now().isoformat())
-		address_size = self.state.bv.arch.address_size
+		address_size = self.state.remote_arch.address_size
 		for reg in self.regs:
 			if address_size*8 == reg['bits']:
 				annotation += " {reg:>4} = {value:0{valuewidth}x}\n".format(reg=reg['name'], value=reg['value'], valuewidth=address_size*2)
@@ -242,7 +242,7 @@ class DebuggerUI:
 		remote_rip = self.state.ip
 		local_rip = self.state.local_ip
 
-		llil = self.state.memory_view.arch.get_low_level_il_from_bytes(self.state.memory_view.read(remote_rip, self.state.memory_view.arch.max_instr_length), remote_rip)
+		llil = self.state.remote_arch.get_low_level_il_from_bytes(self.state.memory_view.read(remote_rip, self.state.remote_arch.max_instr_length), remote_rip)
 		call = llil.operation == LowLevelILOperation.LLIL_CALL
 		jump = llil.operation == LowLevelILOperation.LLIL_JUMP or llil.operation == LowLevelILOperation.LLIL_JUMP_TO
 
@@ -293,7 +293,7 @@ class DebuggerUI:
 							if len(funcs) == 0:
 								raise Exception("Local rip is not at a function?")
 
-							funcs[0].set_user_indirect_branches(local_rip, [(self.state.bv.arch, local_target)])
+							funcs[0].set_user_indirect_branches(local_rip, [(self.state.remote_arch, local_target)])
 
 	def navigate_to_rip(self):
 		if not self.state.connected:
@@ -350,10 +350,7 @@ class DebuggerUI:
 		inst_count = 50
 
 		rip = self.state.ip
-		arch_dis = self.state.bv.arch
-		if arch_dis.name == 'armv7':
-			if self.state.adapter.reg_read('cpsr') & 0x20:
-				arch_dis = binaryninja.Architecture['thumb2']
+		arch_dis = self.state.remote_arch
 
 		# Assume the worst, just in case
 		read_length = arch_dis.max_instr_length * inst_count
