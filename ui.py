@@ -60,6 +60,12 @@ class DebuggerUI:
 			return
 
 		#----------------------------------------------------------------------
+		# Update Memory
+		#----------------------------------------------------------------------
+		self.state.update_memory_view()
+		self.memory_dirty()
+
+		#----------------------------------------------------------------------
 		# Update Registers
 		#----------------------------------------------------------------------
 		self.regs = []
@@ -138,12 +144,6 @@ class DebuggerUI:
 				'refs': refs
 			})
 		stack_widget.notifyStackChanged(self.stack)
-
-		#----------------------------------------------------------------------
-		# Update Memory
-		#----------------------------------------------------------------------
-		self.state.update_memory_view()
-		self.memory_dirty()
 
 		#----------------------------------------------------------------------
 		# Update Status
@@ -509,8 +509,7 @@ def cb_bp_toggle(bv, address):
 		else:
 			debug_state.breakpoints.add_offset(bv.file.original_filename, offset)
 			debug_state.ui.breakpoint_tag_add(address)
-	debug_state.ui.update_breakpoints()
-	debug_state.ui.context_display()
+	debug_state.ui.on_step()
 
 def valid_bp_toggle(bv, address):
 	return True

@@ -462,10 +462,12 @@ class DebuggerState:
 
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):
-		self.memory_view.mark_dirty()
-		self.modules.mark_dirty()
-		self.threads.mark_dirty()
 		self.registers.mark_dirty()
+		self.memory_view.mark_dirty()
+		self.threads.mark_dirty()
+		self.modules.mark_dirty()
+		if self.connected:
+			self.registers.update()
 
 	# Create symbols and variables for the memory view
 	def update_memory_view(self):
