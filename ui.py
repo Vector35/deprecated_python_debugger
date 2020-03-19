@@ -383,7 +383,7 @@ class DebuggerUI:
 			if i == 0:
 				if self.state.breakpoints.contains_absolute(rip + total_read):
 					# Breakpoint & pc
-					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.state.bv.tag_types["Crashes"].icon + ">", width=5))
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.get_breakpoint_tag_type().icon + ">", width=5))
 					color = HighlightStandardColor.RedHighlightColor
 				else:
 					# PC
@@ -392,7 +392,7 @@ class DebuggerUI:
 			else:
 				if self.state.breakpoints.contains_absolute(rip + total_read):
 					# Breakpoint
-					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.state.bv.tag_types["Crashes"].icon, width=5))
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.get_breakpoint_tag_type().icon, width=5))
 					color = HighlightStandardColor.RedHighlightColor
 				else:
 					# Regular line
@@ -444,11 +444,14 @@ class DebuggerUI:
 
 	def breakpoint_tag_add(self, local_address):
 		# create tag
-		tt = self.state.bv.tag_types["Crashes"]
+		tt = self.get_breakpoint_tag_type()
+
 		for func in self.state.bv.get_functions_containing(local_address):
-			tags = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
+			tags = [tag for tag in func.get_address_tags_at(local_address) if tag.type == tt]
 			if len(tags) == 0:
 				tag = func.create_user_address_tag(local_address, tt, "breakpoint")
+
+		self.context_display()
 
 	# breakpoint TAG removal - strictly presentation
 	# (doesn't remove actual breakpoints, just removes the binja tags that mark them)
@@ -457,13 +460,23 @@ class DebuggerUI:
 		if local_addresses == None:
 			local_addresses = [self.state.bv.start + offset for (module, offset) in self.state.breakpoints if module == self.state.bv.file.original_filename]
 
+		tt = self.get_breakpoint_tag_type()
+
 		for local_address in local_addresses:
 			# delete breakpoint tags from all functions containing this address
 			for func in self.state.bv.get_functions_containing(local_address):
 				func.set_auto_instr_highlight(local_address, HighlightStandardColor.NoHighlightColor)
-				delqueue = [tag for tag in func.get_address_tags_at(local_address) if tag.data == 'breakpoint']
+				delqueue = [tag for tag in func.get_address_tags_at(local_address) if tag.type == tt]
 				for tag in delqueue:
 					func.remove_user_address_tag(local_address, tag)
+
+		self.context_display()
+
+	def get_breakpoint_tag_type(self):
+		if "Breakpoints" in self.state.bv.tag_types:
+			return self.state.bv.tag_types["Breakpoints"]
+		else:
+			return self.state.bv.create_tag_type("Breakpoints", "🛑")
 
 	def on_stdout(self, output):
 		def on_stdout_main_thread(output):
