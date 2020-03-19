@@ -495,7 +495,7 @@ class DebuggerState:
 
 		# Special struct for stack frame
 		if self.bv.arch.name == 'x86_64':
-			width = reg_addrs['rbp'] - reg_addrs['rsp'] + self.bv.arch.address_size
+			width = self.registers['rbp'] - self.registers['rsp'] + self.bv.arch.address_size
 			if width > 0:
 				if width > 0x1000:
 					width = 0x1000
@@ -505,11 +505,11 @@ class DebuggerState:
 				for i in range(0, width, self.bv.arch.address_size):
 					var_name = "var_{:x}".format(width - i)
 					struct.insert(i, Type.pointer(self.bv.arch, Type.void()), var_name)
-				self.memory_view.define_data_var(reg_addrs['rsp'], Type.structure_type(struct))
-				self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, reg_addrs['rsp'], "$stack_frame", raw_name="$stack_frame"))
+				self.memory_view.define_data_var(self.registers['rsp'], Type.structure_type(struct))
+				self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, self.registers['rsp'], "$stack_frame", raw_name="$stack_frame"))
 
 				self.old_symbols.append(self.memory_view.get_symbol_by_raw_name("$stack_frame"))
-				self.old_dvs.add(reg_addrs['rsp'])
+				self.old_dvs.add(self.registers['rsp'])
 		else:
 			pass
 			# raise NotImplementedError('only x86_64 so far')
