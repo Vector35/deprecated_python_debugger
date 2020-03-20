@@ -5,9 +5,8 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, Q
 
 import threading
 
-import binaryninja
 import binaryninjaui
-from binaryninja import BinaryView, PythonScriptingInstance
+from binaryninja import BinaryView, PythonScriptingInstance, InstructionTextToken, InstructionTextTokenType, DisassemblyTextLine, LinearDisassemblyLine, LinearDisassemblyLineType, HighlightStandardColor
 from binaryninja.enums import InstructionTextTokenType
 from binaryninjaui import View, ViewType, UIAction, UIActionHandler, LinearView, DisassemblyContainer, ViewFrame, DockHandler, TokenizedTextView
 
@@ -16,7 +15,7 @@ from .. import binjaplug
 
 class DebugView(QWidget, View):
 	def __init__(self, parent, data):
-		if not type(data) == binaryninja.binaryview.BinaryView:
+		if not type(data) == BinaryView:
 			raise Exception('expected widget data to be a BinaryView')
 
 		self.bv = data
@@ -130,7 +129,17 @@ class DebugView(QWidget, View):
 		return binaryninjaui.getMonospaceFont(self)
 
 	def navigate(self, addr):
-		return self.binary_editor.getDisassembly().navigate(addr)
+		print("Navigate! {:x}".format(addr))
+
+		if self.debug_state.memory_view.is_local_addr(addr):
+			addr = self.debug_state.memory_view.remote_addr_to_local(addr)
+			if self.debug_state.bv.read(addr, 1) and len(self.debug_state.bv.get_functions_containing(addr)) > 0:
+				self.show_raw_disassembly(False)
+				return self.binary_editor.getDisassembly().navigate(addr)
+
+		self.show_raw_disassembly(True)
+		self.load_raw_disassembly(addr)
+		return True
 
 	def notifyMemoryChanged(self):
 		self.needs_update = True
@@ -144,7 +153,7 @@ class DebugView(QWidget, View):
 				self.memory_editor.navigate(0)
 				return
 
-			self.memory_editor.navigate(self.debug_state.stack_pointer)
+			# self.memory_editor.navigate(self.debug_state.stack_pointer)
 
 	def showEvent(self, event):
 		if not event.spontaneous():
@@ -161,10 +170,65 @@ class DebugView(QWidget, View):
 		else:
 			return True
 
-	def setRawDisassembly(self, raw=False, lines=[]):
-		if raw != self.is_raw_disassembly:
-			self.splitter.replaceWidget(0, self.disasm_widget if raw else self.bv_widget)
-			self.is_raw_disassembly = raw
+	def load_raw_disassembly(self, rip):
+		# Read a few instructions from rip and disassemble them
+		inst_count = 50
+
+		arch_dis = self.debug_state.remote_arch
+
+		# Assume the worst, just in case
+		read_length = arch_dis.max_instr_length * inst_count
+		data = self.debug_state.memory_view.read(rip, read_length)
+
+		lines = []
+
+		# Append header line
+		tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "(Code not backed by loaded file, showing only raw disassembly)")]
+		contents = DisassemblyTextLine(tokens, rip)
+		line = LinearDisassemblyLine(LinearDisassemblyLineType.BasicLineType, None, None, 0, contents)
+		lines.append(line)
+
+		total_read = 0
+		for i in range(inst_count):
+			line_addr = rip + total_read
+			(insn_tokens, length) = arch_dis.get_instruction_text(data[total_read:], line_addr)
+
+			if insn_tokens is None:
+				insn_tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "??")]
+				length = arch_dis.instr_alignment
+				if length == 0:
+					length = 1
+
+			tokens = []
+			color = HighlightStandardColor.NoHighlightColor
+			if i == 0:
+				if self.debug_state.breakpoints.contains_absolute(rip + total_read):
+					# Breakpoint & pc
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.get_breakpoint_tag_type().icon + ">", width=5))
+					color = HighlightStandardColor.RedHighlightColor
+				else:
+					# PC
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, " ==> "))
+					color = HighlightStandardColor.BlueHighlightColor
+			else:
+				if self.debug_state.breakpoints.contains_absolute(rip + total_read):
+					# Breakpoint
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.get_breakpoint_tag_type().icon, width=5))
+					color = HighlightStandardColor.RedHighlightColor
+				else:
+					# Regular line
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "     "))
+			# Address
+			tokens.append(InstructionTextToken(InstructionTextTokenType.AddressDisplayToken, hex(line_addr)[2:], line_addr))
+			tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "  "))
+			tokens.extend(insn_tokens)
+
+			# Convert to linear disassembly line
+			contents = DisassemblyTextLine(tokens, line_addr, color=color)
+			line = LinearDisassemblyLine(LinearDisassemblyLineType.CodeDisassemblyLineType, None, None, 0, contents)
+			lines.append(line)
+
+			total_read += length
 
 		# terrible workaround for libshiboken conversion issue
 		for line in lines:
@@ -177,6 +241,11 @@ class DebugView(QWidget, View):
 			last_tok.value &= 0x7FFFFFFFFFFFFFFF
 
 		self.binary_text.setLines(lines)
+
+	def show_raw_disassembly(self, raw):
+		if raw != self.is_raw_disassembly:
+			self.splitter.replaceWidget(0, self.disasm_widget if raw else self.bv_widget)
+			self.is_raw_disassembly = raw
 
 class DebugViewType(ViewType):
 	def __init__(self):

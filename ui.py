@@ -3,7 +3,7 @@ from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
 from binaryninja.plugin import PluginCommand
 import binaryninja
-from binaryninja import Endianness, HighlightStandardColor, LinearDisassemblyLine, LinearDisassemblyLineType, DisassemblyTextLine, InstructionTextToken, InstructionTextTokenType, execute_on_main_thread_and_wait, LowLevelILOperation, BinaryReader
+from binaryninja import Endianness, HighlightStandardColor, execute_on_main_thread_and_wait, LowLevelILOperation, BinaryReader
 from binaryninja.settings import Settings
 from binaryninja.log import log_warn, log_error, log_debug
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
@@ -296,18 +296,14 @@ class DebuggerUI:
 							funcs[0].set_user_indirect_branches(local_rip, [(self.state.remote_arch, local_target)])
 
 	def navigate_to_rip(self):
-		if not self.state.connected:
-			local_rip = self.state.bv.entry_point
-		else:
-			local_rip = self.state.local_ip
-		self.state.bv.navigate(self.state.bv.file.view, local_rip)
-
 		if self.debug_view is not None:
-			# select instruction currently at
-			if self.state.bv.read(local_rip, 1) and len(self.state.bv.get_functions_containing(local_rip)) > 0:
-				self.debug_view.setRawDisassembly(False)
+			if not self.state.connected:
+				rip = self.state.bv.entry_point
 			else:
-				self.update_raw_disassembly()
+				rip = self.state.ip
+
+			# select instruction currently at
+			self.debug_view.navigate(rip)
 
 	# Highlight lines
 	def update_highlights(self):
@@ -341,72 +337,6 @@ class DebuggerUI:
 		mods.sort(key=lambda row: row['address'])
 		modules_widget = self.widget('Modules')
 		modules_widget.notifyModulesChanged(mods)
-
-	def update_raw_disassembly(self):
-		if self.debug_view is None:
-			return
-
-		# Read a few instructions from rip and disassemble them
-		inst_count = 50
-
-		rip = self.state.ip
-		arch_dis = self.state.remote_arch
-
-		# Assume the worst, just in case
-		read_length = arch_dis.max_instr_length * inst_count
-		data = self.state.memory_view.read(rip, read_length)
-
-		lines = []
-
-		# Append header line
-		tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "(Code not backed by loaded file, showing only raw disassembly)")]
-		contents = DisassemblyTextLine(tokens, rip)
-		line = LinearDisassemblyLine(LinearDisassemblyLineType.BasicLineType, None, None, 0, contents)
-		lines.append(line)
-
-		total_read = 0
-		for i in range(inst_count):
-			line_addr = rip + total_read
-			(insn_tokens, length) = arch_dis.get_instruction_text(data[total_read:], line_addr)
-
-			if insn_tokens is None:
-				insn_tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "??")]
-				length = arch_dis.instr_alignment
-				if length == 0:
-					length = 1
-
-			tokens = []
-			color = HighlightStandardColor.NoHighlightColor
-			if i == 0:
-				if self.state.breakpoints.contains_absolute(rip + total_read):
-					# Breakpoint & pc
-					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.get_breakpoint_tag_type().icon + ">", width=5))
-					color = HighlightStandardColor.RedHighlightColor
-				else:
-					# PC
-					tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, " ==> "))
-					color = HighlightStandardColor.BlueHighlightColor
-			else:
-				if self.state.breakpoints.contains_absolute(rip + total_read):
-					# Breakpoint
-					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.get_breakpoint_tag_type().icon, width=5))
-					color = HighlightStandardColor.RedHighlightColor
-				else:
-					# Regular line
-					tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "     "))
-			# Address
-			tokens.append(InstructionTextToken(InstructionTextTokenType.AddressDisplayToken, hex(line_addr)[2:], line_addr))
-			tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, "  "))
-			tokens.extend(insn_tokens)
-
-			# Convert to linear disassembly line
-			contents = DisassemblyTextLine(tokens, line_addr, color=color)
-			line = LinearDisassemblyLine(LinearDisassemblyLineType.CodeDisassemblyLineType, None, None, 0, contents)
-			lines.append(line)
-
-			total_read += length
-
-		self.debug_view.setRawDisassembly(True, lines)
 
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):
