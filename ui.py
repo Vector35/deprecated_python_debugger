@@ -7,7 +7,7 @@ from binaryninja import Endianness, HighlightStandardColor, LinearDisassemblyLin
 from binaryninja.settings import Settings
 from binaryninja.log import log_warn, log_error, log_debug
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
-from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, MemoryWidget, ControlsWidget, DebugView, ConsoleWidget, ModulesWidget, widget
+from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, ControlsWidget, DebugView, ConsoleWidget, ModulesWidget, widget
 from . import binjaplug
 import datetime
 import traceback
