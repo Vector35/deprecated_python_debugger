@@ -65,6 +65,8 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		self.dll = CDLL(fpath)
 		if not self.dll:
 			raise DebugAdapter.GeneralError("loading %s" % fpath)
+		if self.dll.setup() != 0:
+			raise DebugAdapter.GeneralError("initializing %s" % fpath)
 
 		# keep mapping between addresses (DbgAdapter namespace) and breakpoint
 		# id's (dbgeng namespace)

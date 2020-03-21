@@ -694,6 +694,7 @@ int process_start(char *cmdline)
 
 	if(!g_Client) {
 		printf_debug("ERROR: interfaces not initialized\n");
+		rc = ERROR_NO_DBGENG_INTERFACES;
 		goto cleanup;
 	}
 
@@ -1189,74 +1190,96 @@ int get_last_breakpoint_address(uint64_t *addr)
 }
 
 /*****************************************************************************/
-/* ENTRYPOINT */
+/* INITIALIZATION, ENTRYPOINT */
 /*****************************************************************************/
+
+EASY_CTYPES_SPEC
+int setup(void)
+{
+	int rc = ERROR_UNSPECIFIED;
+	HRESULT hResult;
+
+	printf_debug("setup()\n");
+
+	hResult = DebugCreate(__uuidof(IDebugClient), (void **)&g_Client);
+	if(hResult != S_OK)
+	{
+		printf_debug("ERROR: getting IDebugClient\n");
+		goto cleanup;
+	}
+
+	if ((hResult = g_Client->QueryInterface(__uuidof(IDebugControl), (void**)&g_Control)) != S_OK ||
+		(hResult = g_Client->QueryInterface(__uuidof(IDebugDataSpaces), (void**)&g_Data)) != S_OK ||
+		(hResult = g_Client->QueryInterface(__uuidof(IDebugRegisters), (void**)&g_Registers)) != S_OK ||
+		(hResult = g_Client->QueryInterface(__uuidof(IDebugSymbols), (void**)&g_Symbols)) != S_OK ||
+		(hResult = g_Client->QueryInterface(__uuidof(IDebugSystemObjects), (void**)&g_Objects)) != S_OK)
+	{
+		printf_debug("ERROR: getting client debugging interface\n");
+		goto cleanup;
+	}
+
+	if ((hResult = g_Client->SetEventCallbacks(&g_EventCb)) != S_OK)
+	{
+		printf_debug("ERROR: registering event callbacks\n");
+		goto cleanup;
+	}
+
+	rc = 0;
+	cleanup:
+	return rc;
+}
+
+EASY_CTYPES_SPEC
+int teardown(void)
+{
+	printf_debug("teardown()\n");
+
+	if (g_Control != NULL) {
+		g_Control->Release();
+		g_Control = NULL;
+	}
+
+	if (g_Data != NULL) {
+		g_Data->Release();
+		g_Data = NULL;
+	}
+
+	if (g_Registers != NULL) {
+		g_Registers->Release();
+		g_Registers = NULL;
+	}
+
+	if (g_Symbols != NULL) {
+		g_Symbols->Release();
+		g_Symbols = NULL;
+	}
+
+	if (g_Objects != NULL) {
+		g_Objects->Release();
+		g_Objects = NULL;
+	}
+
+	if (g_Client != NULL) {
+		g_Client->EndSession(DEBUG_END_PASSIVE);
+		g_Client->Release();
+		g_Client = NULL;
+	}
+
+	return 0;
+}
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
-	// see https://docs.microsoft.com/en-us/windows/win32/dlls/dllmain
-
-	int rc = false;
-	HRESULT hResult;
-
-	switch(fdwReason)
-	{
-		case DLL_PROCESS_ATTACH:
-			printf_debug("DLL_PROCESS_ATTACH: creating debug interfaces\n");
-
-			hResult = DebugCreate(__uuidof(IDebugClient), (void **)&g_Client);
-
-			if(hResult != S_OK)
-			{
-				printf_debug("ERROR: getting IDebugClient\n");
-				goto cleanup;
-			}
-
-			if ((hResult = g_Client->QueryInterface(__uuidof(IDebugControl), (void**)&g_Control)) != S_OK ||
-				(hResult = g_Client->QueryInterface(__uuidof(IDebugDataSpaces), (void**)&g_Data)) != S_OK ||
-				(hResult = g_Client->QueryInterface(__uuidof(IDebugRegisters), (void**)&g_Registers)) != S_OK ||
-				(hResult = g_Client->QueryInterface(__uuidof(IDebugSymbols), (void**)&g_Symbols)) != S_OK ||
-				(hResult = g_Client->QueryInterface(__uuidof(IDebugSystemObjects), (void**)&g_Objects)) != S_OK)
-			{
-				printf_debug("ERROR: getting client debugging interface\n");
-				goto cleanup;
-			}
-
-			if ((hResult = g_Client->SetEventCallbacks(&g_EventCb)) != S_OK)
-			{
-				printf_debug("ERROR: registering event callbacks\n");
-				goto cleanup;
-			}
-
-			printf_debug("debug interfaces created\n");
+	switch(fdwReason) {
+		case DLL_PROCESS_DETACH:
+			printf_debug("DLL_PROCESS_DETACH\n");
+			teardown();
 			break;
 
-		case DLL_PROCESS_DETACH:
-			printf_debug("DLL_PROCESS_DETACH: freeing debug interfaces\n");
-
-			if (g_Control != NULL)
-				g_Control->Release();
-
-			if (g_Data != NULL)
-				g_Data->Release();
-
-			if (g_Registers != NULL)
-				g_Registers->Release();
-
-			if (g_Symbols != NULL)
-				g_Symbols->Release();
-
-			if (g_Objects != NULL)
-				g_Objects->Release();
-
-			if (g_Client != NULL)
-			{
-				g_Client->EndSession(DEBUG_END_PASSIVE);
-				g_Client->Release();
-			}
-
-			printf_debug("debug interfaces freed\n");
-
+		case DLL_PROCESS_ATTACH:
+			printf_debug("DLL_PROCESS_ATTACH\n");
+			/* do NOT initialize here, user should call setup() */
+			/* SEE: https://docs.microsoft.com/en-us/windows/win32/dlls/dllmain */
 			break;
 
 		case DLL_THREAD_ATTACH:
@@ -1272,17 +1295,6 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 			break;
 	}
 
-	rc = true;
-	cleanup:
-	return rc;
+	return true;
 }
 
-EASY_CTYPES_SPEC
-int teardown(void)
-{
-	int rc = ERROR_UNSPECIFIED;
-
-	rc = 0;
-	cleanup:
-	return rc;
-}
