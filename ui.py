@@ -6,7 +6,7 @@ import binaryninja
 from binaryninja import Endianness, HighlightStandardColor, execute_on_main_thread_and_wait, LowLevelILOperation, BinaryReader
 from binaryninja.settings import Settings
 from binaryninja.log import log_warn, log_error, log_debug
-from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType
+from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType, ViewFrame
 from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, ThreadsWidget, ControlsWidget, DebugView, ConsoleWidget, ModulesWidget, widget
 from . import binjaplug
 import datetime
@@ -303,7 +303,8 @@ class DebuggerUI:
 				rip = self.state.ip
 
 			# select instruction currently at
-			self.debug_view.navigate(rip)
+			frame = ViewFrame.viewFrameForWidget(self.debug_view)
+			frame.navigate(self.state.bv, rip, True, True)
 
 	# Highlight lines
 	def update_highlights(self):

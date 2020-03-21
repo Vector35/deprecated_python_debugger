@@ -8,12 +8,20 @@ import threading
 import binaryninjaui
 from binaryninja import BinaryView, PythonScriptingInstance, InstructionTextToken, InstructionTextTokenType, DisassemblyTextLine, LinearDisassemblyLine, LinearDisassemblyLineType, HighlightStandardColor
 from binaryninja.enums import InstructionTextTokenType
-from binaryninjaui import View, ViewType, UIAction, UIActionHandler, LinearView, DisassemblyContainer, ViewFrame, DockHandler, TokenizedTextView
+from binaryninjaui import View, ViewType, UIAction, UIActionHandler, LinearView, DisassemblyContainer, ViewFrame, DockHandler, TokenizedTextView, HistoryEntry
 
 from . import widget, ControlsWidget
 from .. import binjaplug
 
 class DebugView(QWidget, View):
+	class DebugViewHistoryEntry(HistoryEntry):
+		def __init__(self, is_memory, address, is_raw):
+			HistoryEntry.__init__(self)
+
+			self.is_memory = is_memory
+			self.address = address
+			self.is_raw = is_raw
+
 	def __init__(self, parent, data):
 		if not type(data) == BinaryView:
 			raise Exception('expected widget data to be a BinaryView')
@@ -40,6 +48,7 @@ class DebugView(QWidget, View):
 
 		self.binary_text = TokenizedTextView(self, memory_view)
 		self.is_raw_disassembly = False
+		self.raw_address = 0
 
 		# TODO: Handle these and change views accordingly
 		# Currently they are just disabled as the DisassemblyContainer gets confused
@@ -123,20 +132,52 @@ class DebugView(QWidget, View):
 		return self.bv
 
 	def getCurrentOffset(self):
+		if self.is_raw_disassembly:
+			return self.raw_address
 		return self.binary_editor.getDisassembly().getCurrentOffset()
+
+	def getHistoryEntry(self):
+		if self.is_raw_disassembly and self.debug_state.connected:
+			address = self.raw_address
+			module = self.debug_state.modules.get_module_for_addr(address)
+			modstart = self.debug_state.modules[module]
+			relative_address = address - modstart
+			return DebugView.DebugViewHistoryEntry(False, (module, relative_address), True)
+		else:
+			address = self.binary_editor.getDisassembly().getCurrentOffset()
+			return DebugView.DebugViewHistoryEntry(False, address, False)
 
 	def getFont(self):
 		return binaryninjaui.getMonospaceFont(self)
 
-	def navigate(self, addr):
-		print("Navigate! {:x}".format(addr))
+	def navigateToHistoryEntry(self, entry):
+		if hasattr(entry, 'is_raw'):
+			if entry.is_memory:
+				self.memory_editor.navigate(entry.address)
+			else:
+				if entry.is_raw:
+					if self.debug_state.connected:
+						module, relative_address = entry.address
+						address = self.debug_state.modules[module] + relative_address
+						self.navigate_raw(address)
+				else:
+					self.navigate_live(entry.address)
 
+		View.navigateToHistoryEntry(self, entry)
+
+	def navigate(self, addr):
 		if self.debug_state.memory_view.is_local_addr(addr):
 			addr = self.debug_state.memory_view.remote_addr_to_local(addr)
 			if self.debug_state.bv.read(addr, 1) and len(self.debug_state.bv.get_functions_containing(addr)) > 0:
-				self.show_raw_disassembly(False)
-				return self.binary_editor.getDisassembly().navigate(addr)
+				return self.navigate_live(addr)
+		return self.navigate_raw(addr)
 
+	def navigate_live(self, addr):
+		self.show_raw_disassembly(False)
+		return self.binary_editor.getDisassembly().navigate(addr)
+
+	def navigate_raw(self, addr):
+		self.raw_address = addr
 		self.show_raw_disassembly(True)
 		self.load_raw_disassembly(addr)
 		return True
@@ -170,27 +211,28 @@ class DebugView(QWidget, View):
 		else:
 			return True
 
-	def load_raw_disassembly(self, rip):
+	def load_raw_disassembly(self, start_ip):
 		# Read a few instructions from rip and disassemble them
 		inst_count = 50
 
 		arch_dis = self.debug_state.remote_arch
+		rip = self.debug_state.ip
 
 		# Assume the worst, just in case
 		read_length = arch_dis.max_instr_length * inst_count
-		data = self.debug_state.memory_view.read(rip, read_length)
+		data = self.debug_state.memory_view.read(start_ip, read_length)
 
 		lines = []
 
 		# Append header line
 		tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "(Code not backed by loaded file, showing only raw disassembly)")]
-		contents = DisassemblyTextLine(tokens, rip)
+		contents = DisassemblyTextLine(tokens, start_ip)
 		line = LinearDisassemblyLine(LinearDisassemblyLineType.BasicLineType, None, None, 0, contents)
 		lines.append(line)
 
 		total_read = 0
 		for i in range(inst_count):
-			line_addr = rip + total_read
+			line_addr = start_ip + total_read
 			(insn_tokens, length) = arch_dis.get_instruction_text(data[total_read:], line_addr)
 
 			if insn_tokens is None:
@@ -201,8 +243,8 @@ class DebugView(QWidget, View):
 
 			tokens = []
 			color = HighlightStandardColor.NoHighlightColor
-			if i == 0:
-				if self.debug_state.breakpoints.contains_absolute(rip + total_read):
+			if line_addr == rip:
+				if self.debug_state.breakpoints.contains_absolute(start_ip + total_read):
 					# Breakpoint & pc
 					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.get_breakpoint_tag_type().icon + ">", width=5))
 					color = HighlightStandardColor.RedHighlightColor
@@ -211,7 +253,7 @@ class DebugView(QWidget, View):
 					tokens.append(InstructionTextToken(InstructionTextTokenType.TextToken, " ==> "))
 					color = HighlightStandardColor.BlueHighlightColor
 			else:
-				if self.debug_state.breakpoints.contains_absolute(rip + total_read):
+				if self.debug_state.breakpoints.contains_absolute(start_ip + total_read):
 					# Breakpoint
 					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.get_breakpoint_tag_type().icon, width=5))
 					color = HighlightStandardColor.RedHighlightColor
