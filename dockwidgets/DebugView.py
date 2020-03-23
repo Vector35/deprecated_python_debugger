@@ -132,9 +132,39 @@ class DebugView(QWidget, View):
 		return self.bv
 
 	def getCurrentOffset(self):
-		if self.is_raw_disassembly:
-			return self.raw_address
-		return self.binary_editor.getDisassembly().getCurrentOffset()
+		if not self.is_raw_disassembly:
+			return self.binary_editor.getDisassembly().getCurrentOffset()
+		return self.raw_address
+
+	def getSelectionOffsets(self):
+		if not self.is_raw_disassembly:
+			return self.binary_editor.getDisassembly().getSelectionOffsets()
+		return (self.raw_address, self.raw_address)
+
+	def getCurrentFunction(self):
+		if not self.is_raw_disassembly:
+			return self.binary_editor.getDisassembly().getCurrentFunction()
+		return None
+
+	def getCurrentBasicBlock(self):
+		if not self.is_raw_disassembly:
+			return self.binary_editor.getDisassembly().getCurrentBasicBlock()
+		return None
+
+	def getCurrentArchitecture(self):
+		if not self.is_raw_disassembly:
+			return self.binary_editor.getDisassembly().getCurrentArchitecture()
+		return None
+
+	def getCurrentLowLevelILFunction(self):
+		if not self.is_raw_disassembly:
+			return self.binary_editor.getDisassembly().getCurrentLowLevelILFunction()
+		return None
+
+	def getCurrentMediumLevelILFunction(self):
+		if not self.is_raw_disassembly:
+			return self.binary_editor.getDisassembly().getCurrentMediumLevelILFunction()
+		return None
 
 	def getHistoryEntry(self):
 		if self.is_raw_disassembly and self.debug_state.connected:
