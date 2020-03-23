@@ -36,9 +36,9 @@ class DebugConsoleWidget(QWidget, DockContextHandler):
 		self.consoleEntry = QLineEdit(self)
 		inputLayout.addWidget(self.consoleEntry, 1)
 
-		label = QLabel("dbg>>> ", self)
-		label.setFont(getMonospaceFont(self))
-		promptLayout.addWidget(label)
+		self.entryLabel = QLabel("dbg>>> ", self)
+		self.entryLabel.setFont(getMonospaceFont(self))
+		promptLayout.addWidget(self.entryLabel)
 		promptLayout.addStretch(1)
 
 		self.consoleEntry.returnPressed.connect(lambda: self.sendLine())
@@ -51,7 +51,17 @@ class DebugConsoleWidget(QWidget, DockContextHandler):
 	def sizeHint(self):
 		return QSize(300, 100)
 
+	def canWrite(self):
+		debug_state = binjaplug.get_state(self.bv)
+		try:
+			return debug_state.adapter.stdin_is_writable()
+		except:
+			return False
+
 	def sendLine(self):
+		if not self.canWrite():
+			return
+
 		line = self.consoleEntry.text()
 		self.consoleEntry.setText("")
 
@@ -70,14 +80,21 @@ class DebugConsoleWidget(QWidget, DockContextHandler):
 		cursor.movePosition(QTextCursor.End)
 		self.consoleText.setTextCursor(cursor)
 
+		self.updateEnabled()
+
+	def updateEnabled(self):
+		enabled = self.canWrite()
+		self.consoleEntry.setEnabled(enabled)
+		self.entryLabel.setText("stdin>>> " if enabled else "stdin (unavailable) ")
+
 	#--------------------------------------------------------------------------
 	# callbacks to us api/ui/dockhandler.h
 	#--------------------------------------------------------------------------
 	def notifyOffsetChanged(self, offset):
-		pass
+		self.updateEnabled()
 
 	def notifyViewChanged(self, view_frame):
-		pass
+		self.updateEnabled()
 
 	def contextMenuEvent(self, event):
 		self.m_contextMenuManager.show(self.m_menu, self.actionHandler)
