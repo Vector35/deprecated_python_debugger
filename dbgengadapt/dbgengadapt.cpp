@@ -700,11 +700,13 @@ int process_start(char *cmdline)
 
 	if(g_Control->SetEngineOptions(DEBUG_ENGOPT_INITIAL_BREAK) != S_OK) {
 		printf_debug("ERROR: SetEngineOptions()\n");
+		rc = ERROR_DBGENG_API;
 		goto cleanup;
 	}
 
 	if(g_Client->CreateProcess(0, cmdline, DEBUG_ONLY_THIS_PROCESS) != S_OK) {
 		printf_debug("ERROR: creating debug process\n");
+		rc = ERROR_DBGENG_API;
 		goto cleanup;
 	}
 

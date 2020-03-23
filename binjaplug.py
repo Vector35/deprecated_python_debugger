@@ -1,6 +1,7 @@
 import os
 import re
 import time
+import platform
 
 import binaryninja
 from binaryninja import BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation
@@ -177,8 +178,6 @@ class DebuggerModules:
 	@property
 	def current(self):
 		fpath_exe = self.state.bv.file.original_filename
-		if isinstance(self.state.adapter, dbgeng.DebugAdapterDbgeng):
-			fpath_exe = fpath_exe.replace('/', '\\')
 
 		for (mod, base) in self:
 			if mod == fpath_exe:
@@ -385,6 +384,10 @@ class DebuggerState:
 		self.memory_view = ProcessView.DebugProcessView(bv)
 		self.old_symbols = []
 		self.old_dvs = set()
+
+		# ensure bv path adheres to OS convention
+		if platform.system() == 'Windows':
+			self.bv.file.original_filename = self.bv.file.original_filename.replace('/', '\\')
 
 		def get_metadata(key, default):
 			try:

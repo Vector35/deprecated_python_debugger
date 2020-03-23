@@ -125,14 +125,11 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 			iptr = self.reg_read('eip' if self.arch==32 else 'rip')
 
 			bpaddr = self.get_last_breakpoint_address()
-			print('bpaddr: 0x%X' % bpaddr)
 			if bpaddr == iptr:
 				return (DebugAdapter.STOP_REASON.BREAKPOINT, 0)
 
 			(ExceptionCode, ExceptionFlags, ExceptionRecord, ExceptionAddress, NumberParameters) = \
 				self.get_last_exception_info()
-			print('iptr: 0x%X' % iptr)
-			print('ExceptionAddress: 0x%X' % ExceptionAddress)
 			if ExceptionAddress == iptr:
 				lookup = {
 					WINNT_STATUS.STATUS_BREAKPOINT.value: DebugAdapter.STOP_REASON.BREAKPOINT,
@@ -189,8 +186,8 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		self.arch = self.pe_get_arch(fpath)
 
 		# ask dll to create process
-		cmdline = create_string_buffer(cmdline.encode('utf-8'))
-		rc = self.dll.process_start(cmdline)
+		cmdline_ = create_string_buffer(cmdline.encode('utf-8'))
+		rc = self.dll.process_start(cmdline_)
 		if rc:
 			raise Exception('unable to launch "%s", dbgeng adapter returned %d' % (cmdline, rc))
 
