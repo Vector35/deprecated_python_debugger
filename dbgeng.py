@@ -275,6 +275,8 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 	# registers
 	def reg_read(self, name):
+		if name == 'rflags' or name == 'eflags':
+			name='efl'
 		val = c_ulonglong()
 		if self.dll.reg_read(c_char_p(name.encode('utf-8')), byref(val)) != 0:
 			raise DebugAdapter.GeneralError("reading register %s" % name)

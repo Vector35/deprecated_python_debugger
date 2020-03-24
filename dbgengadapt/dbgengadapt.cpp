@@ -66,13 +66,13 @@ IDebugSystemObjects *g_Objects = NULL;
 
 EXCEPTION_RECORD64 g_last_exception64 = {0};
 uint64_t g_last_breakpoint = 0;
+ULONG64 g_image_base;
 
 ULONG lastSessionStatus = DEBUG_SESSION_FAILURE;
 bool b_PROCESS_CREATED = false;
 bool b_PROCESS_EXITED = false;
 bool b_AT_LEAST_ONE_BREAKPOINT = false;
 ULONG process_exit_code;
-ULONG64 image_base;
 
 /* forward declarations */
 void status_to_str(ULONG status, char *str);
@@ -84,7 +84,7 @@ void status_to_str(ULONG status, char *str);
 	printf(asd123); \
 }
 
-#define printf_debug(x, ...) while(0);
+//#define printf_debug(x, ...) while(0);
 
 /*****************************************************************************/
 /* EVENT CALLBACKS */
@@ -270,7 +270,7 @@ STDMETHOD(CreateProcess)(
 	printf_debug("       ModuleName=\"%s\"\n", ModuleName);
 	printf_debug("        ImageName=\"%s\"\n", ImageName);
 
-	image_base = BaseOffset;
+	g_image_base = BaseOffset;
 	b_PROCESS_CREATED = true;
 
 	UNREFERENCED_PARAMETER(ImageFileHandle);
