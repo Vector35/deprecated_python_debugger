@@ -72,7 +72,7 @@ ULONG lastSessionStatus = DEBUG_SESSION_FAILURE;
 bool b_PROCESS_CREATED = false;
 bool b_PROCESS_EXITED = false;
 bool b_AT_LEAST_ONE_BREAKPOINT = false;
-ULONG process_exit_code;
+ULONG g_process_exit_code;
 
 /* forward declarations */
 void status_to_str(ULONG status, char *str);
@@ -84,7 +84,7 @@ void status_to_str(ULONG status, char *str);
 	printf(asd123); \
 }
 
-//#define printf_debug(x, ...) while(0);
+#define printf_debug(x, ...) while(0);
 
 /*****************************************************************************/
 /* EVENT CALLBACKS */
@@ -297,7 +297,7 @@ STDMETHOD(ExitProcess)(
 	printf_debug("EventCallbacks::ExitProcess(ExitCode=%d)\n", ExitCode);
 
 	b_PROCESS_EXITED = true;
-	process_exit_code = ExitCode;
+	g_process_exit_code = ExitCode;
 
 	return DEBUG_STATUS_NO_CHANGE;
 }
@@ -1128,7 +1128,7 @@ int get_exit_code(unsigned long *code)
 		return ERROR_UNSPECIFIED;
 	}
 
-	*code = process_exit_code;
+	*code = g_process_exit_code;
 	return 0;
 }
 
