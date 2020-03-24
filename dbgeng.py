@@ -223,16 +223,10 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		return pid.value
 
 	def target_base(self):
-		lookup = self.mem_modules()
-
-		if self.target_path_ in lookup:
-			return lookup[self.target_path_]
-
-		tmp = os.path.basename(self.target_path_)
-		if tmp in lookup:
-			return lookup[tmp]
-
-		raise DebugAdapter.GeneralError("locating target in module list")
+		base = c_ulonglong();
+		if self.dll.get_image_base(byref(base)) != 0:
+			raise DebugAdapter.GeneralError("retrieving image base")
+		return base.value
 
 	# threads
 	def thread_list(self):

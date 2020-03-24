@@ -1181,6 +1181,13 @@ int get_pid(ULONG *pid)
 }
 
 EASY_CTYPES_SPEC
+int get_image_base(ULONGLONG *base)
+{
+	*base = g_image_base;
+	return 0;
+}
+
+EASY_CTYPES_SPEC
 int get_exception_record64(EXCEPTION_RECORD64 *result)
 {
 	*result = g_last_exception64;
