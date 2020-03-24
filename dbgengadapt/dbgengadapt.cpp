@@ -1175,7 +1175,7 @@ int get_number_threads(void)
 EASY_CTYPES_SPEC
 int get_pid(ULONG *pid)
 {
-	if(g_Objects->GetCurrentProcessId(pid) != S_OK)
+	if(g_Objects->GetCurrentProcessSystemId(pid) != S_OK)
 		return ERROR_UNSPECIFIED;
 	return 0;
 }
