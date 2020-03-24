@@ -22,7 +22,6 @@ import debugger.DebugAdapter as DebugAdapter
 (RED, GREEN, BROWN, NORMAL) = (utils.RED, utils.GREEN, utils.BROWN, utils.NORMAL)
 
 # globals
-arch = None
 adapter = None
 context_last = {}
 
@@ -31,7 +30,7 @@ context_last = {}
 #--------------------------------------------------------------------------
 
 def get_arch_dis():
-	global arch
+	arch = adapter.target_arch()
 
 	if arch in ['x86', 'x86_64', 'aarch64']:
 		return arch
@@ -84,19 +83,18 @@ def cpsr_tostr(cpsr):
 	return result
 
 def context_display(pkt_T=None):
-	global arch
 	global adapter
 	global context_last
 
 	tid = adapter.thread_selected()
 	print('thread 0x%X:' % tid)
 
-
 	def r(reg, fmt='%016X'):
 		return (BROWN+reg+NORMAL+'='+fmt) % adapter.reg_read(reg.strip())
 	def e(reg, fmt='%08X'):
 		return (BROWN+reg+NORMAL+'='+fmt) % adapter.reg_read(reg.strip())
 
+	arch = adapter.target_arch()
 	if arch == 'x86_64':
 		print(r('rax'), r('rbx'), r('rcx'), r('rdx'))
 		print(r('rsi'), r('rdi'), r('rbp'), r('rsp'))

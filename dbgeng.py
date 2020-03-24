@@ -122,7 +122,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		self.stop_reason_fallback = False
 
 		if status == DEBUG_STATUS.BREAK:
-			iptr = self.reg_read('eip' if self.arch=='x86' else 'rip')
+			iptr = self.reg_read('eip' if self.target_arch() =='x86' else 'rip')
 
 			bpaddr = self.get_last_breakpoint_address()
 			if bpaddr == iptr:
@@ -154,21 +154,6 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		# otherwise just return the numeric value of the status
 		return (DebugAdapter.STOP_REASON.UNKNOWN, status.value)
 
-	def pe_get_arch(self, fpath):
-		with open(fpath, 'rb') as fp:
-			data = fp.read()
-
-		if data[0:2] != b'\x4d\x5a':
-			raise DebugAdapter.GeneralError('%s doesnt start with MZ, is it a PE?' % fpath)
-
-		e_lfanew = unpack('<I', data[0x3C:0x40])[0]
-		if data[e_lfanew:e_lfanew+6] == b'\x50\x45\x00\x00\x64\x86':
-			return 'x86_64'
-		elif data[e_lfanew:e_lfanew+6] == b'\x50\x45\x00\x00\x4c\x01':
-			return 'x86'
-		else:
-			raise DebugAdapter.GeneralError('%s has no 32/64 bit indicator' % fpath)
-
 	#--------------------------------------------------------------------------
 	# API
 	#--------------------------------------------------------------------------
@@ -183,9 +168,6 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		if args:
 			cmdline += ' ' + ' '.join(args)
 
-		# set arch
-		self.target_arch_ = self.pe_get_arch(fpath)
-
 		# ask dll to create process
 		cmdline_ = c_char_p(cmdline.encode('utf-8'))
 		rc = self.dll.process_start(cmdline_)
@@ -195,9 +177,6 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		self.target_path_ = fpath
 
 	def attach(self, pid):
-		# TODO: sense if PID is 32
-		self.target_arch_ = 64
-
 		if self.dll.process_attach(target):
 			raise Exception('unable to attach to pid %d' % pid)
 
@@ -211,7 +190,21 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 	# target info
 	def target_arch(self):
-		return self.target_arch_
+		proc_type = c_ulong()
+		if self.dll.get_executing_processor_type(byref(proc_type)) != 0:
+			raise Exception('unable to get executing processor type')
+		proc_type = proc_type.value
+
+		#IMAGE_FILE_MACHINE_I386 	x86 architecture
+		if proc_type == 0x014c:
+			return 'x86'
+		#IMAGE_FILE_MACHINE_AMD64 	x64 architecture
+		if proc_type == 0x8664:
+			return 'x86_64'
+		#IMAGE_FILE_MACHINE_ARM 	ARM architecture
+		#IMAGE_FILE_MACHINE_IA64 	Intel Itanium architecture
+		#IMAGE_FILE_MACHINE_EBC 	EFI byte code architecture
+		raise Exception('unsupported processor type 0x%X' % proc_type)
 
 	def target_path(self):
 		return self.target_path_

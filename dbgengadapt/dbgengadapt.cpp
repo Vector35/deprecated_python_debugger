@@ -1180,6 +1180,33 @@ int get_pid(ULONG *pid)
 	return 0;
 }
 
+/* current processor type (may switch between 64 and 32 in WoW64) */
+EASY_CTYPES_SPEC
+int get_executing_processor_type(ULONG *proc_type)
+{
+	if(g_Control->GetExecutingProcessorType(proc_type) != S_OK)
+		return ERROR_UNSPECIFIED;
+	return 0;
+}
+
+/* processor the target image uses */
+EASY_CTYPES_SPEC
+int get_effective_processor_type(ULONG *proc_type)
+{
+	if(g_Control->GetEffectiveProcessorType(proc_type) != S_OK)
+		return ERROR_UNSPECIFIED;
+	return 0;
+}
+
+/* physical processor on the machine running the target */
+EASY_CTYPES_SPEC
+int get_actual_processor_type(ULONG *proc_type)
+{
+	if(g_Control->GetEffectiveProcessorType(proc_type) != S_OK)
+		return ERROR_UNSPECIFIED;
+	return 0;
+}
+
 EASY_CTYPES_SPEC
 int get_image_base(ULONGLONG *base)
 {
