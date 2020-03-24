@@ -648,11 +648,6 @@ int hello(void)
 	printf_debug("number threads: %d\n", a);
 	printf_debug("total threads: %d\n", b);
 
-	if(g_Objects->GetTotalNumberThreads(&a, &b) != S_OK) {
-		printf_debug("ERROR: GetTotalNumberThreads()\n");
-		goto cleanup;
-	}
-
 	if(g_Objects->GetCurrentThreadId(&a) != S_OK) {
 		printf_debug("ERROR: GetCurrentThread()\n");
 		goto cleanup;
@@ -1004,7 +999,7 @@ int reg_read(char *name, uint64_t *result)
 	DEBUG_VALUE dv;
 
 	if(g_Registers->GetIndexByName(name, &reg_index) != S_OK) {
-		printf_debug("ERROR: GetIndexByName()\n");
+		printf_debug("ERROR: GetIndexByName(\"%s\")\n", name);
 		goto cleanup;
 	}
 
@@ -1029,7 +1024,7 @@ int reg_write(char *name, uint64_t value)
 	DEBUG_VALUE dv;
 
 	if(g_Registers->GetIndexByName(name, &reg_index) != S_OK) {
-		printf_debug("ERROR: GetIndexByName()\n");
+		printf_debug("ERROR: GetIndexByName(\"%s\")\n", name);
 		goto cleanup;
 	}
 	printf_debug("The value of register %s is %d\n", name, reg_index);
@@ -1177,6 +1172,14 @@ int get_number_threads(void)
 }
 
 /* misc */
+EASY_CTYPES_SPEC
+int get_pid(ULONG *pid)
+{
+	if(g_Objects->GetCurrentProcessId(pid) != S_OK)
+		return ERROR_UNSPECIFIED;
+	return 0;
+}
+
 EASY_CTYPES_SPEC
 int get_exception_record64(EXCEPTION_RECORD64 *result)
 {

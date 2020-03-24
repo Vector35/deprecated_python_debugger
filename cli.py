@@ -207,7 +207,7 @@ if __name__ == '__main__':
 			raise Exception('file not found: %s' % arg1)
 
 		adapter = DebugAdapter.get_adapter_for_current_system()
-		adapter.exec(arg1)
+		adapter.exec(arg1, '')
 
 	arch = adapter.target_arch()
 

@@ -122,7 +122,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		self.stop_reason_fallback = False
 
 		if status == DEBUG_STATUS.BREAK:
-			iptr = self.reg_read('eip' if self.arch==32 else 'rip')
+			iptr = self.reg_read('eip' if self.arch=='x86' else 'rip')
 
 			bpaddr = self.get_last_breakpoint_address()
 			if bpaddr == iptr:
@@ -163,9 +163,9 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 		e_lfanew = unpack('<I', data[0x3C:0x40])[0]
 		if data[e_lfanew:e_lfanew+6] == b'\x50\x45\x00\x00\x64\x86':
-			return 64
+			return 'x86_64'
 		elif data[e_lfanew:e_lfanew+6] == b'\x50\x45\x00\x00\x4c\x01':
-			return 32
+			return 'x86'
 		else:
 			raise DebugAdapter.GeneralError('%s has no 32/64 bit indicator' % fpath)
 
@@ -178,22 +178,25 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		# form command line
 		if '/' in fpath:
 			fpath = fpath.replace('/', '\\')
+
 		cmdline = fpath
 		if args:
 			cmdline += ' ' + ' '.join(args)
 
 		# set arch
-		self.arch = self.pe_get_arch(fpath)
+		self.target_arch_ = self.pe_get_arch(fpath)
 
 		# ask dll to create process
-		cmdline_ = create_string_buffer(cmdline.encode('utf-8'))
+		cmdline_ = c_char_p(cmdline.encode('utf-8'))
 		rc = self.dll.process_start(cmdline_)
 		if rc:
 			raise Exception('unable to launch "%s", dbgeng adapter returned %d' % (cmdline, rc))
 
+		self.target_path_ = fpath
+
 	def attach(self, pid):
 		# TODO: sense if PID is 32
-		self.arch = 64
+		self.target_arch_ = 64
 
 		if self.dll.process_attach(target):
 			raise Exception('unable to attach to pid %d' % pid)
@@ -205,6 +208,31 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	def quit(self):
 		self.dll.quit()
 		pass
+
+	# target info
+	def target_arch(self):
+		return self.target_arch_
+
+	def target_path(self):
+		return self.target_path_
+
+	def target_pid(self):
+		pid = c_ulong();
+		if self.dll.get_pid(byref(pid)) != 0:
+			raise DebugAdapter.GeneralError("retrieving process id")
+		return pid.value
+
+	def target_base(self):
+		lookup = self.mem_modules()
+
+		if self.target_path_ in lookup:
+			return lookup[self.target_path_]
+
+		tmp = os.path.basename(self.target_path_)
+		if tmp in lookup:
+			return lookup[tmp]
+
+		raise DebugAdapter.GeneralError("locating target in module list")
 
 	# threads
 	def thread_list(self):
@@ -248,16 +276,14 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	# registers
 	def reg_read(self, name):
 		val = c_ulonglong()
-		name = c_char_p(name.encode('utf-8'))
-		if self.dll.reg_read(name, byref(val)) != 0:
-			raise DebugAdapter.GeneralError("reading register")
+		if self.dll.reg_read(c_char_p(name.encode('utf-8')), byref(val)) != 0:
+			raise DebugAdapter.GeneralError("reading register %s" % name)
 		return val.value
 
 	def reg_write(self, name, value):
-		name = c_char_p(name.encode('utf-8'))
 		value = c_ulonglong(value)
-		if self.dll.reg_write(name, value) != 0:
-			raise DebugAdapter.GeneralError("writing register")
+		if self.dll.reg_write(c_char_p(name.encode('utf-8')), value) != 0:
+			raise DebugAdapter.GeneralError("writing register %s" % name)
 
 	def reg_list(self):
 		regcount = c_int()
