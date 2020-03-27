@@ -15,12 +15,17 @@ from .. import binjaplug
 
 class DebugView(QWidget, View):
 	class DebugViewHistoryEntry(HistoryEntry):
-		def __init__(self, is_memory, address, is_raw):
+		def __init__(self, memory_addr, address, is_raw):
 			HistoryEntry.__init__(self)
 
-			self.is_memory = is_memory
+			self.memory_addr = memory_addr
 			self.address = address
 			self.is_raw = is_raw
+
+		def __repr__(self):
+			if self.is_raw:
+				return "<raw history: {}+{:0x} (memory: {:0x})>".format(self.address[0], self.address[1], self.memory_addr)
+			return "<code history: {:0x} (memory: {:0x})>".format(self.address, self.memory_addr)
 
 	def __init__(self, parent, data):
 		if not type(data) == BinaryView:
@@ -49,6 +54,9 @@ class DebugView(QWidget, View):
 		self.binary_text = TokenizedTextView(self, memory_view)
 		self.is_raw_disassembly = False
 		self.raw_address = 0
+
+		self.is_navigating_history = False
+		self.memory_history_addr = 0
 
 		# TODO: Handle these and change views accordingly
 		# Currently they are just disabled as the DisassemblyContainer gets confused
@@ -131,6 +139,9 @@ class DebugView(QWidget, View):
 	def getData(self):
 		return self.bv
 
+	def getFont(self):
+		return binaryninjaui.getMonospaceFont(self)
+
 	def getCurrentOffset(self):
 		if not self.is_raw_disassembly:
 			return self.binary_editor.getDisassembly().getCurrentOffset()
@@ -167,33 +178,35 @@ class DebugView(QWidget, View):
 		return None
 
 	def getHistoryEntry(self):
+		if self.is_navigating_history:
+			return None
+		memory_addr = self.memory_editor.getCurrentOffset()
+		if memory_addr != self.memory_history_addr:
+			self.memory_history_addr = memory_addr
 		if self.is_raw_disassembly and self.debug_state.connected:
 			address = self.raw_address
 			module = self.debug_state.modules.get_module_for_addr(address)
 			modstart = self.debug_state.modules[module]
 			relative_address = address - modstart
-			return DebugView.DebugViewHistoryEntry(False, (module, relative_address), True)
+			return DebugView.DebugViewHistoryEntry(memory_addr, (module, relative_address), True)
 		else:
 			address = self.binary_editor.getDisassembly().getCurrentOffset()
-			return DebugView.DebugViewHistoryEntry(False, address, False)
-
-	def getFont(self):
-		return binaryninjaui.getMonospaceFont(self)
+			return DebugView.DebugViewHistoryEntry(memory_addr, address, False)
 
 	def navigateToHistoryEntry(self, entry):
+		self.is_navigating_history = True
 		if hasattr(entry, 'is_raw'):
-			if entry.is_memory:
-				self.memory_editor.navigate(entry.address)
+			self.memory_editor.navigate(entry.memory_addr)
+			if entry.is_raw:
+				if self.debug_state.connected:
+					module, relative_address = entry.address
+					address = self.debug_state.modules[module] + relative_address
+					self.navigate_raw(address)
 			else:
-				if entry.is_raw:
-					if self.debug_state.connected:
-						module, relative_address = entry.address
-						address = self.debug_state.modules[module] + relative_address
-						self.navigate_raw(address)
-				else:
-					self.navigate_live(entry.address)
+				self.navigate_live(entry.address)
 
 		View.navigateToHistoryEntry(self, entry)
+		self.is_navigating_history = False
 
 	def navigate(self, addr):
 		if self.debug_state.memory_view.is_local_addr(addr):
