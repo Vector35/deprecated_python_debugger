@@ -22,7 +22,13 @@ def recurse_stack_x86_64(state, ip, rsp, rbp):
 		if fn.arch == state.memory_view.arch:
 			current_function = fn
 			# Some instructions cause no stack variables to be defined
+			# e.g. `cmd` instructions in x86
 			use_fancy_stack = current_function.get_stack_var_at_frame_offset(0, ip) is not None
+
+			# Hack: If our instruction has no variables, try the next one
+			if not use_fancy_stack:
+				ip += state.bv.arch.get_instruction_info(state.bv[ip:ip+state.bv.arch.max_instr_length], ip).length
+				use_fancy_stack = current_function.get_stack_var_at_frame_offset(0, ip) is not None
 
 	width = rbp - rsp + state.bv.arch.address_size
 	if width > 0:
