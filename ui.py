@@ -306,6 +306,11 @@ class DebuggerUI:
 			frame = ViewFrame.viewFrameForWidget(self.debug_view)
 			frame.navigate(self.state.bv, rip, True, True)
 
+			if self.state.connected:
+				if self.state.bv.get_function_at(self.state.local_ip) is not None:
+					# First entry into function, jump to stack pointer
+					self.debug_view.navigate_memory(self.state.stack_pointer)
+
 	# Highlight lines
 	def update_highlights(self):
 		# Clear old highlighted rip

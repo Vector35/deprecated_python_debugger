@@ -225,6 +225,9 @@ class DebugView(QWidget, View):
 		self.load_raw_disassembly(addr)
 		return True
 
+	def navigate_memory(self, addr):
+		self.memory_editor.navigate(addr)
+
 	def notifyMemoryChanged(self):
 		self.needs_update = True
 
