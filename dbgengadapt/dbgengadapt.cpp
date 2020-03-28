@@ -537,6 +537,7 @@ int wait(int timeout)
 	memset(&g_last_exception64, '\0', sizeof(g_last_exception64));
 
 	// block
+	printf_debug("WaitForEvent(timeout=%d)\n", timeout);
 	HRESULT hResult = g_Control->WaitForEvent(
 		0, /* flags */
 		timeout /* timeout (ms) (INFINITE == eat events until "break" event); */
@@ -711,7 +712,9 @@ int process_start(char *cmdline)
 	*/
 
 	/* wait for active session */
+	printf_debug("waiting for active session\n");
 	for(int i=0; i<10; ++i) {
+		printf_debug("wait(100)\n");
 		if(wait(100) == 0) {
 			printf_debug("wait succeeded\n");
 

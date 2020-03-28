@@ -100,6 +100,8 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 	# thread-safe as a result
 	# -------------------------------------------------------------------------
 
+	def setup(self):
+		return self.submit(lambda: self.adapter.setup())
 	def exec(self, path, args=[]):
 		self.record_stat("exec")
 		return self.submit(lambda: self.adapter.exec(path, args))
@@ -174,11 +176,13 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 
 	def break_into(self):
 		self.record_stat("break_into")
-		return self.submit(lambda: self.adapter.break_into())
+		# skip job queue (which is possible waiting in go/step_into/step_over)
+		threading.Thread(target=lambda: self.adapter.break_into()).start()
 
 	def go(self):
 		self.record_stat("go")
-		return self.submit(lambda: self.adapter.go(), block_queue=False)
+		#return self.submit(lambda: self.adapter.go(), block_queue=False)
+		return self.submit(lambda: self.adapter.go())
 	def step_into(self):
 		self.record_stat("step_into")
 		return self.submit(lambda: self.adapter.step_into())

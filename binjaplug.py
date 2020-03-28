@@ -567,11 +567,12 @@ class DebuggerState:
 			raise Exception('cannot find debug target: ' + fpath)
 
 		adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
+		self.adapter = QueuedAdapter.QueuedAdapter(adapter)
+		self.adapter.setup()
 
 		if DebugAdapter.ADAPTER_TYPE.use_exec(self.adapter_type):
 			try:
-				adapter.exec(fpath, self.command_line_args)
-				self.adapter = QueuedAdapter.QueuedAdapter(adapter)
+				self.adapter.exec(fpath, self.command_line_args)
 				self.connecting = False
 			except Exception as e:
 				self.connecting = False

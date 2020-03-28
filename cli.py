@@ -196,6 +196,7 @@ if __name__ == '__main__':
 	if ':' in arg1:
 		(host, port) = arg1.split(':')
 		adapter = gdb.DebugAdapterGdb()
+		adapter.setup()
 		adapter.connect(host, int(port))
 	else:
 		if '~' in arg1:
@@ -205,6 +206,7 @@ if __name__ == '__main__':
 			raise Exception('file not found: %s' % arg1)
 
 		adapter = DebugAdapter.get_adapter_for_current_system()
+		adapter.setup()
 		adapter.exec(arg1, '')
 
 	arch = adapter.target_arch()

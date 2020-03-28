@@ -324,6 +324,7 @@ if __name__ == '__main__':
 	if arg == 'oneoff':
 		fpath = testbin_to_fpath('helloworld_thread')
 		adapter = DebugAdapter.get_adapter_for_current_system()
+		adapter.setup()
 		adapter.exec(fpath)
 		print(adapter.mem_modules())
 		print(type(adapter) == dbgeng.DebugAdapterDbgeng)
@@ -355,18 +356,21 @@ if __name__ == '__main__':
 		fpath = testbin_to_fpath()
 
 		# segfault
+		adapter.setup()
 		adapter.exec(fpath, ['segfault'])
 		(reason, extra) = go_initial(adapter)
 		assert_equality(reason, DebugAdapter.STOP_REASON.ACCESS_VIOLATION)
 		adapter.quit()
 
 		# illegal instruction
+		adapter.setup()
 		adapter.exec(fpath, ['illegalinstr'])
 		(reason, extra) = go_initial(adapter)
 		expect_bad_instruction(reason)
 		adapter.quit()
 
 		# breakpoint, single step, exited
+		adapter.setup()
 		adapter.exec(fpath, ['fakearg'])
 		entry = confirm_initial_module(adapter)
 		adapter.breakpoint_set(entry)
@@ -387,6 +391,7 @@ if __name__ == '__main__':
 		adapter.quit()
 
 		# divzero
+		adapter.setup()
 		adapter.exec(fpath, ['divzero'])
 		(reason, extra) = go_initial(adapter)
 		assert_equality(reason, DebugAdapter.STOP_REASON.CALCULATION)
@@ -405,6 +410,7 @@ if __name__ == '__main__':
 
 		# tester and testee run on same machine
 		adapter = DebugAdapter.get_adapter_for_current_system()
+		adapter.setup()
 		adapter.exec(fpath, '')
 
 		xip = 'eip' if 'x86' in tb else 'rip'
@@ -462,6 +468,7 @@ if __name__ == '__main__':
 
 		# tester and testee run on same machine
 		adapter = DebugAdapter.get_adapter_for_current_system()
+		adapter.setup()
 		fpath = testbin_to_fpath()
 		adapter.exec(fpath, '')
 		entry = confirm_initial_module(adapter)
@@ -567,6 +574,7 @@ if __name__ == '__main__':
 
 		# for x64 machine, tester and testee run on same machine
 		adapter = DebugAdapter.get_adapter_for_current_system()
+		adapter.setup()
 		fpath = testbin_to_fpath()
 		adapter.exec(fpath, '')
 		entry = confirm_initial_module(adapter)
@@ -574,8 +582,8 @@ if __name__ == '__main__':
 		if '_x86-' in tb: xip = 'eip'
 		else: xip = 'rip'
 
-		print('scheduling break in .5 second')
-		threading.Timer(.5, break_into, [adapter]).start()
+		print('scheduling break in 1 second')
+		threading.Timer(1, break_into, [adapter]).start()
 		print('going')
 		(reason, extra) = go_initial(adapter)
 		print('back')
@@ -733,8 +741,8 @@ if __name__ == '__main__':
 		(adapter, entry) = android_test_setup()
 
 		print('pc: 0x%X' % adapter.reg_read('pc'))
-		print('scheduling break in .5 seconds')
-		threading.Timer(.5, break_into, [adapter]).start()
+		print('scheduling break in 1 seconds')
+		threading.Timer(.3, break_into, [adapter]).start()
 		print('going')
 		adapter.go()
 		print('back')

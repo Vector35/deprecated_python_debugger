@@ -164,6 +164,10 @@ class DebugAdapter:
 	def __init__(self, **kwargs):
 		# stdout handling callback
 		self.cb_stdout = kwargs.get('stdout', None)
+	def initialize(self):
+		raise NotImplementedError('')
+	def teardown(self):
+		raise NotImplementedError('')
 
 	# session start/stop
 	def exec(self, path, args=[]):

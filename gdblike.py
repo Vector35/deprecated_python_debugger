@@ -80,6 +80,11 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		# server capabilities
 		self.server_capabilities = {}
 
+	def setup(self):
+		pass
+	def teardown(self):
+		pass
+
 	#--------------------------------------------------------------------------
 	# API
 	#--------------------------------------------------------------------------

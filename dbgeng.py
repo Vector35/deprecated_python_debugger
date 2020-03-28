@@ -3,6 +3,7 @@
 import os
 import re
 import socket
+import threading
 from struct import pack, unpack
 from ctypes import *
 from enum import Enum, auto, unique
@@ -59,15 +60,6 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	def __init__(self, **kwargs):
 		DebugAdapter.DebugAdapter.__init__(self, **kwargs)
 
-		fpath = os.path.abspath(__file__)
-		fpath = os.path.dirname(fpath)
-		fpath = os.path.join(fpath, 'dbgengadapt\dbgengadapt.dll')
-		self.dll = CDLL(fpath)
-		if not self.dll:
-			raise DebugAdapter.GeneralError("loading %s" % fpath)
-		if self.dll.setup() != 0:
-			raise DebugAdapter.GeneralError("initializing %s" % fpath)
-
 		# keep mapping between addresses (DbgAdapter namespace) and breakpoint
 		# id's (dbgeng namespace)
 		self.bp_addr_to_id = {}
@@ -75,8 +67,22 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		#
 		self.stop_reason_fallback = DebugAdapter.STOP_REASON.UNKNOWN
 
-	def __del__(self):
-		#print('destructor')
+		#
+		self.dll = None
+
+	# NOTE: thread that initializes dbgeng session must be same that calls WaitForEvent()
+	def setup(self):
+		fpath = os.path.abspath(__file__)
+		fpath = os.path.dirname(fpath)
+		fpath = os.path.join(fpath, 'dbgengadapt\dbgengadapt.dll')
+		self.dll = CDLL(fpath)
+
+		if not self.dll:
+			raise DebugAdapter.GeneralError("loading %s" % fpath)
+		if self.dll.setup() != 0:
+			raise DebugAdapter.GeneralError("initializing %s" % fpath)
+
+	def teardown(self):
 		pass
 
 	def get_last_breakpoint_address(self):
