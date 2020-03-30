@@ -213,6 +213,13 @@ class DebugView(QWidget, View):
 			addr = self.debug_state.memory_view.remote_addr_to_local(addr)
 			if self.debug_state.bv.read(addr, 1) and len(self.debug_state.bv.get_functions_containing(addr)) > 0:
 				return self.navigate_live(addr)
+
+		# This runs into conflicts if some other address space is mapped over
+		# where the local BV is currently loaded, but this is was less likely
+		# than the user navigating to a function from the UI
+		if self.debug_state.bv.read(addr, 1) and len(self.debug_state.bv.get_functions_containing(addr)) > 0:
+			return self.navigate_live(addr)
+
 		return self.navigate_raw(addr)
 
 	def navigate_live(self, addr):
@@ -220,6 +227,9 @@ class DebugView(QWidget, View):
 		return self.binary_editor.getDisassembly().navigate(addr)
 
 	def navigate_raw(self, addr):
+		if not self.debug_state.connected:
+			# Can't navigate to remote addr when disconnected
+			return False
 		self.raw_address = addr
 		self.show_raw_disassembly(True)
 		self.load_raw_disassembly(addr)
