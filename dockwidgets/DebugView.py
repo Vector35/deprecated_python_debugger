@@ -24,7 +24,7 @@ class DebugView(QWidget, View):
 
 		def __repr__(self):
 			if self.is_raw:
-				return "<raw history: {}+{:0x} (memory: {:0x})>".format(self.address[0], self.address[1], self.memory_addr)
+				return "<raw history: {}+{:0x} (memory: {:0x})>".format(self.address['module'], self.address['offset'], self.memory_addr)
 			return "<code history: {:0x} (memory: {:0x})>".format(self.address, self.memory_addr)
 
 	def __init__(self, parent, data):
@@ -184,11 +184,8 @@ class DebugView(QWidget, View):
 		if memory_addr != self.memory_history_addr:
 			self.memory_history_addr = memory_addr
 		if self.is_raw_disassembly and self.debug_state.connected:
-			address = self.raw_address
-			module = self.debug_state.modules.get_module_for_addr(address)
-			modstart = self.debug_state.modules[module]
-			relative_address = address - modstart
-			return DebugView.DebugViewHistoryEntry(memory_addr, (module, relative_address), True)
+			rel_addr = self.debug_state.modules.absolute_addr_to_relative(self.raw_address)
+			return DebugView.DebugViewHistoryEntry(memory_addr, rel_addr, True)
 		else:
 			address = self.binary_editor.getDisassembly().getCurrentOffset()
 			return DebugView.DebugViewHistoryEntry(memory_addr, address, False)
@@ -199,8 +196,7 @@ class DebugView(QWidget, View):
 			self.memory_editor.navigate(entry.memory_addr)
 			if entry.is_raw:
 				if self.debug_state.connected:
-					module, relative_address = entry.address
-					address = self.debug_state.modules[module] + relative_address
+					address = self.debug_state.modules.relative_addr_to_absolute(entry.address)
 					self.navigate_raw(address)
 			else:
 				self.navigate_live(entry.address)
@@ -210,9 +206,9 @@ class DebugView(QWidget, View):
 
 	def navigate(self, addr):
 		if self.debug_state.memory_view.is_local_addr(addr):
-			addr = self.debug_state.memory_view.remote_addr_to_local(addr)
-			if self.debug_state.bv.read(addr, 1) and len(self.debug_state.bv.get_functions_containing(addr)) > 0:
-				return self.navigate_live(addr)
+			local_addr = self.debug_state.memory_view.remote_addr_to_local(addr)
+			if self.debug_state.bv.read(local_addr, 1) and len(self.debug_state.bv.get_functions_containing(local_addr)) > 0:
+				return self.navigate_live(local_addr)
 
 		# This runs into conflicts if some other address space is mapped over
 		# where the local BV is currently loaded, but this is was less likely

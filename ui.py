@@ -423,6 +423,10 @@ def cb_bp_toggle(bv, address):
 		is_debug_view = True
 		bv = bv.parent_view.parent_view
 
+	if not is_debug_view:
+		if not bv.read(address, 1):
+			is_debug_view = True
+
 	debug_state = binjaplug.get_state(bv)
 	if is_debug_view:
 		if debug_state.breakpoints.contains_absolute(address):

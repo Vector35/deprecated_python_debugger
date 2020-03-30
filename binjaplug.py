@@ -2,6 +2,8 @@ import os
 import re
 import time
 import platform
+import sys
+import traceback
 
 import binaryninja
 from binaryninja import BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation
@@ -226,13 +228,33 @@ class DebuggerModules:
 	def get_module_for_addr(self, remote_address):
 		# TODO: Compare loaded segments
 		closest_modaddr = 0
-		closest_modpath = ""
+		closest_modpath = None
 		for (modpath, modaddr) in self:
 			if modaddr < remote_address and modaddr > closest_modaddr:
 				closest_modaddr = modaddr
 				closest_modpath = modpath
 		return closest_modpath
 
+	def absolute_addr_to_relative(self, abs_addr):
+		module = self.get_module_for_addr(abs_addr)
+		if module is not None:
+			modstart = self[module]
+			relative_address = abs_addr - modstart
+		else:
+			relative_address = abs_addr
+		return {'module': module, 'offset': relative_address}
+
+	def relative_addr_to_absolute(self, rel_addr):
+		module = rel_addr['module']
+		relative_address = rel_addr['offset']
+		if module is not None:
+			modstart = self[module]
+			if modstart is None:
+				raise Exception("Cannot resolve relative address: module {} not loaded".format(module))
+			address = modstart + relative_address
+		else:
+			address = relative_address
+		return address
 
 '''
 Breakpoints are stored inside this helper class, in the format (module, offset).
@@ -263,12 +285,7 @@ class DebuggerBreakpoints:
 	'''
 	def add_absolute(self, remote_address):
 		assert self.state.adapter is not None
-
-		module = self.state.modules.get_module_for_addr(remote_address)
-		modstart = self.state.modules[module]
-		relative_address = remote_address - modstart
-
-		info = {'module': module, 'offset': relative_address}
+		info = self.state.modules.absolute_addr_to_relative(remote_address)
 		if info not in self.breakpoints:
 			self.breakpoints.append(info)
 			self.state.bv.store_metadata('debugger.breakpoints', self.breakpoints)
@@ -300,12 +317,7 @@ class DebuggerBreakpoints:
 	'''
 	def remove_absolute(self, remote_address):
 		assert self.state.adapter is not None
-
-		module = self.state.modules.get_module_for_addr(remote_address)
-		modstart = self.state.modules[module]
-		relative_address = remote_address - modstart
-
-		info = {'module': module, 'offset': relative_address}
+		info = self.state.modules.absolute_addr_to_relative(remote_address)
 		if info in self.breakpoints:
 			self.breakpoints.remove(info)
 			self.state.bv.store_metadata('debugger.breakpoints', self.breakpoints)
@@ -336,12 +348,7 @@ class DebuggerBreakpoints:
 	'''
 	def contains_absolute(self, remote_address):
 		assert self.state.adapter is not None
-
-		module = self.state.modules.get_module_for_addr(remote_address)
-		modstart = self.state.modules[module]
-		relative_address = remote_address - modstart
-
-		info = {'module': module, 'offset': relative_address}
+		info = self.state.modules.absolute_addr_to_relative(remote_address)
 		return info in self.breakpoints
 
 	'''
@@ -361,9 +368,12 @@ class DebuggerBreakpoints:
 
 		remote_breakpoints = self.state.adapter.breakpoint_list()
 		for bp in self.breakpoints:
-			remote_address = self.state.modules[bp['module']] + bp['offset']
+			remote_address = self.state.modules.relative_addr_to_absolute(bp)
 			if remote_address not in remote_breakpoints:
-				self.state.adapter.breakpoint_set(remote_address)
+				try:
+					self.state.adapter.breakpoint_set(remote_address)
+				except:
+					traceback.print_exc(file=sys.stderr)
 
 
 #------------------------------------------------------------------------------
