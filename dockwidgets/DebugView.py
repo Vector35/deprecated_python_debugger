@@ -299,7 +299,7 @@ class DebugView(QWidget, View):
 			if line_addr == rip:
 				if self.debug_state.breakpoints.contains_absolute(start_ip + total_read):
 					# Breakpoint & pc
-					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.get_breakpoint_tag_type().icon + ">", width=5))
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.debug_state.ui.get_breakpoint_tag_type().icon + ">", width=5))
 					color = HighlightStandardColor.RedHighlightColor
 				else:
 					# PC
@@ -308,7 +308,7 @@ class DebugView(QWidget, View):
 			else:
 				if self.debug_state.breakpoints.contains_absolute(start_ip + total_read):
 					# Breakpoint
-					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.get_breakpoint_tag_type().icon, width=5))
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.debug_state.ui.get_breakpoint_tag_type().icon, width=5))
 					color = HighlightStandardColor.RedHighlightColor
 				else:
 					# Regular line
