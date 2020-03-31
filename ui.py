@@ -309,7 +309,7 @@ class DebuggerUI:
 	# Highlight lines
 	def update_highlights(self):
 		# Clear old highlighted rip
-		for func in self.state.bv.get_functions_containing(self.last_ip):
+		for func in (self.state.bv.get_functions_containing(self.last_ip) or []):
 			func.set_auto_instr_highlight(self.last_ip, HighlightStandardColor.NoHighlightColor)
 
 		for (module, offset) in self.state.breakpoints:
@@ -323,7 +323,7 @@ class DebuggerUI:
 			remote_rip = self.state.ip
 			local_rip = self.state.memory_view.remote_addr_to_local(remote_rip)
 
-			for func in self.state.bv.get_functions_containing(local_rip):
+			for func in (self.state.bv.get_functions_containing(local_rip) or []):
 				func.set_auto_instr_highlight(local_rip, HighlightStandardColor.BlueHighlightColor)
 
 	def update_modules(self):

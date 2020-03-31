@@ -252,7 +252,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		mecount = tdict.get('mecount', '-1')
 		if mecount != None: mecount = int(mecount, 16)
 		medata = tdict.get('medata', '-1')
-		print('signal=0x%X metype=%s mecount=%s medata=%s' % (signal, metype, mecount, medata))
+		#print('signal=0x%X metype=%s mecount=%s medata=%s' % (signal, metype, mecount, medata))
 
 		# map the packet macos/lldb "T packet" data to a DebugAdapter reason
 		result = (DebugAdapter.STOP_REASON.UNKNOWN, None)
