@@ -164,7 +164,10 @@ class DebugAdapter:
 	def __init__(self, **kwargs):
 		# stdout handling callback
 		self.cb_stdout = kwargs.get('stdout', None)
-	def initialize(self):
+	# initialize the adapter, eg: dbgeng can request COM interfaces
+	# this is not in the constructor so that adapter wrappers like
+	# QueuedAdapter can still middle-man setup()
+	def setup(self):
 		raise NotImplementedError('')
 	def teardown(self):
 		raise NotImplementedError('')

@@ -56,7 +56,7 @@ using namespace std;
 #define ERROR_DBGENG_API -3
 
 // dbgeng's interfaces
-IDebugClient *g_Client = NULL;
+IDebugClient5 *g_Client = NULL;
 // https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/dbgeng/nn-dbgeng-idebugcontrol
 IDebugControl *g_Control = NULL;
 IDebugDataSpaces *g_Data = NULL;
@@ -783,12 +783,12 @@ EASY_CTYPES_SPEC
 int quit(void)
 {
 	int rc = ERROR_UNSPECIFIED;
-	if(g_Client->EndSession(DEBUG_END_ACTIVE_TERMINATE) != S_OK) {
-		printf_debug("ERROR: EndSession() failed\n");
+	if(g_Client->TerminateCurrentProcess() != S_OK) {
+		printf_debug("ERROR: TerminateCurrentProcess() failed\n");
 		goto cleanup;
 	}
 	else {
-		printf_debug("EndSession() succeeded!\n");
+		printf_debug("TerminateCurrentProcess() succeeded!\n");
 	}
 	rc = 0;
 	cleanup:
@@ -1243,10 +1243,10 @@ int setup(void)
 
 	printf_debug("setup()\n");
 
-	hResult = DebugCreate(__uuidof(IDebugClient), (void **)&g_Client);
+	hResult = DebugCreate(__uuidof(IDebugClient5), (void **)&g_Client);
 	if(hResult != S_OK)
 	{
-		printf_debug("ERROR: getting IDebugClient\n");
+		printf_debug("ERROR: getting IDebugClient5\n");
 		goto cleanup;
 	}
 

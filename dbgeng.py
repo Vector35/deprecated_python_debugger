@@ -58,6 +58,7 @@ ERROR_UNSPECIFIED = -1
 
 class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	def __init__(self, **kwargs):
+		#print('dbgeng.__init__() by thread %d %s' % (threading.current_thread().ident, threading.current_thread().name))
 		DebugAdapter.DebugAdapter.__init__(self, **kwargs)
 
 		# keep mapping between addresses (DbgAdapter namespace) and breakpoint
@@ -70,8 +71,14 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		#
 		self.dll = None
 
+	def __del__(self):
+		#print('dbgeng.__del__() by thread %d %s' % (threading.current_thread().ident, threading.current_thread().name))
+		pass
+
 	# NOTE: thread that initializes dbgeng session must be same that calls WaitForEvent()
 	def setup(self):
+		#print('dbgeng.setup() by thread %d %s' % (threading.current_thread().ident, threading.current_thread().name))
+
 		fpath = os.path.abspath(__file__)
 		fpath = os.path.dirname(fpath)
 		fpath = os.path.join(fpath, 'dbgengadapt\dbgengadapt.dll')
@@ -83,7 +90,10 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 			raise DebugAdapter.GeneralError("initializing %s" % fpath)
 
 	def teardown(self):
-		pass
+		#print('dbgeng.teardown() by thread %d %s' % (threading.current_thread().ident, threading.current_thread().name))
+		self.dll.teardown()
+		del self.dll
+		self.dll = None
 
 	def get_last_breakpoint_address(self):
 		addr = c_ulonglong()

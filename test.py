@@ -345,6 +345,47 @@ if __name__ == '__main__':
 	# x86/x64 TESTS
 	#--------------------------------------------------------------------------
 
+	# repeat adapter use tests
+	for tb in filter(lambda x: x.startswith('helloworld_x64'), testbins):
+		testbin = tb
+		fpath = testbin_to_fpath()
+
+		def thread_task():
+			adapter = DebugAdapter.get_adapter_for_current_system()
+
+			adapter.setup()
+			adapter.exec(fpath, ['segfault'])
+			# set initial breakpoint
+			entry = confirm_initial_module(adapter)
+			adapter.breakpoint_set(entry)
+			# go to breakpoint
+			(reason, extra) = go_initial(adapter)
+			assert_equality(reason, DebugAdapter.STOP_REASON.BREAKPOINT)
+			# clear, single step a few times
+			adapter.breakpoint_clear(entry)
+			(reason, extra) = adapter.step_into()
+			expect_single_step(reason)
+			(reason, extra) = adapter.step_into()
+			expect_single_step(reason)
+			(reason, extra) = adapter.step_into()
+			expect_single_step(reason)
+			# go until executing done
+			(reason, extra) = adapter.go()
+			assert_equality(reason, DebugAdapter.STOP_REASON.PROCESS_EXITED)
+
+			adapter.quit()
+			adapter.teardown()
+			adapter = None
+
+		for i in range(10):
+			utils.green('testing %s %d/10' % (fpath, i+1))
+			t = threading.Thread(target=thread_task)
+			t.start()
+			t.join()
+
+	sys.exit(-1)
+
+
 	# exception test
 	for tb in testbins:
 		if not tb.startswith('do_exception'): continue

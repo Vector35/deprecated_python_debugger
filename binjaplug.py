@@ -629,6 +629,7 @@ class DebuggerState:
 		if self.connected:
 			try:
 				self.adapter.quit()
+				self.adapter.teardown()
 			except BrokenPipeError:
 				pass
 			except ConnectionResetError:
