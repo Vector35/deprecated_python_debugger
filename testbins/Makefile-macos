@@ -1,6 +1,6 @@
 # make -f Makefile-macosos
 
-TARGETS = helloworld_x64-macos helloworld_loop_x64-macos helloworld_thread_x64-macos helloworld_func_x64-macos helloworld_recursion_x64-macos helloworld_pie_x64-macos helloworld_thread_pie_x64-macos helloworld_loop_pie_x64-macos helloworld_func_pie_x64-macos helloworld_recursion_pie_x64-macos asmtest_x64-macos nopspeed_x64-macos cat_x64-macos commandline_test_x64-macos helloworld_objc_x64-macos helloworld_virtual_x64-macos do_exception_x64-macos
+TARGETS = helloworld_x64-macos exitcode_x64-macos helloworld_loop_x64-macos helloworld_thread_x64-macos helloworld_func_x64-macos helloworld_recursion_x64-macos helloworld_pie_x64-macos helloworld_thread_pie_x64-macos helloworld_loop_pie_x64-macos helloworld_func_pie_x64-macos helloworld_recursion_pie_x64-macos asmtest_x64-macos nopspeed_x64-macos cat_x64-macos commandline_test_x64-macos helloworld_objc_x64-macos helloworld_virtual_x64-macos do_exception_x64-macos
 
 all: $(TARGETS)
 
@@ -9,6 +9,9 @@ clean:
 
 helloworld_x64-macos: helloworld.c
 	gcc -Wl,-no_pie helloworld.c -o helloworld_x64-macos
+
+exitcode_x64-macos: exitcode.c
+	gcc -Wl,-no_pie exitcode.c -o exitcode_x64-macos
 
 helloworld_thread_x64-macos: helloworld_thread.c
 	gcc -Wl,-no_pie helloworld_thread.c -o helloworld_thread_x64-macos

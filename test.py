@@ -383,8 +383,19 @@ if __name__ == '__main__':
 			t.start()
 			t.join()
 
-	sys.exit(-1)
+	# return code tests
+	for tb in [x for x in testbins if x.startswith('exitcode')]:
+		testbin = tb
+			
+		fpath = testbin_to_fpath()
 
+		for (arg, expected) in [('-11',245), ('-1',255), ('-3',253), ('0',0), ('3',3), ('7',7), ('123',123)]:
+			adapter = DebugAdapter.get_adapter_for_current_system()
+			utils.green('testing %s %s' % (tb, arg))
+			adapter.exec(fpath, [arg])
+			(reason, extra) = go_initial(adapter)
+			assert_equality(reason, DebugAdapter.STOP_REASON.PROCESS_EXITED)
+			assert_equality(extra, expected)
 
 	# exception test
 	for tb in testbins:
