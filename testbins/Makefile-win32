@@ -1,6 +1,6 @@
 # nmake -f Makefile-win32 from within "x86 Native Tools Command Prompt"
 
-TARGETS_ALL = helloworld_x86-windows.exe helloworld_loop_x86-windows.exe helloworld_thread_x86-windows.exe helloworld_func_x86-windows.exe helloworld_pie_x86-windows.exe helloworld_loop_pie_x86-windows.exe helloworld_thread_pie_x86-windows.exe helloworld_func_pie_x86-windows.exe asmtest_x86-windows.exe do_exception_pie_x86-windows.exe 
+TARGETS_ALL = helloworld_x86-windows.exe exitcode_x86-windows.exe helloworld_loop_x86-windows.exe helloworld_thread_x86-windows.exe helloworld_func_x86-windows.exe helloworld_pie_x86-windows.exe helloworld_loop_pie_x86-windows.exe helloworld_thread_pie_x86-windows.exe helloworld_func_pie_x86-windows.exe asmtest_x86-windows.exe do_exception_pie_x86-windows.exe 
 
 all: $(TARGETS_ALL)
 
@@ -9,6 +9,9 @@ clean:
 
 helloworld_x86-windows.exe: helloworld.c
 	cl helloworld.c /Fe:helloworld_x86-windows.exe /link /DYNAMICBASE:NO
+
+exitcode_x86-windows.exe: exitcode.c
+	cl exitcode.c /Fe:exitcode_x86-windows.exe /link /DYNAMICBASE:NO
 
 helloworld_thread_x86-windows.exe: helloworld_thread.c
 	cl helloworld_thread.c /Fe:helloworld_thread_x86-windows.exe /link /DYNAMICBASE:NO

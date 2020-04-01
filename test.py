@@ -389,13 +389,18 @@ if __name__ == '__main__':
 			
 		fpath = testbin_to_fpath()
 
-		for (arg, expected) in [('-11',245), ('-1',255), ('-3',253), ('0',0), ('3',3), ('7',7), ('123',123)]:
+		# some systems return byte, or low byte of 32-bit code and otheres return 32-bit code
+		testvals = [('-11',[245,4294967285]), ('-1',[4294967295,255]), ('-3',[4294967293,253]), ('0',[0]), ('3',[3]), ('7',[7]), ('123',[123])]
+		for (arg, expected) in testvals:
 			adapter = DebugAdapter.get_adapter_for_current_system()
+			adapter.setup()
+
 			utils.green('testing %s %s' % (tb, arg))
 			adapter.exec(fpath, [arg])
 			(reason, extra) = go_initial(adapter)
 			assert_equality(reason, DebugAdapter.STOP_REASON.PROCESS_EXITED)
-			assert_equality(extra, expected)
+			if not extra in expected:
+				raise Exception('expected return code %d to be in %s' % (extra, expected))
 
 	# exception test
 	for tb in testbins:
