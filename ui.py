@@ -451,7 +451,15 @@ def valid_bp_toggle(bv, address):
 #------------------------------------------------------------------------------
 
 def cb_process_run(bv):
+	def switch_view():
+		dh = DockHandler.getActiveDockHandler()
+		vf = dh.getViewFrame()
+		vf.setViewType('Debugger:' + bv.view_type)
+
 	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is None:
+		execute_on_main_thread_and_wait(switch_view)
+
 	if debug_state.ui.debug_view is not None:
 		debug_state.ui.debug_view.controls.actionRun.trigger()
 
@@ -519,7 +527,13 @@ def cb_control_step_return(bv):
 
 def valid_process_run(bv):
 	debug_state = binjaplug.get_state(bv)
-	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionRun.isEnabled()
+
+	# if the debugger UI is up, the state with debuggee determines whether button is activated
+	if debug_state.ui.debug_view is not None:
+		return debug_state.ui.debug_view.controls.actionRun.isEnabled()
+
+	# else, assume activated, initiate debug_state.ui on click
+	return True
 
 def valid_process_restart(bv):
 	debug_state = binjaplug.get_state(bv)

@@ -339,12 +339,14 @@ class DebugView(QWidget, View):
 			self.is_raw_disassembly = raw
 
 class DebugViewType(ViewType):
+	# executed at plugin load time from from ui.py ViewType.registerViewType()
 	def __init__(self):
 		super(DebugViewType, self).__init__("Debugger", "Debugger")
 
 	def getPriority(self, data, filename):
 		return 1
 
+	# executed when user clicks "Debugger" from dropdown with binary views
 	def create(self, data, view_frame):
 		return DebugView(view_frame, data)
 
