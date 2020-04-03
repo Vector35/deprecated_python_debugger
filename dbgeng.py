@@ -81,7 +81,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 		fpath = os.path.abspath(__file__)
 		fpath = os.path.dirname(fpath)
-		fpath = os.path.join(fpath, 'dbgengadapt\dbgengadapt.dll')
+		fpath = os.path.join(fpath, 'dbgengadapt\\dbgengadapt.dll')
 		self.dll = CDLL(fpath)
 
 		if not self.dll:
