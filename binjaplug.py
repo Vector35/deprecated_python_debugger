@@ -4,6 +4,7 @@ import time
 import platform
 import sys
 import traceback
+import tempfile
 
 import binaryninja
 from binaryninja import BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation
@@ -395,6 +396,8 @@ class DebuggerState:
 		self.old_symbols = []
 		self.old_dvs = set()
 
+		self.temp_file = None
+
 		# ensure bv path adheres to OS convention
 		if platform.system() == 'Windows':
 			self.bv.file.original_filename = self.bv.file.original_filename.replace('/', '\\')
@@ -573,8 +576,24 @@ class DebuggerState:
 		self.connecting = True
 		fpath = self.bv.file.original_filename
 
+		# TODO: Detect modifications and run from tmp if any exist #60
+		run_from_tmp = False
 		if not os.path.exists(fpath):
-			raise Exception('cannot find debug target: ' + fpath)
+			# Original target was deleted
+			run_from_tmp = True
+
+		if run_from_tmp:
+			self.temp_file = tempfile.NamedTemporaryFile(prefix="bndebugfile_")
+			temp_name = self.temp_file.name
+			# macOS symlinks /tmp to /private/tmp
+			temp_name = os.path.realpath(temp_name)
+
+			self.bv.file.raw.save(temp_name)
+			os.chmod(temp_name, 0o700)
+
+			# Swap the real path for this temp one
+			fpath = temp_name
+			self.modules.translations[fpath] = self.bv.file.original_filename
 
 		adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
 		self.adapter = QueuedAdapter.QueuedAdapter(adapter)
@@ -640,6 +659,10 @@ class DebuggerState:
 				self.adapter = None
 				self.remote_arch = None
 		self.memory_dirty()
+
+		# Clean up temporary dumped file
+		if self.temp_file is not None:
+			self.temp_file = None
 
 	def restart(self):
 		self.quit()
