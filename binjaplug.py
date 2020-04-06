@@ -248,11 +248,16 @@ class DebuggerModules:
 	def relative_addr_to_absolute(self, rel_addr):
 		module = rel_addr['module']
 		relative_address = rel_addr['offset']
+
 		if module is not None:
-			modstart = self[module]
-			if modstart is None:
+			if self[module]:
+				address = self[module] + relative_address
+			elif self[os.path.abspath(module)]:
+				address = self[os.path.abspath(module)] + relative_address
+			elif self[os.path.basename(module)]:
+				address = self[os.path.basename(module)] + relative_address
+			else:
 				raise Exception("Cannot resolve relative address: module {} not loaded".format(module))
-			address = modstart + relative_address
 		else:
 			address = relative_address
 		return address
