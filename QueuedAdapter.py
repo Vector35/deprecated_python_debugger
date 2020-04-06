@@ -23,6 +23,9 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 
 		self.function_stats = {}
 
+	def __del__(self):
+		stop_worker_thread()
+
 	# -------------------------------------------------------------------------
 	# Thread-safe work queue for the adapter. Results and exceptions
 	# are returned via the map self.results. Submitted jobs block for
@@ -46,6 +49,10 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 		while True:
 			# Get next job and its condition var
 			index, block_queue, job = self.queue.get()
+
+			if job == 'BREAK':
+				perform_task(index, lambda: True)
+				break
 
 			if block_queue:
 				perform_task(index, job)
@@ -76,6 +83,14 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 		if not suceeded:
 			raise result
 		return result
+
+	# UI mode: worker thread can persist alongside binary view
+	# headless: scripts need a way to explicitly end this thread
+	def stop_worker_thread(self):
+		if self.worker_thread:
+			self.submit('BREAK')
+			self.worker_thread.join()
+			self.worker_thread = None
 
 	# -------------------------------------------------------------------------
 	# Track statistics for which adapter functions are called the most, and
