@@ -253,6 +253,7 @@ class DebuggerUI:
 				# If there's already a function here, then we have already been here
 				if len(self.state.bv.get_functions_containing(local_rip)) == 0:
 					self.state.bv.add_function(local_rip)
+					self.state.bv.update_analysis()
 		if call:
 			try:
 				remote_target = self.evaluate_llil(self.state, llil.dest)
@@ -268,6 +269,7 @@ class DebuggerUI:
 						return
 
 					self.state.bv.add_function(local_target)
+					self.state.bv.update_analysis()
 		elif jump:
 			try:
 				remote_target = self.evaluate_llil(self.state, llil.dest)
@@ -294,6 +296,7 @@ class DebuggerUI:
 								raise Exception("Local rip is not at a function?")
 
 							funcs[0].set_user_indirect_branches(local_rip, [(self.state.remote_arch, local_target)])
+							self.state.bv.update_analysis()
 
 	def navigate_to_rip(self):
 		if self.debug_view is not None:
