@@ -69,9 +69,6 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		# client tracks selected thread
 		self.tid = None
 
-		# memory map
-		self.module2addr = None
-
 		# target info
 		self.target_arch_ = None
 		self.target_pid_ = None
@@ -149,10 +146,17 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		return self.target_pid_
 
 	def target_base(self):
-		if self.module2addr == None:
-			self.mem_modules()
+		module2addr = self.mem_modules()
 
-		return self.module2addr.get(self.target_path())
+		a = self.target_path()
+		if a:
+			if a in module2addr: return module2addr[a]
+			b = os.path.abspath(a)
+			if b in module2addr: return module2addr[b]
+			c = os.path.basename(a)
+			return module2addr.get(c)
+
+		return None
 
 	# threads
 	def thread_list(self):
@@ -340,7 +344,6 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go(self):
 		self.reg_cache = {}
-		self.module2addr = None
 		#return self.go_generic('c', self.handler_async_pkt)
 		(reason, reason_data) = self.go_generic('vCont;c:-1', self.handler_async_pkt)
 		self.handle_stop(reason, reason_data)
@@ -355,7 +358,6 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	def step_over(self):
 		# gdb, lldb just doesn't have this, you must synthesize it yourself
 		self.reg_cache = {}
-		self.module2addr = None
 		raise NotImplementedError('step over')
 
 	#--------------------------------------------------------------------------
@@ -610,7 +612,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			# exit status
 			elif reply[0] == 'W':
 				exit_status = int(reply[1:], 16)
-				print('inferior exited with status: %d' % exit_status)
+				#print('gdblike: inferior exited with status: %d' % exit_status)
 				(reason, reason_data) = (DebugAdapter.STOP_REASON.PROCESS_EXITED, exit_status)
 
 			else:

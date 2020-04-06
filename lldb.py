@@ -60,6 +60,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 		except Exception:
 			raise Exception('invoking debugserver (used path: %s)' % path_debugserver)
 
+		self.target_path_ = path
 		self.connect('localhost', port)
 
 	def connect(self, address, port):
@@ -77,6 +78,11 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 
 		# learn initial pointer to shared lib info in dyld
 		self.p_dyld_all_image_infos = int(self.rspConn.tx_rx('qShlibInfoAddr'), 16)
+
+		# learn pid
+		reply = self.rspConn.tx_rx('qProcessInfo')
+		if reply.startswith('pid:'):
+			self.target_pid_ = int(re.match(r'^pid:([a-fA-F0-9]+)', reply).group(1), 16)
 
 	# threads
 	def thread_list(self):
