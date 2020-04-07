@@ -601,15 +601,16 @@ class DebuggerState:
 			self.modules.translations[fpath] = self.bv.file.original_filename
 
 		adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
-		self.adapter = QueuedAdapter.QueuedAdapter(adapter)
-		self.adapter.setup()
 
 		if DebugAdapter.ADAPTER_TYPE.use_exec(self.adapter_type):
 			try:
+				self.adapter = QueuedAdapter.QueuedAdapter(adapter)
+				self.adapter.setup()
 				self.adapter.exec(fpath, self.command_line_args)
 				self.connecting = False
 			except Exception as e:
 				self.connecting = False
+				self.adapter = None
 				raise e
 		else:
 			self.connecting = False
@@ -628,11 +629,13 @@ class DebuggerState:
 		adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
 		if DebugAdapter.ADAPTER_TYPE.use_connect(self.adapter_type):
 			try:
-				adapter.connect(self.remote_host, self.remote_port)
-				self.adapter = adapter
+				self.adapter = QueuedAdapter.QueuedAdapter(adapter)
+				self.adapter.setup()
+				self.adapter.connect(self.remote_host, self.remote_port)
 				self.connecting = False
 			except Exception as e:
 				self.connecting = False
+				self.adapter = None
 				raise e
 		else:
 			self.connecting = False
