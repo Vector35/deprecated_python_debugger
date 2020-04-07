@@ -372,6 +372,9 @@ class DebuggerUI:
 
 		bp_widget = self.widget("Breakpoints")
 		bp_widget.notifyBreakpointsChanged(bps)
+		# Refresh disassembly to show the new bp
+		if self.debug_view is not None:
+			self.debug_view.refresh_raw_disassembly()
 
 	def breakpoint_tag_add(self, local_address):
 		# create tag
@@ -444,7 +447,7 @@ def cb_bp_toggle(bv, address):
 		else:
 			debug_state.breakpoints.add_offset(bv.file.original_filename, offset)
 			debug_state.ui.breakpoint_tag_add(address)
-	debug_state.ui.on_step()
+	debug_state.ui.update_breakpoints()
 
 def valid_bp_toggle(bv, address):
 	return True

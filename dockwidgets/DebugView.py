@@ -338,6 +338,11 @@ class DebugView(QWidget, View):
 			self.splitter.replaceWidget(0, self.disasm_widget if raw else self.bv_widget)
 			self.is_raw_disassembly = raw
 
+	def refresh_raw_disassembly(self):
+		if self.is_raw_disassembly:
+			self.load_raw_disassembly(self.getCurrentOffset())
+
+
 class DebugViewType(ViewType):
 	# executed at plugin load time from from ui.py ViewType.registerViewType()
 	def __init__(self):
