@@ -446,6 +446,8 @@ class DebuggerState:
 
 	@property
 	def ip(self):
+		if not self.connected:
+			raise Exception('Cannot read ip when disconnected')
 		if self.remote_arch.name == 'x86_64':
 			return self.registers['rip']
 		elif self.remote_arch.name == 'x86':
@@ -467,6 +469,8 @@ class DebuggerState:
 
 	@property
 	def stack_pointer(self):
+		if not self.connected:
+			raise Exception('Cannot read stack pointer when disconnected')
 		if self.remote_arch.name == 'x86_64':
 			return self.registers['rsp']
 		elif self.remote_arch.name == 'x86':

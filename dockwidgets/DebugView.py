@@ -339,6 +339,10 @@ class DebugView(QWidget, View):
 			self.is_raw_disassembly = raw
 
 	def refresh_raw_disassembly(self):
+		if not self.debug_state.connected:
+			# Can't navigate to remote addr when disconnected
+			return
+
 		if self.is_raw_disassembly:
 			self.load_raw_disassembly(self.getCurrentOffset())
 
