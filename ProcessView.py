@@ -16,10 +16,11 @@ class DebugProcessView(BinaryView):
 	def __init__(self, parent):
 		self.memory = DebugMemoryView(parent)
 		self.local_view = parent
-		self.remote_base = 0
 		BinaryView.__init__(self, parent_view=self.memory, file_metadata=self.memory.file)
 		self.arch = parent.arch
 		self.platform = parent.platform
+
+		self.saved_bases = {}
 
 		# TODO: Read segments from debugger
 		length = self.memory.perform_get_length()
@@ -49,31 +50,41 @@ class DebugProcessView(BinaryView):
 	Update cached base address for the remote process
 	"""
 	def update_base(self):
-		self.remote_base = self.get_remote_base()
+		self.saved_bases = {}
 
 	"""
 	Get the base address of the binary in the debugged process
 	"""
-	def get_remote_base(self):
-		debug_state = binjaplug.get_state(self.local_view)
-		return debug_state.modules[debug_state.modules.current]
+	def get_remote_base(self, relative_view=None):
+		if relative_view is None:
+			relative_view = self.local_view
+		module = relative_view.file.original_filename
+		if module not in self.saved_bases:
+			debug_state = binjaplug.get_state(self.local_view)
+			base = debug_state.modules[module]
+			self.saved_bases[module] = base
+		return self.saved_bases[module]
 
 	"""
 	Determine if the debugged process is using ASLR for its code segment
 	(eg in a PIE binary)
 	"""
-	def is_code_aslr(self):
-		return self.remote_base != self.local_view.start
+	def is_code_aslr(self, relative_view=None):
+		if relative_view is None:
+			relative_view = self.local_view
+		return self.get_remote_base(relative_view) != relative_view.start
 
 	"""
 	Given a local address (relative to the analysis binaryview),
 	find its remote address (relative to the debugged process) after ASLR
 	If the address is not within our view, it will be unchanged
 	"""
-	def local_addr_to_remote(self, local_addr):
-		local_base = self.local_view.start
-		remote_base = self.remote_base
-		if local_addr < local_base or local_addr >= local_base + len(self.local_view):
+	def local_addr_to_remote(self, local_addr, relative_view=None):
+		if relative_view is None:
+			relative_view = self.local_view
+		local_base = relative_view.start
+		remote_base = self.get_remote_base(relative_view)
+		if local_addr < local_base or local_addr >= local_base + len(relative_view):
 			# Not within our local binary, return original
 			return local_addr
 		return local_addr - local_base + remote_base
@@ -83,13 +94,15 @@ class DebugProcessView(BinaryView):
 	find its local address (relative to the analysis binaryview)
 	If the address is not within our view, it will be unchanged
 	"""
-	def remote_addr_to_local(self, remote_addr):
+	def remote_addr_to_local(self, remote_addr, relative_view=None):
+		if relative_view is None:
+			relative_view = self.local_view
 		# TODO: Make sure the addr is within the loaded segments for our binary
 		# Else return the original
-		local_base = self.local_view.start
-		remote_base = self.remote_base
+		local_base = relative_view.start
+		remote_base = self.get_remote_base(relative_view)
 		local_addr = remote_addr - remote_base + local_base
-		if local_addr < local_base or local_addr >= local_base + len(self.local_view):
+		if local_addr < local_base or local_addr >= local_base + len(relative_view):
 			# Not within our local binary, return original
 			return remote_addr
 		return local_addr
@@ -97,11 +110,13 @@ class DebugProcessView(BinaryView):
 	"""
 	Determine if a remote address is within the loaded BinaryView
 	"""
-	def is_local_addr(self, remote_addr):
-		local_base = self.local_view.start
-		remote_base = self.remote_base
+	def is_local_addr(self, remote_addr, relative_view=None):
+		if relative_view is None:
+			relative_view = self.local_view
+		local_base = relative_view.start
+		remote_base = self.get_remote_base(relative_view)
 		local_addr = remote_addr - remote_base + local_base
-		return local_addr > local_base and local_addr < local_base + len(self.local_view)
+		return local_addr > local_base and local_addr < local_base + len(relative_view)
 
 class DebugMemoryView(BinaryView):
 	name = "Debugged Process Memory"
