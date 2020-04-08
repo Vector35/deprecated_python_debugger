@@ -504,6 +504,8 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		def target_xml_char_data_handler(data):
 			nonlocal inarch
 			if inarch:
+				if data == 'i386:x86-64':
+					data = 'x86_64'
 				self.target_arch_ = data
 
 		p = xml.parsers.expat.ParserCreate()

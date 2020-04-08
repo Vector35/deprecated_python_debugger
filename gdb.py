@@ -15,7 +15,10 @@ from . import DebugAdapter
 class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 	def __init__(self, **kwargs):
 		gdblike.DebugAdapterGdbLike.__init__(self, **kwargs)
+
 		self.rsp = None
+
+		self.module_cache = {}
 
 	#--------------------------------------------------------------------------
 	# API
@@ -66,10 +69,10 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		self.target_pid_ = self.tid
 
 	def mem_modules(self, cache_ok=True):
-		if cache_ok and self.module2addr != None:
-			return self.module2addr
+		if cache_ok and self.module_cache:
+			return self.module_cache
 
-		self.module2addr = {}
+		self.module_cache = {}
 
 		fpath = '/proc/%d/maps' % self.target_pid_
 
@@ -86,10 +89,10 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 			m = re.match(r'^([0-9a-f]+)-[0-9a-f]+ [rwxp-]{4} .* (/.*)$', line)
 			if not m: continue
 			(addr, module) = m.group(1,2)
-			if module in self.module2addr: continue
-			self.module2addr[module] = int(addr, 16)
+			if module in self.module_cache: continue
+			self.module_cache[module] = int(addr, 16)
 
-		return self.module2addr
+		return self.module_cache
 
 	#--------------------------------------------------------------------------
 	# NON-DEBUGADAPTER API

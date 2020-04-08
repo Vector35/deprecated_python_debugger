@@ -100,7 +100,12 @@ def context_display(pkt_T=None):
 		print(r('rsi'), r('rdi'), r('rbp'), r('rsp'))
 		print(r(' r8'), r(' r9'), r('r10'), r('r11'))
 		print(r('r12'), r('r13'), r('r14'), r('r15'))
-		print(r('rip'), r('rflags'))
+		print(r('rip'), end='')
+
+		if 'rflags' in adapter.reg_list():
+			print(r('rflags'))
+		else:
+			print(r('eflags'))
 	elif arch == 'x86':
 		print(e('eax'), e('ebx'), e('ecx'), e('edx'))
 		print(e('esi'), e('edi'), e('ebp'), e('esp'))
