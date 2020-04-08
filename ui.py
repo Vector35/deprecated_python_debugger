@@ -360,8 +360,13 @@ class DebuggerUI:
 				address = 0
 				enabled = False
 			else:
-				address = self.state.modules[module] + offset
-				enabled = address in remote_list
+				modbase = self.state.modules[module]
+				if modbase is not None:
+					address = modbase + offset
+					enabled = address in remote_list
+				else:
+					address = 0
+					enabled = False
 
 			bps.append({
 				'enabled': enabled,
