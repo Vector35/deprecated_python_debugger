@@ -180,8 +180,9 @@ class DebuggerModules:
 
 	@property
 	def current(self):
-		fpath_exe = self.state.bv.file.original_filename
+		return self.get_module_for_addr(self.state.ip)
 
+	def resolve_path(self, fpath_exe):
 		for (mod, base) in self:
 			if mod == fpath_exe:
 				return mod
@@ -647,7 +648,7 @@ class DebuggerState:
 
 		self.memory_view.update_base()
 
-		current_module = self.modules.current
+		current_module = self.modules.resolve_path(self.bv.file.original_filename)
 		if current_module != self.bv.file.original_filename:
 			print("Detected remote process running at different path: {}".format(current_module))
 			self.modules.translations[current_module] = self.bv.file.original_filename
