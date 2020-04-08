@@ -374,12 +374,12 @@ class DebuggerBreakpoints:
 
 		remote_breakpoints = self.state.adapter.breakpoint_list()
 		for bp in self.breakpoints:
-			remote_address = self.state.modules.relative_addr_to_absolute(bp)
-			if remote_address not in remote_breakpoints:
-				try:
+			try:
+				remote_address = self.state.modules.relative_addr_to_absolute(bp)
+				if remote_address not in remote_breakpoints:
 					self.state.adapter.breakpoint_set(remote_address)
-				except:
-					traceback.print_exc(file=sys.stderr)
+			except:
+				traceback.print_exc(file=sys.stderr)
 
 
 #------------------------------------------------------------------------------
