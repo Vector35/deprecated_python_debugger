@@ -295,7 +295,7 @@ class DebuggerBreakpoints:
 		info = self.state.modules.absolute_addr_to_relative(remote_address)
 		if info not in self.breakpoints:
 			self.breakpoints.append(info)
-			self.state.bv.store_metadata('debugger.breakpoints', self.breakpoints)
+			self.serialize_meatadata()
 			return self.state.adapter.breakpoint_set(remote_address)
 		return False
 
@@ -307,7 +307,7 @@ class DebuggerBreakpoints:
 		info = {'module': module, 'offset': offset}
 		if info not in self.breakpoints:
 			self.breakpoints.append(info)
-			self.state.bv.store_metadata('debugger.breakpoints', self.breakpoints)
+			self.serialize_meatadata()
 
 			if self.state.adapter is not None:
 				remote_address = self.state.modules[module] + offset
@@ -327,7 +327,7 @@ class DebuggerBreakpoints:
 		info = self.state.modules.absolute_addr_to_relative(remote_address)
 		if info in self.breakpoints:
 			self.breakpoints.remove(info)
-			self.state.bv.store_metadata('debugger.breakpoints', self.breakpoints)
+			self.serialize_meatadata()
 			return self.state.adapter.breakpoint_clear(remote_address)
 		return False
 
@@ -339,7 +339,7 @@ class DebuggerBreakpoints:
 		info = {'module': module, 'offset': offset}
 		if info in self.breakpoints:
 			self.breakpoints.remove(info)
-			self.state.bv.store_metadata('debugger.breakpoints', self.breakpoints)
+			self.serialize_meatadata()
 
 			if self.state.adapter is not None:
 				remote_address = self.state.modules[module] + offset
@@ -382,6 +382,31 @@ class DebuggerBreakpoints:
 			except:
 				traceback.print_exc(file=sys.stderr)
 
+	'''
+	Store the breakpoints in binary view metadata.
+	Escape backslashes to avoid them being treated as escape characters by BNCreateMeataDataStringData()
+	'''
+	def serialize_meatadata(self):
+		tmp = []
+		for pair in self.breakpoints:
+			module = pair['module'].replace('\\', '\\\\')
+			tmp.append({'module':module, 'offset':pair['offset']})
+		self.state.bv.store_metadata('debugger.breakpoints', tmp)
+
+	'''
+	Load the breakpoints from binary view metadata.
+	Un-Escape backslashes.
+	'''
+	def unserialize_metadata(self):
+		tmp = []
+		try:
+			tmp = self.state.bv.query_metadata('debugger.breakpoints')
+			for i in range(len(tmp)):
+				tmp[i]['module'] = tmp[i]['module'].replace('\\\\', '\\')
+		except Exception as e:
+			pass
+
+		self.breakpoints = tmp
 
 #------------------------------------------------------------------------------
 # DEBUGGER STATE / CONTROLLER
@@ -415,7 +440,6 @@ class DebuggerState:
 				return default
 
 		self.command_line_args = get_metadata('debugger.command_line_args', [])
-		initial_bps = get_metadata('debugger.breakpoints', [])
 
 		self.adapter_type = list(DebugAdapter.ADAPTER_TYPE)[get_metadata('debugger.adapter_type', DebugAdapter.ADAPTER_TYPE.DEFAULT.value)]
 		self.remote_host = get_metadata('debugger.remote_host', 'localhost')
@@ -425,7 +449,8 @@ class DebuggerState:
 		self.registers = DebuggerRegisters(self)
 		self.threads = DebuggerThreads(self)
 		self.modules = DebuggerModules(self)
-		self.breakpoints = DebuggerBreakpoints(self, initial_bps)
+		self.breakpoints = DebuggerBreakpoints(self)
+		self.breakpoints.unserialize_metadata()
 		self.remote_arch = None
 
 		if have_ui:
