@@ -218,8 +218,8 @@ class DebugControlsWidget(QToolBar):
 			if self.debug_state.running:
 				self.state_running()
 			elif self.debug_state.connected:
-				local_rip = self.debug_state.local_ip
-				if self.debug_state.bv.read(local_rip, 1) and len(self.debug_state.bv.get_functions_containing(local_rip)) > 0:
+				(bv, local_rip) = self.debug_state.local_ip
+				if bv.read(local_rip, 1) and len(bv.get_functions_containing(local_rip)) > 0:
 					self.state_stopped()
 				else:
 					self.state_stopped_extern()
@@ -262,7 +262,7 @@ class DebugControlsWidget(QToolBar):
 
 	def perform_step_into_il(self):
 
-		disasm = self.debug_state.ui.debug_view.binary_editor.getDisassembly()
+		disasm = self.debug_state.ui.debug_view.current_binary_editor.getDisassembly()
 		graph_type = disasm.getGraphType()
 
 		def perform_step_into_il_thread():
@@ -291,7 +291,7 @@ class DebugControlsWidget(QToolBar):
 
 	def perform_step_over_il(self):
 
-		disasm = self.debug_state.ui.debug_view.binary_editor.getDisassembly()
+		disasm = self.debug_state.ui.debug_view.current_binary_editor.getDisassembly()
 		graph_type = disasm.getGraphType()
 
 		def perform_step_over_il_thread():

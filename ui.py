@@ -17,6 +17,7 @@ class DebuggerUI:
 		self.state = state
 		self.debug_view = None
 		self.last_ip = 0
+		self.last_bv = None
 		self.regs = []
 		self.stack = []
 
@@ -148,12 +149,13 @@ class DebuggerUI:
 		#----------------------------------------------------------------------
 		# Update Status
 		#----------------------------------------------------------------------
-		local_rip = self.state.local_ip
+		(bv, local_rip) = self.state.local_ip
 		self.update_highlights()
 		self.last_ip = local_rip
+		self.last_bv = bv
 
 		if self.debug_view is not None:
-			if self.state.bv.read(local_rip, 1) and len(self.state.bv.get_functions_containing(local_rip)) > 0:
+			if bv.read(local_rip, 1) and len(bv.get_functions_containing(local_rip)) > 0:
 				self.debug_view.controls.state_stopped()
 			else:
 				self.debug_view.controls.state_stopped_extern()
@@ -172,10 +174,10 @@ class DebuggerUI:
 		if not self.state.connected:
 			return
 		remote_rip = self.state.ip
-		local_rip = self.state.local_ip
-		if self.state.bv.read(local_rip, 1) is None:
+		(bv, local_rip) = self.state.local_ip
+		if bv.read(local_rip, 1) is None:
 			return
-		function = self.state.bv.get_function_at(local_rip)
+		function = bv.get_function_at(local_rip)
 		if not function:
 			return
 		annotation = "At {}:\n\n".format(datetime.datetime.now().isoformat())
@@ -240,63 +242,63 @@ class DebuggerUI:
 			return
 
 		remote_rip = self.state.ip
-		local_rip = self.state.local_ip
+		(bv, local_rip) = self.state.local_ip
 
 		llil = self.state.remote_arch.get_low_level_il_from_bytes(self.state.memory_view.read(remote_rip, self.state.remote_arch.max_instr_length), remote_rip)
 		call = llil.operation == LowLevelILOperation.LLIL_CALL
 		jump = llil.operation == LowLevelILOperation.LLIL_JUMP or llil.operation == LowLevelILOperation.LLIL_JUMP_TO
 
-		if self.state.modules.get_module_for_addr(remote_rip) == self.state.bv.file.original_filename:
-			if self.state.bv.read(local_rip, 1) is None:
+		if self.state.modules.get_module_for_addr(remote_rip) == bv.file.original_filename:
+			if bv.read(local_rip, 1) is None:
 				raise Exception("Local address that is not local?")
 			else:
 				# If there's already a function here, then we have already been here
-				if len(self.state.bv.get_functions_containing(local_rip)) == 0:
-					self.state.bv.add_function(local_rip)
-					self.state.bv.update_analysis()
+				if len(bv.get_functions_containing(local_rip)) == 0:
+					bv.add_function(local_rip)
+					bv.update_analysis()
 		if call:
 			try:
 				remote_target = self.evaluate_llil(self.state, llil.dest)
 			except e:
 				raise Exception("llil eval failed: {}".format(e))
-			if self.state.modules.get_module_for_addr(remote_target) == self.state.bv.file.original_filename:
-				local_target = self.state.memory_view.remote_addr_to_local(remote_target)
-				if self.state.bv.read(local_target, 1) is None:
+			if self.state.modules.get_module_for_addr(remote_target) == bv.file.original_filename:
+				local_target = self.state.memory_view.remote_addr_to_local(remote_target, bv)
+				if bv.read(local_target, 1) is None:
 					raise Exception("Local address that is not local?")
 				else:
 					# If there's already a function here, then we have already been here
-					if len(self.state.bv.get_functions_containing(local_target)) > 0:
+					if len(bv.get_functions_containing(local_target)) > 0:
 						return
 
-					self.state.bv.add_function(local_target)
-					self.state.bv.update_analysis()
+					bv.add_function(local_target)
+					bv.update_analysis()
 		elif jump:
 			try:
 				remote_target = self.evaluate_llil(self.state, llil.dest)
 			except e:
 				raise Exception("llil eval failed: {}".format(e))
-			if self.state.modules.get_module_for_addr(remote_target) == self.state.bv.file.original_filename:
-				local_target = self.state.memory_view.remote_addr_to_local(remote_target)
-				if self.state.bv.read(local_target, 1) is None:
+			if self.state.modules.get_module_for_addr(remote_target) == bv.file.original_filename:
+				local_target = self.state.memory_view.remote_addr_to_local(remote_target, bv)
+				if bv.read(local_target, 1) is None:
 					raise Exception("Local address that is not local?")
 				else:
 					# If there's already a function here, then we have already been here
-					if len(self.state.bv.get_functions_containing(local_target)) > 0:
+					if len(bv.get_functions_containing(local_target)) > 0:
 						# TODO: Can annotate the assembly with where we're going
 						return
 
 					# Add as a branch target to current function
-					if self.state.modules.get_module_for_addr(remote_rip) == self.state.bv.file.original_filename:
-						if self.state.bv.read(local_rip, 1) is None:
+					if self.state.modules.get_module_for_addr(remote_rip) == bv.file.original_filename:
+						if bv.read(local_rip, 1) is None:
 							raise Exception("Local address that is not local?")
 						else:
 							# If there's already a function here, then we have already been here
-							funcs = self.state.bv.get_functions_containing(local_rip)
+							funcs = bv.get_functions_containing(local_rip)
 							if len(funcs) == 0:
 								raise Exception("Local rip is not at a function?")
 
 							funcs[0].set_user_indirect_branches(local_rip, [(self.state.remote_arch, local_target)])
-							self.state.bv.update_analysis()
+							bv.update_analysis()
 
 	def navigate_to_rip(self):
 		if self.debug_view is not None:
@@ -312,8 +314,9 @@ class DebuggerUI:
 	# Highlight lines
 	def update_highlights(self):
 		# Clear old highlighted rip
-		for func in (self.state.bv.get_functions_containing(self.last_ip) or []):
-			func.set_auto_instr_highlight(self.last_ip, HighlightStandardColor.NoHighlightColor)
+		if self.last_bv is not None:
+			for func in (self.last_bv.get_functions_containing(self.last_ip) or []):
+				func.set_auto_instr_highlight(self.last_ip, HighlightStandardColor.NoHighlightColor)
 
 		for (module, offset) in self.state.breakpoints:
 			if module != self.state.bv.file.original_filename:
@@ -324,9 +327,16 @@ class DebuggerUI:
 
 		if self.state.connected:
 			remote_rip = self.state.ip
-			local_rip = self.state.memory_view.remote_addr_to_local(remote_rip)
+			(bv, local_rip) = self.state.local_ip
 
-			for func in (self.state.bv.get_functions_containing(local_rip) or []):
+			for (module, offset) in self.state.breakpoints:
+				if module != bv.file.original_filename:
+					continue
+				bp = bv.start + offset
+				for func in bv.get_functions_containing(bp):
+					func.set_auto_instr_highlight(bp, HighlightStandardColor.RedHighlightColor)
+
+			for func in (bv.get_functions_containing(local_rip) or []):
 				func.set_auto_instr_highlight(local_rip, HighlightStandardColor.BlueHighlightColor)
 
 	def update_modules(self):
@@ -335,7 +345,8 @@ class DebuggerUI:
 		for (modpath, address) in self.state.modules:
 			mods.append({
 				'address': address,
-				'modpath': modpath
+				'modpath': modpath,
+				'have_analysis': modpath in self.state.bvs
 				# TODO: Length, segments, etc
 			})
 		mods.sort(key=lambda row: row['address'])
@@ -381,11 +392,11 @@ class DebuggerUI:
 		if self.debug_view is not None:
 			self.debug_view.refresh_raw_disassembly()
 
-	def breakpoint_tag_add(self, local_address):
+	def breakpoint_tag_add(self, bv, local_address):
 		# create tag
-		tt = self.get_breakpoint_tag_type()
+		tt = self.get_breakpoint_tag_type(bv)
 
-		for func in self.state.bv.get_functions_containing(local_address):
+		for func in bv.get_functions_containing(local_address):
 			tags = [tag for tag in func.get_address_tags_at(local_address) if tag.type == tt]
 			if len(tags) == 0:
 				tag = func.create_user_address_tag(local_address, tt, "breakpoint")
@@ -395,15 +406,15 @@ class DebuggerUI:
 	# breakpoint TAG removal - strictly presentation
 	# (doesn't remove actual breakpoints, just removes the binja tags that mark them)
 	#
-	def breakpoint_tag_del(self, local_addresses=None):
+	def breakpoint_tag_del(self, bv, local_addresses=None):
 		if local_addresses == None:
-			local_addresses = [self.state.bv.start + offset for (module, offset) in self.state.breakpoints if module == self.state.bv.file.original_filename]
+			local_addresses = [bv.start + offset for (module, offset) in self.state.breakpoints if module == bv.file.original_filename]
 
-		tt = self.get_breakpoint_tag_type()
+		tt = self.get_breakpoint_tag_type(bv)
 
 		for local_address in local_addresses:
 			# delete breakpoint tags from all functions containing this address
-			for func in self.state.bv.get_functions_containing(local_address):
+			for func in bv.get_functions_containing(local_address):
 				func.set_auto_instr_highlight(local_address, HighlightStandardColor.NoHighlightColor)
 				delqueue = [tag for tag in func.get_address_tags_at(local_address) if tag.type == tt]
 				for tag in delqueue:
@@ -411,17 +422,21 @@ class DebuggerUI:
 
 		self.context_display()
 
-	def get_breakpoint_tag_type(self):
-		if "Breakpoints" in self.state.bv.tag_types:
-			return self.state.bv.tag_types["Breakpoints"]
+	def get_breakpoint_tag_type(self, bv):
+		if "Breakpoints" in bv.tag_types:
+			return bv.tag_types["Breakpoints"]
 		else:
-			return self.state.bv.create_tag_type("Breakpoints", "🛑")
+			return bv.create_tag_type("Breakpoints", "🛑")
 
 	def on_stdout(self, output):
 		def on_stdout_main_thread(output):
 			console_widget = self.widget('Debugger Console')
 			console_widget.notifyStdout(output)
 		execute_on_main_thread_and_wait(lambda: on_stdout_main_thread(output))
+
+	def add_bv(self, bv):
+		if self.debug_view is not None:
+			self.debug_view.add_module(bv)
 
 #------------------------------------------------------------------------------
 # right click plugin
@@ -447,11 +462,11 @@ def cb_bp_toggle(bv, address):
 	else:
 		offset = address - bv.start
 		if debug_state.breakpoints.contains_offset(bv.file.original_filename, offset):
-			debug_state.ui.breakpoint_tag_del([address])
+			debug_state.ui.breakpoint_tag_del(bv, [address])
 			debug_state.breakpoints.remove_offset(bv.file.original_filename, offset)
 		else:
 			debug_state.breakpoints.add_offset(bv.file.original_filename, offset)
-			debug_state.ui.breakpoint_tag_add(address)
+			debug_state.ui.breakpoint_tag_add(bv, address)
 	debug_state.ui.update_breakpoints()
 
 def valid_bp_toggle(bv, address):
@@ -534,6 +549,18 @@ def cb_control_step_return(bv):
 	if debug_state.ui.debug_view is not None:
 		debug_state.ui.debug_view.controls.actionStepReturn.trigger()
 
+def cb_apply_breakpoints(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		debug_state.breakpoints.apply()
+		debug_state.ui.update_breakpoints()
+
+def cb_load_module(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is not None:
+		module = debug_state.modules.current
+		debug_state.add_bv(module)
+
 # -----------------------------------------------------------------------------
 
 def valid_process_run(bv):
@@ -594,6 +621,26 @@ def valid_control_step_return(bv):
 	debug_state = binjaplug.get_state(bv)
 	return debug_state.ui.debug_view is not None and debug_state.ui.debug_view.controls.actionStepReturn.isEnabled()
 
+def valid_apply_breakpoints(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is None:
+		return False
+	if not debug_state.connected:
+		return False
+	return True
+
+def valid_load_module(bv):
+	debug_state = binjaplug.get_state(bv)
+	if debug_state.ui.debug_view is None:
+		return False
+	if not debug_state.connected:
+		return False
+	module = debug_state.modules.current
+	if module in debug_state.bvs:
+		return False
+	return True
+
+
 #------------------------------------------------------------------------------
 # Load plugin commands and actions
 #------------------------------------------------------------------------------
@@ -621,5 +668,8 @@ def initialize_ui():
 	PluginCommand.register("Debugger\\Control\\Step Over (Assembly)", "Step over function call", cb_control_step_over_asm, is_valid=valid_control_step_over_asm)
 	PluginCommand.register("Debugger\\Control\\Step Over (IL)", "Step over function call", cb_control_step_over_il, is_valid=valid_control_step_over_il)
 	PluginCommand.register("Debugger\\Control\\Step Return", "Step until current function returns", cb_control_step_return, is_valid=valid_control_step_return)
+
+	PluginCommand.register("Debugger\\Breakpoints\\Apply Breakpoints", "Refresh the breakpoint list on the target", cb_apply_breakpoints, is_valid=valid_apply_breakpoints)
+	PluginCommand.register("Debugger\\Module\\Load Current Module", "Load analysis for the current module", cb_load_module, is_valid=valid_load_module)
 
 	ViewType.registerViewType(DebugView.DebugViewType())

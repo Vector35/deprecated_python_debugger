@@ -42,18 +42,14 @@ class DebugView(QWidget, View):
 		View.__init__(self)
 
 		self.setupView(self)
-
-		self.current_offset = 0
+		frame = ViewFrame.viewFrameForWidget(self)
 
 		self.splitter = QSplitter(Qt.Orientation.Horizontal, self)
-
-		frame = ViewFrame.viewFrameForWidget(self)
-		self.memory_editor = LinearView(memory_view, frame)
-		self.binary_editor = DisassemblyContainer(frame, data, frame)
 
 		self.binary_text = TokenizedTextView(self, memory_view)
 		self.is_raw_disassembly = False
 		self.raw_address = 0
+		self.current_offset = 0
 
 		self.is_navigating_history = False
 		self.memory_history_addr = 0
@@ -61,28 +57,19 @@ class DebugView(QWidget, View):
 		# TODO: Handle these and change views accordingly
 		# Currently they are just disabled as the DisassemblyContainer gets confused
 		# about where to go and just shows a bad view
-		self.binary_editor.getDisassembly().actionHandler().bindAction("View in Hex Editor", UIAction())
-		self.binary_editor.getDisassembly().actionHandler().bindAction("View in Linear Disassembly", UIAction())
-		self.binary_editor.getDisassembly().actionHandler().bindAction("View in Types View", UIAction())
-
+		self.memory_editor = LinearView(memory_view, frame)
 		self.memory_editor.actionHandler().bindAction("View in Hex Editor", UIAction())
 		self.memory_editor.actionHandler().bindAction("View in Disassembly Graph", UIAction())
 		self.memory_editor.actionHandler().bindAction("View in Types View", UIAction())
 
+		self.binary_editors = {}
+		self.bv_widgets = {}
+		self.current_module = None
+		self.add_module(self.debug_state.bv)
+		self.set_module(self.debug_state.bv.file.original_filename)
+
 		small_font = QApplication.font()
 		small_font.setPointSize(11)
-
-		bv_layout = QVBoxLayout()
-		bv_layout.setSpacing(0)
-		bv_layout.setContentsMargins(0, 0, 0, 0)
-
-		bv_label = QLabel("Loaded File")
-		bv_label.setFont(small_font)
-		bv_layout.addWidget(bv_label)
-		bv_layout.addWidget(self.binary_editor)
-
-		self.bv_widget = QWidget()
-		self.bv_widget.setLayout(bv_layout)
 
 		disasm_layout = QVBoxLayout()
 		disasm_layout.setSpacing(0)
@@ -108,7 +95,7 @@ class DebugView(QWidget, View):
 		self.memory_widget = QWidget()
 		self.memory_widget.setLayout(memory_layout)
 
-		self.splitter.addWidget(self.bv_widget)
+		self.splitter.addWidget(self.bv_widgets[self.current_module])
 		self.splitter.addWidget(self.memory_widget)
 
 		# Equally sized
@@ -136,45 +123,77 @@ class DebugView(QWidget, View):
 			if type(thread) == PythonScriptingInstance.InterpreterThread:
 				thread.locals["dbg"] = self.debug_state
 
+	def add_module(self, bv):
+		frame = ViewFrame.viewFrameForWidget(self)
+		binary_editor = DisassemblyContainer(frame, bv, frame)
+		binary_editor.getDisassembly().actionHandler().bindAction("View in Hex Editor", UIAction())
+		binary_editor.getDisassembly().actionHandler().bindAction("View in Linear Disassembly", UIAction())
+		binary_editor.getDisassembly().actionHandler().bindAction("View in Types View", UIAction())
+
+		small_font = QApplication.font()
+		small_font.setPointSize(11)
+
+		bv_layout = QVBoxLayout()
+		bv_layout.setSpacing(0)
+		bv_layout.setContentsMargins(0, 0, 0, 0)
+
+		bv_label = QLabel(bv.file.original_filename)
+		bv_label.setFont(small_font)
+		bv_layout.addWidget(bv_label)
+		bv_layout.addWidget(binary_editor)
+
+		bv_widget = QWidget(self)
+		bv_widget.setLayout(bv_layout)
+
+		# TODO: Can we get the view from another window?
+		self.splitter.replaceWidget(0, bv_widget)
+
+		self.binary_editors[bv.file.original_filename] = binary_editor
+		self.bv_widgets[bv.file.original_filename] = bv_widget
+
+	def set_module(self, module):
+		self.current_binary_editor = self.binary_editors[module]
+		self.current_module = module
+
 	def getData(self):
-		return self.bv
+		return self.debug_state.bvs.get(self.current_module, self.bv)
 
 	def getFont(self):
 		return binaryninjaui.getMonospaceFont(self)
 
 	def getCurrentOffset(self):
 		if not self.is_raw_disassembly:
-			return self.binary_editor.getDisassembly().getCurrentOffset()
+			return self.current_binary_editor.getDisassembly().getCurrentOffset()
 		return self.raw_address
 
 	def getSelectionOffsets(self):
 		if not self.is_raw_disassembly:
-			return self.binary_editor.getDisassembly().getSelectionOffsets()
+			return self.current_binary_editor.getDisassembly().getSelectionOffsets()
 		return (self.raw_address, self.raw_address)
 
 	def getCurrentFunction(self):
 		if not self.is_raw_disassembly:
-			return self.binary_editor.getDisassembly().getCurrentFunction()
+			return self.current_binary_editor.getDisassembly().getCurrentFunction()
 		return None
 
 	def getCurrentBasicBlock(self):
 		if not self.is_raw_disassembly:
-			return self.binary_editor.getDisassembly().getCurrentBasicBlock()
+			return self.current_binary_editor.getDisassembly().getCurrentBasicBlock()
 		return None
 
 	def getCurrentArchitecture(self):
 		if not self.is_raw_disassembly:
-			return self.binary_editor.getDisassembly().getCurrentArchitecture()
+			return self.current_binary_editor.getDisassembly().getCurrentArchitecture()
 		return None
 
 	def getCurrentLowLevelILFunction(self):
 		if not self.is_raw_disassembly:
-			return self.binary_editor.getDisassembly().getCurrentLowLevelILFunction()
+			return self.current_binary_editor.getDisassembly().getCurrentLowLevelILFunction()
 		return None
 
 	def getCurrentMediumLevelILFunction(self):
 		if not self.is_raw_disassembly:
-			return self.binary_editor.getDisassembly().getCurrentMediumLevelILFunction()
+			return self.current_binary_editor.getDisassembly().getCurrentMediumLevelILFunction()
 		return None
 
 	def getHistoryEntry(self):
@@ -187,8 +206,7 @@ class DebugView(QWidget, View):
 			rel_addr = self.debug_state.modules.absolute_addr_to_relative(self.raw_address)
 			return DebugView.DebugViewHistoryEntry(memory_addr, rel_addr, True)
 		else:
-			address = self.binary_editor.getDisassembly().getCurrentOffset()
-			return DebugView.DebugViewHistoryEntry(memory_addr, address, False)
+			return DebugView.DebugViewHistoryEntry(memory_addr, (self.current_module, self.getCurrentOffset()), False)
 
 	def navigateToHistoryEntry(self, entry):
 		self.is_navigating_history = True
@@ -199,35 +217,42 @@ class DebugView(QWidget, View):
 					address = self.debug_state.modules.relative_addr_to_absolute(entry.address)
 					self.navigate_raw(address)
 			else:
-				self.navigate_live(entry.address)
+				(module, address) = entry.address
+				self.navigate_live(module, address)
 
 		View.navigateToHistoryEntry(self, entry)
 		self.is_navigating_history = False
 
 	def navigate(self, addr):
-		if self.debug_state.memory_view.is_local_addr(addr):
-			local_addr = self.debug_state.memory_view.remote_addr_to_local(addr)
-			if self.debug_state.bv.read(local_addr, 1) and len(self.debug_state.bv.get_functions_containing(local_addr)) > 0:
-				return self.navigate_live(local_addr)
+		bv = self.debug_state.current_bv
+		if self.debug_state.memory_view.is_local_addr(addr, bv):
+			local_addr = self.debug_state.memory_view.remote_addr_to_local(addr, bv)
+			if bv.read(local_addr, 1) and len(bv.get_functions_containing(local_addr)) > 0:
+				return self.navigate_live(bv.file.original_filename, local_addr)
 
 		# This runs into conflicts if some other address space is mapped over
 		# where the local BV is currently loaded, but this is was less likely
 		# than the user navigating to a function from the UI
-		if self.debug_state.bv.read(addr, 1) and len(self.debug_state.bv.get_functions_containing(addr)) > 0:
-			return self.navigate_live(addr)
+		if bv.read(addr, 1) and len(bv.get_functions_containing(addr)) > 0:
+			return self.navigate_live(bv.file.original_filename, addr)
 
 		return self.navigate_raw(addr)
 
-	def navigate_live(self, addr):
-		self.show_raw_disassembly(False)
-		return self.binary_editor.getDisassembly().navigate(addr)
+	def navigate_live(self, module, addr):
+		if self.current_module != module:
+			self.set_module(module)
+			self.show_raw_disassembly(False)
+		elif self.is_raw_disassembly:
+			self.show_raw_disassembly(False)
+		return self.current_binary_editor.getDisassembly().navigate(addr)
 
 	def navigate_raw(self, addr):
 		if not self.debug_state.connected:
 			# Can't navigate to remote addr when disconnected
 			return False
 		self.raw_address = addr
-		self.show_raw_disassembly(True)
+		if not self.is_raw_disassembly:
+			self.show_raw_disassembly(True)
 		self.load_raw_disassembly(addr)
 		return True
 
@@ -295,7 +320,7 @@ class DebugView(QWidget, View):
 			if line_addr == rip:
 				if self.debug_state.breakpoints.contains_absolute(start_ip + total_read):
 					# Breakpoint & pc
-					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.debug_state.ui.get_breakpoint_tag_type().icon + ">", width=5))
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.debug_state.ui.get_breakpoint_tag_type(self.debug_state.bv).icon + ">", width=5))
 					color = HighlightStandardColor.RedHighlightColor
 				else:
 					# PC
@@ -304,7 +329,7 @@ class DebugView(QWidget, View):
 			else:
 				if self.debug_state.breakpoints.contains_absolute(start_ip + total_read):
 					# Breakpoint
-					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.debug_state.ui.get_breakpoint_tag_type().icon, width=5))
+					tokens.append(InstructionTextToken(InstructionTextTokenType.TagToken, self.debug_state.ui.get_breakpoint_tag_type(self.debug_state.bv).icon, width=5))
 					color = HighlightStandardColor.RedHighlightColor
 				else:
 					# Regular line
@@ -334,9 +359,8 @@ class DebugView(QWidget, View):
 		self.binary_text.setLines(lines)
 
 	def show_raw_disassembly(self, raw):
-		if raw != self.is_raw_disassembly:
-			self.splitter.replaceWidget(0, self.disasm_widget if raw else self.bv_widget)
-			self.is_raw_disassembly = raw
+		self.splitter.replaceWidget(0, self.disasm_widget if raw else self.bv_widgets[self.current_module])
+		self.is_raw_disassembly = raw
 
 	def refresh_raw_disassembly(self):
 		if not self.debug_state.connected:

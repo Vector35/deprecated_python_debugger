@@ -7,7 +7,7 @@ import traceback
 import tempfile
 
 import binaryninja
-from binaryninja import BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation
+from binaryninja import BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation, BinaryViewType
 
 from . import DebugAdapter, ProcessView, dbgeng, QueuedAdapter
 
@@ -33,6 +33,12 @@ def get_state(bv):
 	# Try to find an existing state object
 	for state in DebuggerState.states:
 		if state.bv == bv:
+			return state
+		if state.memory_view == bv:
+			return state
+		if state.memory_view == bv.parent_view:
+			return state
+		if bv in state.bvs.values():
 			return state
 
 	# Else make a new one, initially inactive
@@ -294,6 +300,7 @@ class DebuggerBreakpoints:
 		assert self.state.adapter is not None
 		info = self.state.modules.absolute_addr_to_relative(remote_address)
 		if info not in self.breakpoints:
+			assert info['module'] is not None
 			self.breakpoints.append(info)
 			self.state.bv.store_metadata('debugger.breakpoints', self.breakpoints)
 			return self.state.adapter.breakpoint_set(remote_address)
@@ -306,6 +313,7 @@ class DebuggerBreakpoints:
 	def add_offset(self, module, offset):
 		info = {'module': module, 'offset': offset}
 		if info not in self.breakpoints:
+			assert info['module'] is not None
 			self.breakpoints.append(info)
 			self.state.bv.store_metadata('debugger.breakpoints', self.breakpoints)
 
@@ -433,12 +441,16 @@ class DebuggerState:
 		else:
 			self.ui = None
 
+		self.bvs = {
+			self.bv.file.original_filename: self.bv
+		}
+
 		if self.bv and self.bv.entry_point:
 			local_entry_offset = self.bv.entry_point - self.bv.start
 			if not self.breakpoints.contains_offset(self.bv.file.original_filename, local_entry_offset):
 				self.breakpoints.add_offset(self.bv.file.original_filename, local_entry_offset)
 				if self.ui is not None:
-					self.ui.breakpoint_tag_add(self.bv.entry_point)
+					self.ui.breakpoint_tag_add(self.bv, self.bv.entry_point)
 					self.ui.update_breakpoints()
 
 	#--------------------------------------------------------------------------
@@ -462,7 +474,7 @@ class DebuggerState:
 
 	@property
 	def local_ip(self):
-		return self.memory_view.remote_addr_to_local(self.ip)
+		return (self.current_bv, self.memory_view.remote_addr_to_local(self.ip, self.current_bv))
 
 	@property
 	def remote_ip(self):
@@ -552,6 +564,22 @@ class DebuggerState:
 		else:
 			pass
 			# raise NotImplementedError('only x86_64 so far')
+
+	#--------------------------------------------------------------------------
+
+	def add_bv(self, path):
+		# TODO: Options and Load It For Real
+		bv = BinaryViewType.get_view_of_file(path)
+		self.bvs[path] = bv
+
+		if self.ui is not None:
+			self.ui.add_bv(bv)
+
+	@property
+	def current_bv(self):
+		if not self.connected:
+			return self.bv
+		return self.bvs.get(self.modules.current, self.bv)
 
 	#--------------------------------------------------------------------------
 	# I/O Handling
@@ -774,9 +802,10 @@ class DebuggerState:
 			raise Exception('missing adapter')
 
 		remote_rip = self.ip
+		bv = self.current_bv
 
 		# Cannot IL step through non-analyzed code
-		if not self.memory_view.is_local_addr(remote_rip):
+		if not self.memory_view.is_local_addr(remote_rip, bv):
 			il = FunctionGraphType.NormalFunctionGraph
 
 		if il == FunctionGraphType.NormalFunctionGraph:
@@ -803,12 +832,12 @@ class DebuggerState:
 				result = self.step_into(FunctionGraphType.NormalFunctionGraph)
 				self.memory_dirty()
 				new_remote_rip = self.ip
-				new_local_rip = self.memory_view.remote_addr_to_local(new_remote_rip)
-				if not self.memory_view.is_local_addr(new_remote_rip):
+				new_local_rip = self.memory_view.remote_addr_to_local(new_remote_rip, bv)
+				if not self.memory_view.is_local_addr(new_remote_rip, bv):
 					# Stepped outside of loaded bv
 					return result
 
-				fns = self.bv.get_functions_containing(new_local_rip)
+				fns = bv.get_functions_containing(new_local_rip)
 				if len(fns) == 0:
 					return result
 				for fn in fns:
@@ -823,12 +852,12 @@ class DebuggerState:
 				result = self.step_into(FunctionGraphType.NormalFunctionGraph)
 				self.memory_dirty()
 				new_remote_rip = self.ip
-				new_local_rip = self.memory_view.remote_addr_to_local(new_remote_rip)
-				if not self.memory_view.is_local_addr(new_remote_rip):
+				new_local_rip = self.memory_view.remote_addr_to_local(new_remote_rip, bv)
+				if not self.memory_view.is_local_addr(new_remote_rip, bv):
 					# Stepped outside of loaded bv
 					return result
 
-				fns = self.bv.get_functions_containing(new_local_rip)
+				fns = bv.get_functions_containing(new_local_rip)
 				if len(fns) == 0:
 					return result
 				for fn in fns:
@@ -849,16 +878,16 @@ class DebuggerState:
 			pass
 
 		remote_rip = self.ip
-		local_rip = self.memory_view.remote_addr_to_local(remote_rip)
+		(bv, local_rip) = self.local_ip
 
 		# Cannot IL step through non-analyzed code
-		if not self.memory_view.is_local_addr(remote_rip):
+		if not self.memory_view.is_local_addr(remote_rip, bv):
 			il = FunctionGraphType.NormalFunctionGraph
 
 		if il == FunctionGraphType.NormalFunctionGraph:
 			arch_dis = self.remote_arch
 			addr = local_rip
-			sample = self.bv.read(addr, arch_dis.max_instr_length)
+			sample = bv.read(addr, arch_dis.max_instr_length)
 			if not sample:
 				addr = remote_rip
 				sample = self.adapter.mem_read(addr, arch_dis.max_instr_length)
@@ -892,11 +921,11 @@ class DebuggerState:
 					self.memory_dirty()
 					new_remote_rip = self.ip
 					new_local_rip = self.memory_view.remote_addr_to_local(new_remote_rip)
-					if not self.memory_view.is_local_addr(new_remote_rip):
+					if not self.memory_view.is_local_addr(new_remote_rip, bv):
 						# Stepped outside of loaded bv
 						return result
 
-					fns = self.bv.get_functions_containing(new_local_rip)
+					fns = bv.get_functions_containing(new_local_rip)
 					if len(fns) == 0:
 						return result
 					for fn in fns:
@@ -912,11 +941,11 @@ class DebuggerState:
 					self.memory_dirty()
 					new_remote_rip = self.ip
 					new_local_rip = self.memory_view.remote_addr_to_local(new_remote_rip)
-					if not self.memory_view.is_local_addr(new_remote_rip):
+					if not self.memory_view.is_local_addr(new_remote_rip, bv):
 						# Stepped outside of loaded bv
 						return result
 
-					fns = self.bv.get_functions_containing(new_local_rip)
+					fns = bv.get_functions_containing(new_local_rip)
 					if len(fns) == 0:
 						return result
 					for fn in fns:
@@ -933,10 +962,10 @@ class DebuggerState:
 			raise Exception('missing adapter')
 
 		remote_rip = self.ip
-		local_rip = self.memory_view.remote_addr_to_local(remote_rip)
+		(bv, local_rip) = self.local_ip
 
 		# TODO: If we don't have a function loaded, walk the stack
-		funcs = self.bv.get_functions_containing(local_rip)
+		funcs = bv.get_functions_containing(local_rip)
 		if len(funcs) != 0:
 			mlil = funcs[0].mlil
 

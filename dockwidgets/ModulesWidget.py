@@ -14,7 +14,7 @@ class DebugModulesListModel(QAbstractItemModel):
 	def __init__(self, parent, bv):
 		QAbstractItemModel.__init__(self, parent)
 		self.bv = bv
-		self.columns = ["Address", "Name", "Full Path"]
+		self.columns = ["Address", "Name", "Analyzed", "Full Path"]
 		self.update_rows(None)
 
 	def update_rows(self, new_rows):
@@ -69,6 +69,8 @@ class DebugModulesListModel(QAbstractItemModel):
 				text = info['modpath']
 				if '/' in text:
 					text = text[text.rfind('/')+1:]
+			elif self.columns[index.column()] == "Analyzed":
+				text = "True" if info['have_analysis'] else "False"
 			elif self.columns[index.column()] == "Full Path":
 				text = info['modpath']
 			else:
@@ -88,7 +90,7 @@ class DebugModulesItemDelegate(QItemDelegate):
 		self.char_height = QFontMetricsF(self.font).height()
 		self.char_offset = binaryninjaui.getFontVerticalOffset()
 
-		self.expected_char_widths = [20, 20, 30]
+		self.expected_char_widths = [20, 20, 10, 30]
 
 	def sizeHint(self, option, idx):
 		width = self.expected_char_widths[idx.column()]
