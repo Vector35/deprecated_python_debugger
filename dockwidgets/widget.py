@@ -22,7 +22,7 @@ def create_widget(widget_class, name, parent, data, *args):
 			if bv == data:
 				widgets[name] = widget
 				found = True
-		
+
 		if not found:
 			debug_dockwidgets.append((data, {
 				name: widget
@@ -48,10 +48,7 @@ def destroy_widget(destroyed, old, data, name):
 
 
 def register_dockwidget(widget_class, name, area, orientation, default_visibility, *args):
-	mainWindow = QApplication.allWidgets()[0].window()
-
-	# binaryninja/api/ui/dockhandler.h
-	dock_handler = mainWindow.findChild(DockHandler, '__DockHandler')
+	dock_handler = DockHandler.getActiveDockHandler()
 
 	# create main debugger controls
 	dock_handler.addDockWidget(name, lambda n,p,d: create_widget(widget_class, n, p, d, *args), area, orientation, default_visibility)
@@ -60,6 +57,6 @@ def get_dockwidget(data, name):
 	for (bv, widgets) in debug_dockwidgets:
 		if bv == data:
 			return widgets.get(name)
-	
+
 	return None
 
