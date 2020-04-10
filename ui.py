@@ -600,7 +600,7 @@ def initialize_ui():
 	widget.register_dockwidget(ThreadsWidget.DebugThreadsWidget, "Debugger Threads", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 	widget.register_dockwidget(StackWidget.DebugStackWidget, "Debugger Stack", Qt.LeftDockWidgetArea, Qt.Vertical, False)
 	widget.register_dockwidget(ModulesWidget.DebugModulesWidget, "Debugger Modules", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
-	widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Registers", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
+	widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 
 	PluginCommand.register_for_address("Debugger\\Toggle Breakpoint", "sets/clears breakpoint at right-clicked address", cb_bp_toggle, is_valid=valid_bp_toggle)
 
