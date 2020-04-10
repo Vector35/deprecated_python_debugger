@@ -26,13 +26,14 @@ except (ModuleNotFoundError, ImportError, IndexError) as e:
 #------------------------------------------------------------------------------
 
 def get_state(bv):
-	# TODO: Better way of determining this
-	if 'Memory' in bv.sections:
-		bv = bv.parent_view.parent_view
-
 	# Try to find an existing state object
 	for state in DebuggerState.states:
 		if state.bv == bv:
+			return state
+		# Detect memory views
+		if state.memory_view == bv:
+			return state
+		if state.memory_view == bv.parent_view:
 			return state
 
 	# Else make a new one, initially inactive

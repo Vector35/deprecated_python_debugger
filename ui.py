@@ -428,18 +428,14 @@ class DebuggerUI:
 #------------------------------------------------------------------------------
 
 def cb_bp_toggle(bv, address):
-	is_debug_view = False
-	# TODO: Better way of determining this
-	if 'Memory' in bv.sections:
-		is_debug_view = True
-		bv = bv.parent_view.parent_view
-
-	if not is_debug_view:
-		if not bv.read(address, 1):
-			is_debug_view = True
-
 	debug_state = binjaplug.get_state(bv)
-	if is_debug_view:
+
+	# If the breakpoint should be set with the absolute address on memory
+	is_absolute_address = False
+	if bv == debug_state.memory_view or bv.parent_view == debug_state.memory_view:
+		is_absolute_address = True
+
+	if is_absolute_address:
 		if debug_state.breakpoints.contains_absolute(address):
 			debug_state.breakpoints.remove_absolute(address)
 		else:
