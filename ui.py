@@ -20,11 +20,11 @@ class DebuggerUI:
 		self.regs = []
 		self.stack = []
 
-		registers_widget = self.widget('Registers')
-		modules_widget = self.widget('Modules')
-		threads_widget = self.widget('Threads')
-		stack_widget = self.widget('Stack')
-		bp_widget = self.widget("Breakpoints")
+		registers_widget = self.widget("Debugger Registers")
+		modules_widget = self.widget("Debugger Modules")
+		threads_widget = self.widget("Debugger Threads")
+		stack_widget = self.widget("Debugger Stack")
+		bp_widget = self.widget("Debugger Breakpoints")
 		console_widget = self.widget('Debugger Console')
 
 		if registers_widget is None or modules_widget is None or threads_widget is None or stack_widget is None or bp_widget is None or console_widget is None:
@@ -43,10 +43,10 @@ class DebuggerUI:
 		return widget.get_dockwidget(self.state.bv, name)
 
 	def context_display(self):
-		registers_widget = self.widget('Registers')
-		modules_widget = self.widget('Modules')
-		threads_widget = self.widget('Threads')
-		stack_widget = self.widget('Stack')
+		registers_widget = self.widget("Debugger Registers")
+		modules_widget = self.widget("Debugger Modules")
+		threads_widget = self.widget("Debugger Threads")
+		stack_widget = self.widget("Debugger Stack")
 
 		if not self.state.connected:
 			# Disconnected
@@ -339,7 +339,7 @@ class DebuggerUI:
 				# TODO: Length, segments, etc
 			})
 		mods.sort(key=lambda row: row['address'])
-		modules_widget = self.widget('Modules')
+		modules_widget = self.widget("Debugger Modules")
 		modules_widget.notifyModulesChanged(mods)
 
 	# Mark memory as dirty, will refresh memory view
@@ -375,7 +375,7 @@ class DebuggerUI:
 				'address': address
 			})
 
-		bp_widget = self.widget("Breakpoints")
+		bp_widget = self.widget("Debugger Breakpoints")
 		bp_widget.notifyBreakpointsChanged(bps)
 		# Refresh disassembly to show the new bp
 		if self.debug_view is not None:
@@ -595,12 +595,12 @@ def valid_control_step_return(bv):
 #------------------------------------------------------------------------------
 
 def initialize_ui():
-	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Breakpoints", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
-	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Registers", Qt.RightDockWidgetArea, Qt.Vertical, False)
-	widget.register_dockwidget(ThreadsWidget.DebugThreadsWidget, "Threads", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
-	widget.register_dockwidget(StackWidget.DebugStackWidget, "Stack", Qt.LeftDockWidgetArea, Qt.Vertical, False)
-	widget.register_dockwidget(ModulesWidget.DebugModulesWidget, "Modules", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
-	widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
+	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Debugger Breakpoints", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
+	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Debugger Registers", Qt.RightDockWidgetArea, Qt.Vertical, False)
+	widget.register_dockwidget(ThreadsWidget.DebugThreadsWidget, "Debugger Threads", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
+	widget.register_dockwidget(StackWidget.DebugStackWidget, "Debugger Stack", Qt.LeftDockWidgetArea, Qt.Vertical, False)
+	widget.register_dockwidget(ModulesWidget.DebugModulesWidget, "Debugger Modules", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
+	widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Registers", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 
 	PluginCommand.register_for_address("Debugger\\Toggle Breakpoint", "sets/clears breakpoint at right-clicked address", cb_bp_toggle, is_valid=valid_bp_toggle)
 
