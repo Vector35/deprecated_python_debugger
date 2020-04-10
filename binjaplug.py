@@ -296,7 +296,7 @@ class DebuggerBreakpoints:
 		info = self.state.modules.absolute_addr_to_relative(remote_address)
 		if info not in self.breakpoints:
 			self.breakpoints.append(info)
-			self.serialize_meatadata()
+			self.serialize_metadata()
 			return self.state.adapter.breakpoint_set(remote_address)
 		return False
 
@@ -308,7 +308,7 @@ class DebuggerBreakpoints:
 		info = {'module': module, 'offset': offset}
 		if info not in self.breakpoints:
 			self.breakpoints.append(info)
-			self.serialize_meatadata()
+			self.serialize_metadata()
 
 			if self.state.adapter is not None:
 				remote_address = self.state.modules[module] + offset
@@ -328,7 +328,7 @@ class DebuggerBreakpoints:
 		info = self.state.modules.absolute_addr_to_relative(remote_address)
 		if info in self.breakpoints:
 			self.breakpoints.remove(info)
-			self.serialize_meatadata()
+			self.serialize_metadata()
 			return self.state.adapter.breakpoint_clear(remote_address)
 		return False
 
@@ -340,7 +340,7 @@ class DebuggerBreakpoints:
 		info = {'module': module, 'offset': offset}
 		if info in self.breakpoints:
 			self.breakpoints.remove(info)
-			self.serialize_meatadata()
+			self.serialize_metadata()
 
 			if self.state.adapter is not None:
 				remote_address = self.state.modules[module] + offset
@@ -385,9 +385,9 @@ class DebuggerBreakpoints:
 
 	'''
 	Store the breakpoints in binary view metadata.
-	Escape backslashes to avoid them being treated as escape characters by BNCreateMeataDataStringData()
+	Escape backslashes to avoid them being treated as escape characters by BNCreateMetaDataStringData()
 	'''
-	def serialize_meatadata(self):
+	def serialize_metadata(self):
 		tmp = []
 		for pair in self.breakpoints:
 			module = pair['module'].replace('\\', '\\\\')
@@ -396,7 +396,7 @@ class DebuggerBreakpoints:
 
 	'''
 	Load the breakpoints from binary view metadata.
-	Un-Escape backslashes.
+	Unescape backslashes.
 	'''
 	def unserialize_metadata(self):
 		tmp = []
