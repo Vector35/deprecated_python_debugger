@@ -647,6 +647,11 @@ class DebuggerState:
 			self.connecting = False
 			raise Exception("cannot exec adapter of type %s" % self.adapter_type)
 
+		current_module = self.modules.resolve_path(self.bv.file.original_filename)
+		if current_module != self.bv.file.original_filename:
+			print("Detected local process running at different path: {}".format(current_module))
+			self.modules.translations[current_module] = self.bv.file.original_filename
+
 		self.memory_dirty()
 		self.memory_view.update_base()
 		self.breakpoints.apply()
