@@ -6,15 +6,19 @@
 # warn if minimum version not met
 import binaryninja
 import sys
+import re
+
 min_version = 2085
+(incrementing, _, development) = re.search(r"^\d+.\d+.(\d+)( Personal)?( development)?", binaryninja.core_version()).groups()
+
 # git builds end with ' development'
-if not binaryninja.core_version().endswith(" development"):
-	(major, minor, incrementing) = map(int, binaryninja.core_version().split('-')[0].split('.'))
-	if incrementing < min_version:
+if not development:
+	if int(incrementing) < min_version:
+		message = "Debugger relies on features and fixes present in Binary Ninja >= {}. Errors may follow, please update.".format(min_version)
 		if binaryninja.core_ui_enabled():
-			binaryninja.interaction.show_message_box("Debugger Version Check Failed", "Debugger relies on features and fixes present in Binary Ninja >= %d. Errors may follow, please update." % min_version)
+			binaryninja.interaction.show_message_box("Debugger Version Check Failed", message)
 		else:
-			print("Debugger relies on features and fixes present in Binary Ninja >= %d. Errors may follow, please update." % min_version, file=sys.stderr)
+			print(message, file=sys.stderr)
 
 from . import binjaplug
 
