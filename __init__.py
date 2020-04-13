@@ -9,7 +9,7 @@ import sys
 import re
 
 min_version = 2085
-(incrementing, _, development) = re.search(r"^\d+.\d+.(\d+)( Personal)?( development)?", binaryninja.core_version()).groups()
+(incrementing, development) = re.search(r"^\d+.\d+.(\d+).*( development)?", binaryninja.core_version()).groups()
 
 # git builds end with ' development'
 if not development:
