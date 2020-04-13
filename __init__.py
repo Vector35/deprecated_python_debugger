@@ -9,10 +9,11 @@ import sys
 import re
 
 min_version = 2085
-(incrementing, development) = re.search(r"^\d+.\d+.(\d+).*( development)?", binaryninja.core_version()).groups()
+version = binaryninja.core_version()
+incrementing = re.match(r'^\d+\.\d+\.(\d+)', version).group(1)
 
 # git builds end with ' development'
-if not development:
+if not version.endswith('development'):
 	if int(incrementing) < min_version:
 		message = "Debugger relies on features and fixes present in Binary Ninja >= {}. Errors may follow, please update.".format(min_version)
 		if binaryninja.core_ui_enabled():
