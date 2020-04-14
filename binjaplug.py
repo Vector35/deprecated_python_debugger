@@ -619,12 +619,16 @@ class DebuggerState:
 			run_from_tmp = True
 
 		if run_from_tmp:
-			self.temp_file = tempfile.NamedTemporaryFile(prefix="bndebugfile_")
-			temp_name = self.temp_file.name
-			# macOS symlinks /tmp to /private/tmp
-			temp_name = os.path.realpath(temp_name)
+			if platform.system() == 'Windows':
+				self.temp_file = tempfile.NamedTemporaryFile(prefix="bndebugfile_", suffix='.exe')
+			else:
+				self.temp_file = tempfile.NamedTemporaryFile(prefix="bndebugfile_")
 
-			self.bv.file.raw.save(temp_name)
+			self.temp_file.close()
+			temp_name = os.path.realpath(self.temp_file.name)
+
+			if not self.bv.file.raw.save(temp_name):
+				raise Exception('could not write temporary file %s' % temp_name)
 			os.chmod(temp_name, 0o700)
 
 			# Swap the real path for this temp one
