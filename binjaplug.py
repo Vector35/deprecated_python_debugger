@@ -233,7 +233,7 @@ class DebuggerModules:
 		closest_modaddr = 0
 		closest_modpath = None
 		for (modpath, modaddr) in self:
-			if modaddr < remote_address and modaddr > closest_modaddr:
+			if modaddr <= remote_address and modaddr > closest_modaddr:
 				closest_modaddr = modaddr
 				closest_modpath = modpath
 		return closest_modpath
@@ -647,7 +647,7 @@ class DebuggerState:
 			self.connecting = False
 			raise Exception("cannot exec adapter of type %s" % self.adapter_type)
 
-		current_module = self.modules.resolve_path(self.bv.file.original_filename)
+		current_module = self.modules.get_module_for_addr(adapter.target_base())
 		if current_module != self.bv.file.original_filename:
 			print("Detected local process running at different path: {}".format(current_module))
 			self.modules.translations[current_module] = self.bv.file.original_filename
@@ -679,7 +679,7 @@ class DebuggerState:
 
 		self.memory_view.update_base()
 
-		current_module = self.modules.resolve_path(self.bv.file.original_filename)
+		current_module = self.modules.get_module_for_addr(adapter.target_base())
 		if current_module != self.bv.file.original_filename:
 			print("Detected remote process running at different path: {}".format(current_module))
 			self.modules.translations[current_module] = self.bv.file.original_filename
