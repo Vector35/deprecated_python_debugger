@@ -28,7 +28,7 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		# resolve path to gdbserver
 		path_gdbserver = shutil.which('gdbserver')
 		if not os.path.exists(path_gdbserver):
-			raise Exception('cannot locate gdbserver')
+			raise DebugAdapter.NotInstalledError('gdbserver')
 
 		# get available port
 		port = gdblike.get_available_port()

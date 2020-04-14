@@ -45,7 +45,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 			path_debugserver = '/Library/Developer/CommandLineTools/Library/' + \
 			'PrivateFrameworks/LLDB.framework/Versions/A/Resources/debugserver'
 		if not os.path.exists(path_debugserver):
-			raise Exception('cannot locate debugserver')
+			raise DebugAdapter.NotInstalledError('lldb')
 
 		# get available port
 		port = gdblike.get_available_port()

@@ -3,7 +3,9 @@ from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QToolBar, QToolButton, QMenu, QAction
 from binaryninja import execute_on_main_thread_and_wait
+from binaryninja.interaction import show_message_box, MessageBoxIcon
 from binaryninjaui import ViewFrame
+import platform
 import threading
 import traceback
 import sys
@@ -127,11 +129,52 @@ class DebugControlsWidget(QToolBar):
 		# binjaplug.delete_state(self.bv)
 		pass
 
+	# -------------------------------------------------------------------------
+	# Helpers
+	# -------------------------------------------------------------------------
+
 	def can_exec(self):
 		return DebugAdapter.ADAPTER_TYPE.use_exec(self.debug_state.adapter_type)
 
 	def can_connect(self):
 		return DebugAdapter.ADAPTER_TYPE.use_connect(self.debug_state.adapter_type)
+
+	def alert_need_install(self, proc):
+		message = "Cannot start debugger: {} not found on {}.".format(proc, "the target machine" if self.can_connect() else "your machine")
+
+		adapter_type = self.debug_state.adapter_type
+
+		# TODO: detect remote os correctly, as gdb/lldb are compatible with both macos and linux
+		if adapter_type == DebugAdapter.ADAPTER_TYPE.LOCAL_GDB or adapter_type == DebugAdapter.ADAPTER_TYPE.REMOTE_GDB:
+			remote_os = "Linux"
+		elif adapter_type == DebugAdapter.ADAPTER_TYPE.LOCAL_LLDB or adapter_type == DebugAdapter.ADAPTER_TYPE.REMOTE_LLDB:
+			remote_os = "Darwin"
+		elif adapter_type == DebugAdapter.ADAPTER_TYPE.LOCAL_DBGENG or adapter_type == DebugAdapter.ADAPTER_TYPE.REMOTE_DBGENG:
+			remote_os = "Windows"
+		else:
+			# Uncertain
+			remote_os = platform.system()
+
+		if remote_os == "Linux":
+			message += "\nYou can find this in your package manager or build it from source."
+		elif remote_os == "Darwin":
+			if proc == "debugserver":
+				message += "\nYou need to install it by running the following command in Terminal:\nxcode-select --install"
+			elif proc == "gdbserver":
+				message += "\nYou can find this in your package manager or build it from source."
+			else:
+				message += "\nYou need to install this manually."
+		elif remote_os == "Windows":
+			# TODO: dbgeng does not currently throw this
+			message += "\nYou need to reinstall the debugger plugin."
+		else:
+			message += "\nYou need to install this manually."
+
+		show_message_box("Cannot Start Debugger", message, icon=MessageBoxIcon.ErrorIcon)
+
+	# -------------------------------------------------------------------------
+	# UIActions
+	# -------------------------------------------------------------------------
 
 	def perform_run(self):
 
@@ -141,6 +184,9 @@ class DebugControlsWidget(QToolBar):
 				execute_on_main_thread_and_wait(perform_run_after)
 			except ConnectionRefusedError:
 				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Connection Refused'))
+			except DebugAdapter.NotInstalledError as e:
+				execute_on_main_thread_and_wait(lambda: self.alert_need_install(e.args[0]))
+				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Debugger not Installed'))
 			except Exception as e:
 				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: ' + ' '.join(e.args)))
 				traceback.print_exc(file=sys.stderr)
@@ -318,6 +364,10 @@ class DebugControlsWidget(QToolBar):
 		self.state_busy("STEPPING")
 		threading.Thread(target=perform_step_return_thread).start()
 
+	# -------------------------------------------------------------------------
+	# Control state setters
+	# -------------------------------------------------------------------------
+
 	def set_actions_enabled(self, **kwargs):
 		def enable_step_into(e):
 			self.actionStepIntoAsm.setEnabled(e)
@@ -400,6 +450,10 @@ class DebugControlsWidget(QToolBar):
 			defaultThreadAction = self.threadMenu.addAction("Thread List")
 			defaultThreadAction.setEnabled(False)
 			self.btnThreads.setDefaultAction(defaultThreadAction)
+
+	# -------------------------------------------------------------------------
+	# State handling
+	# -------------------------------------------------------------------------
 
 	def state_starting(self, msg=None):
 		self.editStatus.setText(msg or 'INACTIVE')
