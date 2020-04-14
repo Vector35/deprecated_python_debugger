@@ -198,7 +198,7 @@ if __name__ == '__main__':
 	if not sys.argv[1:]:
 		raise Exception('specify target on command line')
 	arg1 = sys.argv[1]
-	if ':' in arg1:
+	if re.match(r'^.*:\d+$', arg1):
 		(host, port) = arg1.split(':')
 		adapter = gdb.DebugAdapterGdb()
 		adapter.setup()
