@@ -158,7 +158,7 @@ class DebugControlsWidget(QToolBar):
 		if remote_os == "Linux":
 			message += "\nYou can find this in your package manager or build it from source."
 		elif remote_os == "Darwin":
-			if proc == "debugserver":
+			if proc == "lldb":
 				message += "\nYou need to install it by running the following command in Terminal:\nxcode-select --install"
 			elif proc == "gdbserver":
 				message += "\nYou can find this in your package manager or build it from source."
