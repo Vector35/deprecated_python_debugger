@@ -184,9 +184,11 @@ class DebugControlsWidget(QToolBar):
 				execute_on_main_thread_and_wait(perform_run_after)
 			except ConnectionRefusedError:
 				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Connection Refused'))
+			except DebugAdapter.NotExecutableError:
+				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Target Not Executable'))
 			except DebugAdapter.NotInstalledError as e:
 				execute_on_main_thread_and_wait(lambda: self.alert_need_install(e.args[0]))
-				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Debugger not Installed'))
+				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Debugger Not Installed'))
 			except Exception as e:
 				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: ' + ' '.join(e.args)))
 				traceback.print_exc(file=sys.stderr)

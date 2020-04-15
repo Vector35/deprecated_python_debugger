@@ -39,6 +39,9 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 
 	# session start/stop
 	def exec(self, path, args=[]):
+		if not os.access(path, os.X_OK):
+			raise DebugAdapter.NotExecutableError(path)
+
 		# resolve path to debugserver
 		path_debugserver = shutil.which('debugserver')
 		if not path_debugserver:

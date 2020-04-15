@@ -25,6 +25,9 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 	#--------------------------------------------------------------------------
 
 	def exec(self, path, args=[]):
+		if not os.access(path, os.X_OK):
+			raise DebugAdapter.NotExecutableError(path)
+
 		# resolve path to gdbserver
 		path_gdbserver = shutil.which('gdbserver')
 		if not os.path.exists(path_gdbserver):

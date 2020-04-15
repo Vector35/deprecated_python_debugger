@@ -9,6 +9,8 @@ class BreakpointSetError(Exception):
 	pass
 class NotInstalledError(Exception):
 	pass
+class NotExecutableError(Exception):
+	pass
 
 @unique
 class ADAPTER_TYPE(Enum):
