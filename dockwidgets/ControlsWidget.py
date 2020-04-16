@@ -3,12 +3,13 @@ from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QToolBar, QToolButton, QMenu, QAction
 from binaryninja import execute_on_main_thread_and_wait
-from binaryninja.interaction import show_message_box, MessageBoxIcon
+from binaryninja.interaction import show_message_box, MessageBoxIcon, MessageBoxButtonSet, MessageBoxButtonResult
 from binaryninjaui import ViewFrame
 import platform
 import threading
 import traceback
 import sys
+import os
 
 from . import AdapterSettingsDialog
 from .. import binjaplug, DebugAdapter
@@ -179,19 +180,29 @@ class DebugControlsWidget(QToolBar):
 	def perform_run(self):
 
 		def perform_run_thread():
-			try:
-				self.debug_state.run()
-				execute_on_main_thread_and_wait(perform_run_after)
-			except ConnectionRefusedError:
-				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Connection Refused'))
-			except DebugAdapter.NotExecutableError:
-				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Target Not Executable'))
-			except DebugAdapter.NotInstalledError as e:
-				execute_on_main_thread_and_wait(lambda: self.alert_need_install(e.args[0]))
-				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Debugger Not Installed'))
-			except Exception as e:
-				execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: ' + ' '.join(e.args)))
-				traceback.print_exc(file=sys.stderr)
+			while True:
+				try:
+					self.debug_state.run()
+					execute_on_main_thread_and_wait(perform_run_after)
+				except ConnectionRefusedError:
+					execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Connection Refused'))
+				except DebugAdapter.NotExecutableError as e:
+					fpath = e.args[0]
+					if platform.system() != 'Windows':
+						msg = '%s is not executable, would you like to set +x and retry?' % fpath
+						res = show_message_box('Error', msg, MessageBoxButtonSet.YesNoButtonSet, MessageBoxIcon.ErrorIcon)
+						if res == MessageBoxButtonResult.YesButton:
+							os.chmod(fpath, os.stat(fpath).st_mode | 0o100)
+							continue
+					execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Target Not Executable'))
+				except DebugAdapter.NotInstalledError as e:
+					execute_on_main_thread_and_wait(lambda: self.alert_need_install(e.args[0]))
+					execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Debugger Not Installed'))
+				except Exception as e:
+					execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: ' + ' '.join(e.args)))
+					traceback.print_exc(file=sys.stderr)
+
+				break
 
 		def perform_run_after():
 			self.state_stopped()
