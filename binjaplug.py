@@ -11,15 +11,18 @@ from binaryninja import BinaryView, Symbol, SymbolType, Type, Structure, Structu
 
 from . import DebugAdapter, ProcessView, dbgeng, QueuedAdapter
 
-try:
-	# create the widgets, debugger, etc.
-	from . import ui
-	ui.initialize_ui()
-	have_ui = True
-except (ModuleNotFoundError, ImportError, IndexError) as e:
-	have_ui = False
-	print(e)
-	print("Could not initialize UI, using headless mode only")
+if binaryninja.core_ui_enabled():
+    try:
+        # create the widgets, debugger, etc.
+        from . import ui
+        ui.initialize_ui()
+        have_ui = True
+    except (ModuleNotFoundError, ImportError, IndexError) as e:
+        have_ui = False
+        print(e)
+        print("Could not initialize UI, using headless mode only")
+else:
+    have_ui = False
 
 #------------------------------------------------------------------------------
 # Globals
