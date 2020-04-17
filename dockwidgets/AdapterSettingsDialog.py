@@ -3,7 +3,6 @@ from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize
 from PySide2.QtGui import QPalette, QFontMetricsF
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QDialog, QPushButton, QFormLayout, QLineEdit, QLabel, QMenu
 
-import binaryninja
 import binaryninjaui
 from binaryninja import BinaryView, Settings, SettingsScope
 from binaryninjaui import DockContextHandler, UIActionHandler, LinearView, ViewFrame, UIContext
@@ -14,7 +13,7 @@ from .. import binjaplug, DebugAdapter
 
 class AdapterSettingsDialog(QDialog):
 	def __init__(self, parent, data):
-		assert type(data) == binaryninja.binaryview.BinaryView
+		assert type(data) == BinaryView
 		self.bv = data
 		QDialog.__init__(self, parent)
 

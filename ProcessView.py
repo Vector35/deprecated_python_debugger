@@ -1,5 +1,3 @@
-import binaryninja
-
 from binaryninja import BinaryView, SegmentFlag
 
 from . import binjaplug

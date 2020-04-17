@@ -3,7 +3,7 @@ from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize
 from PySide2.QtGui import QPalette, QFontMetricsF
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QTableView, QItemDelegate, QStyle, QHeaderView, QAbstractItemView
 
-import binaryninja
+from binaryninja import Endianness, BinaryView
 import binaryninjaui
 from binaryninjaui import DockContextHandler, UIActionHandler
 
@@ -83,7 +83,7 @@ class DebugStackModel(QAbstractItemModel):
 			column = self.columns[index.column()]
 			if column == "Value":
 				conts = info['value']
-				if debug_state.remote_arch.endianness == binaryninja.Endianness.LittleEndian:
+				if debug_state.remote_arch.endianness == Endianness.LittleEndian:
 					conts = conts[::-1]
 				text = conts.hex()
 			elif column == "Offset":
@@ -126,7 +126,7 @@ class DebugStackModel(QAbstractItemModel):
 			new_val = bytes.fromhex(value)
 		except:
 			return False
-		if debug_state.remote_arch.endianness == binaryninja.Endianness.LittleEndian:
+		if debug_state.remote_arch.endianness == Endianness.LittleEndian:
 			new_val = new_val[::-1]
 		new_val = new_val.ljust(len(old_val), b'\x00')
 		address = info['address']
@@ -196,7 +196,7 @@ class DebugStackItemDelegate(QItemDelegate):
 
 class DebugStackWidget(QWidget, DockContextHandler):
 	def __init__(self, parent, name, data):
-		if not type(data) == binaryninja.binaryview.BinaryView:
+		if not type(data) == BinaryView:
 			raise Exception('expected widget data to be a BinaryView')
 
 		self.bv = data

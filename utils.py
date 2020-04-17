@@ -1,7 +1,7 @@
 import struct
 import binascii
 
-import binaryninja
+from binaryninja import Architecture
 
 RED = '\x1B[31m'
 GREEN = '\x1B[32m'
@@ -65,7 +65,7 @@ def hex_dump(data, addr=0, grouping=1, endian='little'):
 	return result
 
 def disasm1(data, addr, arch='x86_64'):
-	arch = binaryninja.Architecture[arch]
+	arch = Architecture[arch]
 	toksAndLen = arch.get_instruction_text(data, addr)
 	if not toksAndLen or toksAndLen[1]==0:
 		return (None, 0)
