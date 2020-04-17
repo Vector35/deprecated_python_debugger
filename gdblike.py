@@ -49,7 +49,7 @@ def connect(host, port):
 	raise ConnectionRefusedError
 
 def preexec():
-    os.setpgrp()
+	os.setpgrp()
 
 #--------------------------------------------------------------------------
 # CLASS FOR GDB-LIKE ADAPTERS

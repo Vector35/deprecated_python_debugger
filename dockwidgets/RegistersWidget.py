@@ -3,9 +3,9 @@ from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize
 from PySide2.QtGui import QPalette, QFontMetricsF
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QTableView, QItemDelegate, QStyle, QHeaderView, QAbstractItemView
 
-import binaryninja
 import binaryninjaui
 from binaryninjaui import DockContextHandler, UIActionHandler
+from binaryninja import BinaryView
 
 from . import widget
 from .. import binjaplug
@@ -177,7 +177,7 @@ class DebugRegistersItemDelegate(QItemDelegate):
 
 class DebugRegistersWidget(QWidget, DockContextHandler):
 	def __init__(self, parent, name, data):
-		if not type(data) == binaryninja.binaryview.BinaryView:
+		if not type(data) == BinaryView:
 			raise Exception('expected widget data to be a BinaryView')
 
 		self.bv = data

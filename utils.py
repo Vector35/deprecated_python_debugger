@@ -63,8 +63,8 @@ def hex_dump(data, addr=0, grouping=1, endian='little'):
 	return result
 
 def disasm1(data, addr, arch='x86_64'):
-	import binaryninja
-	arch = binaryninja.Architecture[arch]
+	from binaryninja import Architecture
+	arch = Architecture[arch]
 	toksAndLen = arch.get_instruction_text(data, addr)
 	if not toksAndLen or toksAndLen[1]==0:
 		return (None, 0)

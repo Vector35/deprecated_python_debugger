@@ -6,8 +6,7 @@ import sys
 import traceback
 import tempfile
 
-import binaryninja
-from binaryninja import BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation
+from binaryninja import Architecture, BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation
 
 from . import DebugAdapter, ProcessView, dbgeng, QueuedAdapter
 
@@ -520,7 +519,7 @@ class DebuggerState:
 		# TODO: be more platform agnostic
 		if arch.name == 'armv7':
 			if self.registers['cpsr'] & 0x20:
-				arch = binaryninja.Architecture['thumb2']
+				arch = Architecture['thumb2']
 		return arch
 
 	# Mark memory as dirty, will refresh memory view
@@ -978,7 +977,7 @@ class DebuggerState:
 			# Set a bp on every ret in the function and go
 			rets = set()
 			for insn in mlil.instructions:
-				if insn.operation == binaryninja.MediumLevelILOperation.MLIL_RET or insn.operation == binaryninja.MediumLevelILOperation.MLIL_TAILCALL:
+				if insn.operation == MediumLevelILOperation.MLIL_RET or insn.operation == MediumLevelILOperation.MLIL_TAILCALL:
 					rets.add(self.memory_view.local_addr_to_remote(insn.address))
 			return self.step_to(rets)
 		else:
