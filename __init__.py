@@ -28,6 +28,10 @@ try:
 except:
 	pass
 
+if sys.version_info < (3, 6, 0):
+	# Stop executing this file, we will just throw on later imports
+	raise Exception("Debugger requires Python 3.6 or greater")
+
 from . import binjaplug
 
 """
