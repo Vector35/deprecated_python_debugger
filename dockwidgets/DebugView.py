@@ -282,7 +282,7 @@ class DebugView(QWidget, View):
 		# Append header line
 		tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "(Code not backed by loaded file, showing only raw disassembly)")]
 		contents = DisassemblyTextLine(tokens, start_ip)
-		if (major == 2 or (major, minor, buildid) == (1, 3, 1369)):
+		if (major == 2):
 			line = LinearDisassemblyLine(LinearDisassemblyLineType.BasicLineType, None, None, contents)
 		else:
 			line = LinearDisassemblyLine(LinearDisassemblyLineType.BasicLineType, None, None, 0, contents)
@@ -325,7 +325,7 @@ class DebugView(QWidget, View):
 
 			# Convert to linear disassembly line
 			contents = DisassemblyTextLine(tokens, line_addr, color=color)
-			if (major == 2 or (major, minor, buildid) == (1, 3, 1369)):
+			if (major == 2):
 				line = LinearDisassemblyLine(LinearDisassemblyLineType.CodeDisassemblyLineType, None, None, contents)
 			else:
 				line = LinearDisassemblyLine(LinearDisassemblyLineType.CodeDisassemblyLineType, None, None, 0, contents)
