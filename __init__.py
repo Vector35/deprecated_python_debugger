@@ -6,10 +6,19 @@
 import os
 import re
 import sys
-import binaryninja
+
+# if binja license fails, assume standalone mode, with minimal debugger functionality
+standalone = False
+try:
+	import binaryninja
+except RuntimeError:
+	standalone = True
 
 # warn if minimum version not met
 try:
+	if standalone:
+		raise Exception('no version check in standalone mode')
+
 	import json
 	fpath = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'plugin.json')
 	with open(fpath) as fp:
@@ -30,7 +39,8 @@ try:
 except:
 	pass
 
-from . import binjaplug
+if not standalone:
+	from . import binjaplug
 
 """
 Retrieve the debugger state instance for a given BinaryView

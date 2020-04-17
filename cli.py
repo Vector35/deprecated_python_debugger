@@ -43,6 +43,45 @@ def get_arch_dis():
 
 	raise Exception('couldn\'t determine architecture to disassemble with')
 
+def disasm1(data, addr):
+	if not data: return
+	arch_dis = get_arch_dis()
+
+	if 'binaryninja' in sys.modules:
+		return utils.disasm1(data, addr, arch_dis)
+	else:
+		import capstone
+		if arch_dis == 'x86_64':
+			md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+		elif arch_dis == 'x86':
+			md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+		gen = md.disasm(data, addr)
+		insn = next(gen)
+		return ('%s %s' % (insn.mnemonic, insn.op_str), insn.size)
+
+def disasm(data, addr):
+	if not data: return
+	arch_dis = get_arch_dis()
+
+	if 'binaryninja' in sys.modules:
+		return utils.disasm1(data, addr, arch_dis)
+	else:
+		import capstone
+		offset = 0
+		lines = []
+		if arch_dis == 'x86_64':
+			md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+		elif arch_dis == 'x86':
+			md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+		for i in md.disasm(data, addr):
+			addrstr = '%s%016X%s' % (GREEN, i.address, NORMAL)
+			bytestr = hexlify(data[offset:offset+i.size]).decode('utf-8').ljust(16)
+			asmstr = i.mnemonic + ' ' + i.op_str
+			line = '%s: %s %s' % (addrstr, bytestr, asmstr)
+			lines.append(line)
+			offset += i.size
+		return '\n'.join(lines)
+
 def cpsr_tostr(cpsr):
 	result = '('
 	# bits [31, 27]
@@ -135,7 +174,7 @@ def context_display(pkt_T=None):
 	try:
 		data = adapter.mem_read(pc, 16)
 		if data:
-			(asmstr, asmlen) = utils.disasm1(data, pc, get_arch_dis())
+			(asmstr, asmlen) = disasm1(data, pc)
 			print(('%s'+pc_fmt+'%s: %s\t%s') % \
 				(GREEN, pc, NORMAL, hexlify(data[0:asmlen]).decode('utf-8'), asmstr))
 	except DebugAdapter.GeneralError as e:
@@ -287,7 +326,7 @@ if __name__ == '__main__':
 			elif text.startswith('u '):
 				addr = int(text[2:],16)
 				data = adapter.mem_read(addr, 32)
-				print(utils.disasm(data, addr, get_arch_dis()))
+				print(disasm(data, addr))
 			elif text == 'lm':
 				module2addr = adapter.mem_modules()
 				for module in sorted(module2addr, key=lambda m: module2addr[m]):
