@@ -8,10 +8,10 @@ import re
 import sys
 from binaryninja import core_version, log_error
 
-(major, minor, buildid) = re.match(r'^(\d+)\.(\d+)\.(\d+)', core_version()).groups()
-major=int(major)
-minor=int(minor)
-buildid=int(buildid)
+(major, minor, buildid) = re.match(r'^(\d+)\.(\d+)\.?(\d+)?', core_version()).groups()
+major = int(major)
+minor = int(minor)
+buildid = int(buildid) if buildid is not None else 0xffffffff
 
 # warn if minimum version not met
 try:

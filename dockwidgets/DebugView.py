@@ -14,10 +14,10 @@ from binaryninjaui import View, ViewType, UIAction, UIActionHandler, LinearView,
 from . import widget, ControlsWidget
 from .. import binjaplug
 
-(major, minor, buildid) = re.match(r'^(\d+)\.(\d+)\.(\d+)', core_version()).groups()
-major=int(major)
-minor=int(minor)
-buildid=int(buildid)
+(major, minor, buildid) = re.match(r'^(\d+)\.(\d+)\.?(\d+)?', core_version()).groups()
+major = int(major)
+minor = int(minor)
+buildid = int(buildid) if buildid is not None else 0xffffffff
 
 class DebugView(QWidget, View):
 	class DebugViewHistoryEntry(HistoryEntry):
