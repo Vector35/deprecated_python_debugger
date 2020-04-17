@@ -74,8 +74,8 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		self.target_pid_ = None
 		self.target_path_ = None
 
-		# server capabilities
-		self.server_capabilities = {}
+		# rsp connection
+		self.rspConn = None
 
 	def setup(self):
 		pass
@@ -134,7 +134,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		if self.target_path_ != None:
 			return self.target_path_
 
-		if 'qXfer:exec-file:read+' in self.server_capabilities:
+		if 'qXfer:exec-file:read+' in self.rspConn.server_capabilities:
 			pktlen = self.rspConn.pktlen
 			reply = self.rspConn.tx_rx('qXfer:exec-file:read:%X:0,%X'%(self.target_pid_, pktlen))
 			if reply.startswith('l'):
@@ -149,6 +149,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		module2addr = self.mem_modules()
 
 		a = self.target_path()
+
 		if a:
 			if a in module2addr: return module2addr[a]
 			b = os.path.abspath(a)
@@ -324,7 +325,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 	def mem_modules(self, cache_ok=True):
 		# this SHOULD work, but reply is always empty "l<library-list-svr4 version="1.0"/>"
 		# and online people have the same issue
-		#if 'qXfer:libraries-svr4:read+' in self.server_capabilities:
+		#if 'qXfer:libraries-svr4:read+' in self.rspConn.server_capabilities:
 		#	print(self.rspConn.tx_rx('qXfer:libraries-svr4:read::0,fff'))
 		#	...
 
@@ -453,7 +454,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		#print('downloading %s' % fname)
 		xml = ''
 		offs = 0
-		pktsize = int(self.server_capabilities.get('PacketSize', '1000'), 16)
+		pktsize = int(self.rspConn.server_capabilities.get('PacketSize', '1000'), 16)
 		while 1:
 			data = self.rspConn.tx_rx('qXfer:features:read:%s:%X,%X' % (fname, offs, pktsize), 'ack_then_reply')
 			if not data[0] in ['l', 'm']:

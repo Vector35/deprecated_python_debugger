@@ -323,7 +323,7 @@ if __name__ == '__main__':
 				print('arch: %s' % adapter.target_arch())
 				print('path: %s' % adapter.target_path())
 				print(' pid: 0x%X (%d)' % (adapter.target_pid(), adapter.target_pid()))
-				print('base: 0x%X' %  adapter.target_base())
+				print('base: 0x%X' % adapter.target_base())
 
 			# quit, detach, quit+detach
 			elif text in ['q', 'quit', 'exit']:
