@@ -3,15 +3,21 @@ from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize, QTimer
 from PySide2.QtGui import QPalette, QFontMetricsF
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QStyle, QSplitter, QLabel
 
+import re
 import threading
 
 import binaryninjaui
-from binaryninja import BinaryView, PythonScriptingInstance, InstructionTextToken, InstructionTextTokenType, DisassemblyTextLine, LinearDisassemblyLine, LinearDisassemblyLineType, HighlightStandardColor
+from binaryninja import BinaryView, PythonScriptingInstance, InstructionTextToken, InstructionTextTokenType, DisassemblyTextLine, LinearDisassemblyLine, LinearDisassemblyLineType, HighlightStandardColor, core_version
 from binaryninja.enums import InstructionTextTokenType
 from binaryninjaui import View, ViewType, UIAction, UIActionHandler, LinearView, DisassemblyContainer, ViewFrame, DockHandler, TokenizedTextView, HistoryEntry
 
 from . import widget, ControlsWidget
 from .. import binjaplug
+
+(major, minor, buildid) = re.match(r'^(\d+)\.(\d+)\.(\d+)', core_version()).groups()
+major=int(major)
+minor=int(minor)
+buildid=int(buildid)
 
 class DebugView(QWidget, View):
 	class DebugViewHistoryEntry(HistoryEntry):
@@ -276,7 +282,10 @@ class DebugView(QWidget, View):
 		# Append header line
 		tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "(Code not backed by loaded file, showing only raw disassembly)")]
 		contents = DisassemblyTextLine(tokens, start_ip)
-		line = LinearDisassemblyLine(LinearDisassemblyLineType.BasicLineType, None, None, 0, contents)
+		if (major == 2 or (major, minor, buildid) == (1, 3, 1369)):
+			line = LinearDisassemblyLine(LinearDisassemblyLineType.BasicLineType, None, None, contents)
+		else:
+			line = LinearDisassemblyLine(LinearDisassemblyLineType.BasicLineType, None, None, 0, contents)
 		lines.append(line)
 
 		total_read = 0
@@ -316,7 +325,10 @@ class DebugView(QWidget, View):
 
 			# Convert to linear disassembly line
 			contents = DisassemblyTextLine(tokens, line_addr, color=color)
-			line = LinearDisassemblyLine(LinearDisassemblyLineType.CodeDisassemblyLineType, None, None, 0, contents)
+			if (major == 2 or (major, minor, buildid) == (1, 3, 1369)):
+				line = LinearDisassemblyLine(LinearDisassemblyLineType.CodeDisassemblyLineType, None, None, contents)
+			else:
+				line = LinearDisassemblyLine(LinearDisassemblyLineType.CodeDisassemblyLineType, None, None, 0, contents)
 			lines.append(line)
 
 			total_read += length
