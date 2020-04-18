@@ -5,7 +5,9 @@
 import os
 import sys
 import struct
+import platform
 from collections import defaultdict
+import binaryninja
 from binaryninja.binaryview import BinaryViewType
 
 # open for analysis
@@ -13,10 +15,15 @@ fpath = sys.argv[1]
 bv = BinaryViewType.get_view_of_file(fpath)
 bv.update_analysis_and_wait()
 
-from debugger import DebugAdapter, lldb
+from debugger import DebugAdapter, lldb, gdb
 
 # create debug adapter
-adapt = lldb.DebugAdapterLLDB()
+if platform.system() == 'Linux':
+	adapt = gdb.DebugAdapterGdb()
+elif platform.system() == 'Darwin':
+	adapt = lldb.DebugAdapterLLDB()
+else:
+	raise Exception('unknown system!')
 adapt.exec(fpath, ['-sabcdefghijklmnopqrstuvwxyz'])
 
 # sense aslr situation, resolve symbols
@@ -25,19 +32,19 @@ base_bv = bv.start
 delta = base - base_bv
 print('analysis rooted at 0x%X, target in memory at 0x%X, delta 0x%X' % (base_bv, base, delta))
 for f in bv.functions:
-	if f.symbol.full_name == '_MD5Init': _MD5Init = f.start + delta
-	if f.symbol.full_name == '_MD5Update': _MD5Update = f.start + delta
-	if f.symbol.full_name == '_MD5Final': _MD5Final = f.start + delta
-print('  _MD5Init: 0x%X' % _MD5Init)
-print('_MD5Update: 0x%X' % _MD5Update)
-print(' _MD5Final: 0x%X' % _MD5Final)
+	if f.symbol.full_name in ['MD5Init', '_MD5Init']: MD5Init = f.start + delta
+	if f.symbol.full_name in ['MD5Update', '_MD5Update']: MD5Update = f.start + delta
+	if f.symbol.full_name in ['MD5Final', '_MD5Final']: MD5Final = f.start + delta
+print('  MD5Init: 0x%X' % MD5Init)
+print('MD5Update: 0x%X' % MD5Update)
+print(' MD5Final: 0x%X' % MD5Final)
 
 # go until MD5 starts
-adapt.breakpoint_set(_MD5Init)
+adapt.breakpoint_set(MD5Init)
 (reason, data) = adapt.go()
 assert reason == DebugAdapter.STOP_REASON.BREAKPOINT
-assert adapt.reg_read('rip') == _MD5Init
-adapt.breakpoint_clear(_MD5Init)
+assert adapt.reg_read('rip') == MD5Init
+adapt.breakpoint_clear(MD5Init)
 
 print('at MD5Init()')
 
@@ -50,7 +57,7 @@ while 1:
 	opc = bv.get_disassembly(rip - delta).split()[0]
 	tally[opc] += 1
 	#print('0x%X %s' % (rip, opc))
-	if adapt.reg_read('rip') == _MD5Final:
+	if adapt.reg_read('rip') == MD5Final:
 		break
 
 n_instrs = sum(tally.values())
