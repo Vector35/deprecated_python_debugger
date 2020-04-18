@@ -634,11 +634,11 @@ class DebuggerState:
 			fpath = temp_name
 			self.modules.translations[fpath] = self.bv.file.original_filename
 
-		adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
+		self.adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
 
 		if DebugAdapter.ADAPTER_TYPE.use_exec(self.adapter_type):
 			try:
-				self.adapter = QueuedAdapter.QueuedAdapter(adapter)
+				self.adapter = QueuedAdapter.QueuedAdapter(self.adapter)
 				self.adapter.setup()
 				self.adapter.exec(fpath, self.command_line_args)
 				self.connecting = False
@@ -650,7 +650,7 @@ class DebuggerState:
 			self.connecting = False
 			raise Exception("cannot exec adapter of type %s" % self.adapter_type)
 
-		current_module = self.modules.get_module_for_addr(adapter.target_base())
+		current_module = self.modules.get_module_for_addr(self.adapter.target_base())
 		if current_module != self.bv.file.original_filename:
 			print("Detected local process running at different path: {}".format(current_module))
 			self.modules.translations[current_module] = self.bv.file.original_filename
@@ -665,10 +665,10 @@ class DebuggerState:
 			raise Exception("Tried to attach but already debugging")
 
 		self.connecting = True
-		adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
+		self.adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
 		if DebugAdapter.ADAPTER_TYPE.use_connect(self.adapter_type):
 			try:
-				self.adapter = QueuedAdapter.QueuedAdapter(adapter)
+				self.adapter = QueuedAdapter.QueuedAdapter(self.adapter)
 				self.adapter.setup()
 				self.adapter.connect(self.remote_host, self.remote_port)
 				self.connecting = False
@@ -682,7 +682,7 @@ class DebuggerState:
 
 		self.memory_view.update_base()
 
-		current_module = self.modules.get_module_for_addr(adapter.target_base())
+		current_module = self.modules.get_module_for_addr(self.adapter.target_base())
 		if current_module != self.bv.file.original_filename:
 			print("Detected remote process running at different path: {}".format(current_module))
 			self.modules.translations[current_module] = self.bv.file.original_filename
