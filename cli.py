@@ -54,7 +54,7 @@ def disasm1(data, addr):
 		if arch_dis == 'x86_64':
 			md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 		elif arch_dis == 'x86':
-			md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+			md = capstone.Cs(capstone.CS_ARCH_X86, 0)
 		gen = md.disasm(data, addr)
 		insn = next(gen)
 		return ('%s %s' % (insn.mnemonic, insn.op_str), insn.size)
@@ -72,7 +72,7 @@ def disasm(data, addr):
 		if arch_dis == 'x86_64':
 			md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
 		elif arch_dis == 'x86':
-			md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
+			md = capstone.Cs(capstone.CS_ARCH_X86, 0)
 		for i in md.disasm(data, addr):
 			addrstr = '%s%016X%s' % (GREEN, i.address, NORMAL)
 			bytestr = hexlify(data[offset:offset+i.size]).decode('utf-8').ljust(16)

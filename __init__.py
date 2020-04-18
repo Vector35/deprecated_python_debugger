@@ -11,7 +11,10 @@ import sys
 standalone = False
 try:
 	import binaryninja
-except RuntimeError:
+	# guard against namespace package trap
+	if not sys.modules['binaryninja'].__file__:
+		raise Exception
+except Exception:
 	standalone = True
 
 # warn if minimum version not met
