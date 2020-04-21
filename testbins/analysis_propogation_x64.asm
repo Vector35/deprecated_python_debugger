@@ -2,25 +2,46 @@ default rel
 
 	global start
 	section .text
-	start:
+start:
+	mov		rcx, 4
 
+.top:
+	push	rcx
+
+.test4:
+	cmp		rcx, 4
+	jne		.test3
 	lea		rbx, [print_00]
-	call	rbx
+	jmp		.dispatch
+
+.test3:
+	cmp		rcx, 3
+	jne		.test2
 	lea		rbx, [print_01]
-	call	rbx
-	; call hidden function
+	jmp		.dispatch
+
+.test2:
+	cmp		rcx, 2
+	jne		.test1
 	lea		rbx, [junk]
 	mov		rdi, 453 ; -> 48
 	call	mapper
 	add		rbx, rax
-	call	rbx
-	; call hidden function
+	jmp		.dispatch
+
+.test1:
+	cmp		rcx, 1
 	lea		rbx, [junk]
 	mov		rdi, 163 ; -> 142
 	call	mapper
 	add		rbx, rax
-	call	rbx	
-	; done
+
+.dispatch:
+	call	rbx
+
+.check:
+	pop		rcx
+	loop	.top
 	jmp		exit
 
 ; evade data flow
