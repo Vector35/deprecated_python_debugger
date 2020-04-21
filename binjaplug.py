@@ -6,11 +6,11 @@ import sys
 import traceback
 import tempfile
 
-from binaryninja import Architecture, BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation
+from binaryninja import Architecture, BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation, core_ui_enabled
 
 from . import DebugAdapter, ProcessView, dbgeng, QueuedAdapter
 
-if binaryninja.core_ui_enabled():
+if core_ui_enabled():
     try:
         # create the widgets, debugger, etc.
         from . import ui
