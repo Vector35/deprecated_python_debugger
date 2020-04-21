@@ -872,6 +872,26 @@ class DebuggerState:
 					start = fn.mlil.get_instruction_start(new_local_rip)
 					if start is not None and fn.mlil[start].address == new_local_rip:
 						return result
+		elif il == FunctionGraphType.HighLevelILFunctionGraph:
+			# Step into until we're at an mlil instruction
+			result = (None, None)
+			while True:
+				# Step once in disassembly, then see if we've hit an IL instruction
+				result = self.step_into(FunctionGraphType.NormalFunctionGraph)
+				self.memory_dirty()
+				new_remote_rip = self.ip
+				new_local_rip = self.memory_view.remote_addr_to_local(new_remote_rip)
+				if not self.memory_view.is_local_addr(new_remote_rip):
+					# Stepped outside of loaded bv
+					return result
+
+				fns = self.bv.get_functions_containing(new_local_rip)
+				if len(fns) == 0:
+					return result
+				for fn in fns:
+					addresses = set(inst.address for inst in fn.hlil.instructions)
+					if new_local_rip in addresses:
+						return result
 		else:
 			raise NotImplementedError('step unimplemented for il type %s' % il)
 
@@ -959,6 +979,26 @@ class DebuggerState:
 					for fn in fns:
 						start = fn.mlil.get_instruction_start(new_local_rip)
 						if start is not None and fn.mlil[start].address == new_local_rip:
+							return result
+			elif il == FunctionGraphType.HighLevelILFunctionGraph:
+				# Step over until we're at an hlil instruction
+				result = (None, None)
+				while True:
+					# Step once in disassembly, then see if we've hit an IL instruction
+					result = self.step_over(FunctionGraphType.NormalFunctionGraph)
+					self.memory_dirty()
+					new_remote_rip = self.ip
+					new_local_rip = self.memory_view.remote_addr_to_local(new_remote_rip)
+					if not self.memory_view.is_local_addr(new_remote_rip):
+						# Stepped outside of loaded bv
+						return result
+
+					fns = self.bv.get_functions_containing(new_local_rip)
+					if len(fns) == 0:
+						return result
+					for fn in fns:
+						addresses = set(inst.address for inst in fn.hlil.instructions)
+						if new_local_rip in addresses:
 							return result
 			else:
 				raise NotImplementedError('step unimplemented for il type %s' % il)
