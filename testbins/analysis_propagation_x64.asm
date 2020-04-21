@@ -2,10 +2,68 @@ default rel
 
 	global start
 	section .text
+
 start:
+	; well behaved switches
+	mov		rdi, 0
+	call	function_with_switch
+	mov		rdi, 1 
+	call	function_with_switch
+	mov		rdi, 2
+	call	function_with_switch
+	mov		rdi, 3
+	call	function_with_switch
+
+	; modify function table entry 0
+	;lea		rdi, [function_with_switch.jump_table]
+	;lea		rax, [junk + 48]
+	;mov		[rdi], rax
+	;mov		rdi, 0
+	call	function_with_switch
+
+	call	function_with_indirect_call
+
+	mov		rax, 0x2000001 ; exit
+	mov		rdi, 0
+	syscall
+	ret
+
+; do indirect jumps test
+; 
+function_with_switch:
+	mov		rcx, rdi				; arg0: 0,1,2,3
+	and		rcx, 0x3
+
+	lea		rax, [.jump_table]
+	movsx	rdx, dword[rax+rcx*4]
+	add		rdx, rax
+	jmp		rdx
+.case0:
+	call	print_00
+	jmp		.switch_end
+.case1:
+	call	print_01	
+	jmp		.switch_end
+.case2:
+	call	print_00
+	jmp		.switch_end
+.case3:
+	call	print_01
+	jmp		.switch_end
+.jump_table:
+	dd		function_with_switch.case0 - .jump_table
+	dd		function_with_switch.case1 - .jump_table
+	dd		function_with_switch.case2 - .jump_table
+	dd		function_with_switch.case3 - .jump_table
+.switch_end:
+	ret
+
+; do indirect calls test
+;
+function_with_indirect_call:
 	mov		rcx, 4
 
-.top:
+.next:
 	push	rcx
 
 .test4:
@@ -41,8 +99,8 @@ start:
 
 .check:
 	pop		rcx
-	loop	.top
-	jmp		exit
+	loop	.next
+	ret
 
 ; evade data flow
 ; maps {1,2,3,4,5,6,7,8,9,10,...} -> {1,3,9,27,81,243,220,151,453,341,...}
@@ -89,11 +147,6 @@ print_01:
 	db		"I'm print_01!", 0x0a
 .done:
 	ret
-
-exit:
-	mov		rax, 0x2000001 ; exit
-	mov		rdi, 0
-	syscall
 
 junk:
 ; junk

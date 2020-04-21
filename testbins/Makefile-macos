@@ -1,6 +1,6 @@
 # make -f Makefile-macosos
 
-TARGETS = helloworld_x64-macos exitcode_x64-macos helloworld_loop_x64-macos helloworld_thread_x64-macos helloworld_func_x64-macos helloworld_recursion_x64-macos helloworld_pie_x64-macos helloworld_thread_pie_x64-macos helloworld_loop_pie_x64-macos helloworld_func_pie_x64-macos helloworld_recursion_pie_x64-macos asmtest_x64-macos nopspeed_x64-macos cat_x64-macos commandline_test_x64-macos helloworld_objc_x64-macos helloworld_virtual_x64-macos do_exception_x64-macos undiscovered_func_x64-macos many_stdlib_calls_x64-macos analysis_propogation_x64-macos
+TARGETS = helloworld_x64-macos exitcode_x64-macos helloworld_loop_x64-macos helloworld_thread_x64-macos helloworld_func_x64-macos helloworld_recursion_x64-macos helloworld_pie_x64-macos helloworld_thread_pie_x64-macos helloworld_loop_pie_x64-macos helloworld_func_pie_x64-macos helloworld_recursion_pie_x64-macos asmtest_x64-macos nopspeed_x64-macos cat_x64-macos commandline_test_x64-macos helloworld_objc_x64-macos helloworld_virtual_x64-macos do_exception_x64-macos undiscovered_func_x64-macos many_stdlib_calls_x64-macos analysis_propagation_x64-macos
 
 all: $(TARGETS)
 
@@ -53,9 +53,10 @@ asmtest_x64-macos: asmtest_x64.asm
 	nasm -f macho64 -DOS_IS_MACOS asmtest_x64.asm -o asmtest_x64-macos.o
 	ld -macosx_version_min 10.7.0 -lSystem asmtest_x64-macos.o -o asmtest_x64-macos
 
-analysis_propogation_x64-macos: analysis_propogation_x64.asm
-	nasm -f macho64 -DOS_IS_MACOS analysis_propogation_x64.asm -o analysis_propogation_x64-macos.o -l analysis_propogation_x64-macos.lst
-	ld -macosx_version_min 10.7.0 -lSystem analysis_propogation_x64-macos.o -o analysis_propogation_x64-macos
+analysis_propagation_x64-macos: analysis_propagation_x64.asm
+	nasm -f macho64 -DOS_IS_MACOS analysis_propagation_x64.asm -o analysis_propagation_x64-macos.o -l analysis_propagation_x64-macos.lst
+	ld -macosx_version_min 10.7.0 -lSystem analysis_propagation_x64-macos.o -o analysis_propagation_x64-macos
+	strip analysis_propagation_x64-macos
 
 undiscovered_func_x64-macos: undiscovered_func_x64.asm
 	nasm -f macho64 -DOS_IS_MACOS undiscovered_func_x64.asm -o undiscovered_func_x64-macos.o
