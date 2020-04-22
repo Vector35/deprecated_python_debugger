@@ -1,65 +1,96 @@
+; The point here is to test the ability to pass runtime information to analysis.
+;
+; The simplest case is when a call is encountered in the debugger where the
+; destination is not yet an identified function. Just make a function at this
+; address.
+;
+; The second case is when a branch is encountered whose destination is not
+; in the set of indirect branches picked up by analysis. This is exercised here
+; by having a jump table's check bypassed from another function. Binja picks up
+; the legal values of the jump table, but doesn't see that a side flow of
+; execution can hop over the constraint for the value that indexes the table.
+
 default rel
 
 	global start
 	section .text
 
 start:
-	; well behaved switches
+	; call case0, case1 of switch
 	mov		rdi, 0
 	call	function_with_switch
-	mov		rdi, 1 
+	mov		rdi, 1
 	call	function_with_switch
 	mov		rdi, 2
 	call	function_with_switch
 	mov		rdi, 3
 	call	function_with_switch
 
-	; modify function table entry 0
-	;lea		rdi, [function_with_switch.jump_table]
-	;lea		rax, [junk + 48]
-	;mov		[rdi], rax
-	;mov		rdi, 0
-	call	function_with_switch
+	; call case 4 (illegal) of switch by jumping passed check
+	lea		rbx, [function_with_switch]
+	mov		edi, 431
+	call	mapper ; returns 7
+	add		rbx, rax
+	mov		rcx, 4
+	call	rbx
 
+	; call case 5 (illegal) of switch by jumping passed check
+	lea		rbx, [function_with_switch]
+	mov		edi, 431
+	call	mapper ; returns 7
+	add		rbx, rax
+	mov		rcx, 5
+	call	rbx
+
+	; make some indirect calls
 	call	function_with_indirect_call
 
+	; done
 	mov		rax, 0x2000001 ; exit
 	mov		rdi, 0
 	syscall
 	ret
 
-; do indirect jumps test
-; 
 function_with_switch:
+	; 00000000: 0x48, 0x89, 0xf9
 	mov		rcx, rdi				; arg0: 0,1,2,3
+	; 00000003: 0x48, 0x83, 0xe1, 0x03
 	and		rcx, 0x3
+	; 00000007: <--- jumping here bypasses the constraint
 
 	lea		rax, [.jump_table]
 	movsx	rdx, dword[rax+rcx*4]
 	add		rdx, rax
 	jmp		rdx
+
 .case0:
 	call	print_00
 	jmp		.switch_end
+
 .case1:
-	call	print_01	
-	jmp		.switch_end
-.case2:
-	call	print_00
-	jmp		.switch_end
-.case3:
 	call	print_01
 	jmp		.switch_end
+
+.case2:
+	call	print_02
+	jmp		.switch_end
+
+.case3:
+	call	print_03
+	jmp		.switch_end
+
+.switch_end:
+	ret
+
 .jump_table:
 	dd		function_with_switch.case0 - .jump_table
 	dd		function_with_switch.case1 - .jump_table
 	dd		function_with_switch.case2 - .jump_table
 	dd		function_with_switch.case3 - .jump_table
-.switch_end:
-	ret
+	; these entries should be invisible/illegal to binja because of the "and 3" constraint
+	dd		junk + 0x30 - .jump_table
+	dd		junk + 0x8e - .jump_table
 
-; do indirect calls test
-;
 function_with_indirect_call:
 	mov		rcx, 4
 
@@ -148,6 +179,32 @@ print_01:
 .done:
 	ret
 
+print_02:
+	mov		rsi, .msg_start
+	mov		rdx, .done
+	sub		rdx, rsi
+	mov		rdi, 1 ; stdout
+	mov		rax, 0x2000004 ; write
+	syscall
+	jmp		.done
+.msg_start:
+	db		"I'm print_02!", 0x0a
+.done:
+	ret
+
+print_03:
+	mov		rsi, .msg_start
+	mov		rdx, .done
+	sub		rdx, rsi
+	mov		rdi, 1 ; stdout
+	mov		rax, 0x2000004 ; write
+	syscall
+	jmp		.done
+.msg_start:
+	db		"I'm print_03!", 0x0a
+.done:
+	ret
+
 junk:
 ; junk
 db 0xEF, 0x3D, 0x53, 0x7C, 0xFB, 0x80, 0x3B, 0x28,
@@ -194,4 +251,4 @@ db  0x59, 0x4F, 0x55, 0x20, 0x46, 0x4F, 0x55, 0x4E, 0x44, 0x20, 0x4D, 0x45, 0x32
 db 0xC3                                             ; ret
 
 section .data
-	db		"Heres some data"
+	db		"Here's some data.", 0x0a
