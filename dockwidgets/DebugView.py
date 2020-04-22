@@ -211,6 +211,10 @@ class DebugView(QWidget, View):
 		self.is_navigating_history = False
 
 	def navigate(self, addr):
+		# If we're not connected we cannot even check if the address is remote
+		if not self.debug_state.connected:
+			return self.navigate_live(addr)
+
 		if self.debug_state.memory_view.is_local_addr(addr):
 			local_addr = self.debug_state.memory_view.remote_addr_to_local(addr)
 			if self.debug_state.bv.read(local_addr, 1) and len(self.debug_state.bv.get_functions_containing(local_addr)) > 0:
