@@ -16,6 +16,14 @@ default rel
 	section .text
 
 start:
+	; call case 4 (illegal) of switch by jumping passed check
+	lea		rbx, [function_with_switch]
+	mov		edi, 431
+	call	mapper ; returns 7
+	add		rbx, rax
+	mov		rcx, 4
+	call	rbx
+
 	; call case0, case1 of switch
 	mov		rdi, 0
 	call	function_with_switch
@@ -25,14 +33,6 @@ start:
 	call	function_with_switch
 	mov		rdi, 3
 	call	function_with_switch
-
-	; call case 4 (illegal) of switch by jumping passed check
-	lea		rbx, [function_with_switch]
-	mov		edi, 431
-	call	mapper ; returns 7
-	add		rbx, rax
-	mov		rcx, 4
-	call	rbx
 
 	; call case 5 (illegal) of switch by jumping passed check
 	lea		rbx, [function_with_switch]

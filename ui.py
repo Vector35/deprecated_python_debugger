@@ -232,84 +232,62 @@ class DebuggerUI:
 		elif llil.operation == LowLevelILOperation.LLIL_LSR:
 			return self.evaluate_llil(state, llil.operands[0]) >> self.evaluate_llil(state, llil.operands[1])
 		else:
-			raise NotImplementedError('todo: evaluate llil for %s' % llil.operation)
+			raise NotImplementedError('TODO: evaluate llil for %s' % llil.operation)
 
 	def detect_new_code(self):
 		if not self.state.connected:
 			return
 
-		remote_rip = self.state.ip
 		local_rip = self.state.local_ip
+		if local_rip < self.state.bv.start or local_rip >= self.state.bv.end:
+			return
 
+		# if executing where a function isn't defined, define one!
+		if self.state.bv.read(local_rip, 1) is None:
+			raise Exception("Local address that is not local?")
+		else:
+			# If there's already a function here, then we have already been here
+			if len(self.state.bv.get_functions_containing(local_rip)) == 0:
+				#print('adding function at: 0x%X' % local_rip)
+				self.state.bv.add_function(local_rip)
+				self.state.bv.update_analysis()
+
+		# analyze current instruction through LLIL
+		remote_rip = self.state.ip
 		llil = self.state.remote_arch.get_low_level_il_from_bytes(self.state.memory_view.read(remote_rip, self.state.remote_arch.max_instr_length), remote_rip)
 		call = llil.operation == LowLevelILOperation.LLIL_CALL
 		jump = llil.operation == LowLevelILOperation.LLIL_JUMP or llil.operation == LowLevelILOperation.LLIL_JUMP_TO
+		jump_indirect = jump and not (llil.operands[0].operation in [LowLevelILOperation.LLIL_CONST, LowLevelILOperation.LLIL_CONST_PTR])
 
-		if self.state.modules.get_module_for_addr(remote_rip) == self.state.bv.file.original_filename:
-			if self.state.bv.read(local_rip, 1) is None:
-				raise Exception("Local address that is not local?")
-			else:
-				# If there's already a function here, then we have already been here
-				if len(self.state.bv.get_functions_containing(local_rip)) == 0:
-					self.state.bv.add_function(local_rip)
+		if not (call or jump):
+			return
+
+		# evaluate IL to get remote target, validate
+		try:
+			remote_target = self.evaluate_llil(self.state, llil.dest)
+		except e:
+			raise Exception("llil eval failed: {}".format(e))
+
+		local_target = self.state.memory_view.remote_addr_to_local(remote_target)
+		if local_target < self.state.bv.start or local_target >= self.state.bv.end:
+			return
+
+		# if target (call or jump) is within bv, and no function, make one
+		if not self.state.bv.get_functions_containing(local_target):
+			self.state.bv.add_function(local_target)
+			self.state.bv.update_analysis()
+
+		# if target target isn't in analysis's indirect jumps, add it
+		if jump_indirect:
+			for func in self.state.bv.get_functions_containing(local_rip):
+				# get auto and user branches, autos shadowed by user
+				branches = [(b.dest_arch, b.dest_addr) for b in func.get_indirect_branches_at(local_rip)]
+				new_branch = (self.state.remote_arch, local_target)
+				if not new_branch in branches:
+					#print('adding indirect branch target: 0x%X' % (new_branch[1]))
+					branches.append(new_branch)
+					func.set_user_indirect_branches(local_rip, list(branches))
 					self.state.bv.update_analysis()
-		if call:
-			try:
-				remote_target = self.evaluate_llil(self.state, llil.dest)
-			except e:
-				raise Exception("llil eval failed: {}".format(e))
-			if self.state.modules.get_module_for_addr(remote_target) == self.state.bv.file.original_filename:
-				local_target = self.state.memory_view.remote_addr_to_local(remote_target)
-				if self.state.bv.read(local_target, 1) is None:
-					raise Exception("Local address that is not local?")
-				else:
-					# If there's already a function here, then we have already been here
-					if len(self.state.bv.get_functions_containing(local_target)) > 0:
-						return
-
-					self.state.bv.add_function(local_target)
-					self.state.bv.update_analysis()
-		elif jump:
-			try:
-				remote_target = self.evaluate_llil(self.state, llil.dest)
-			except e:
-				raise Exception("llil eval failed: {}".format(e))
-			if self.state.modules.get_module_for_addr(remote_target) == self.state.bv.file.original_filename:
-				local_target = self.state.memory_view.remote_addr_to_local(remote_target)
-				if self.state.bv.read(local_target, 1) is None:
-					raise Exception("Local address that is not local?")
-				else:
-					# If there's already a function here, then we have already been here
-					if len(self.state.bv.get_functions_containing(local_target)) > 0:
-						# TODO: Can annotate the assembly with where we're going
-						return
-
-					# Add as a branch target to current function
-					if self.state.modules.get_module_for_addr(remote_rip) == self.state.bv.file.original_filename:
-						if self.state.bv.read(local_rip, 1) is None:
-							raise Exception("Local address that is not local?")
-						else:
-							# If there's already a function here, then we have already been here
-							funcs = self.state.bv.get_functions_containing(local_rip)
-							if len(funcs) == 0:
-								raise Exception("Local rip is not at a function?")
-
-							existing_branches = funcs[0].get_indirect_branches_at(local_rip)
-							# Be sure to include any existing branches in our new list
-							# TODO: This includes auto branches because they are ignored when adding user branches
-							# That seems like a bug with binja core and we're working around it here.
-							user_branches = [(b.dest_arch, b.dest_addr) for b in existing_branches]
-							have_this_addr = False
-							for b in user_branches:
-								if b[0] == self.state.remote_arch and b[1] == local_target:
-									# TODO: Will this ever happen? This means the target is a branch target but not analyzed
-									have_this_addr = True
-
-							if not have_this_addr:
-								user_branches.append((self.state.remote_arch, local_target))
-
-							funcs[0].set_user_indirect_branches(local_rip, list(user_branches))
-							self.state.bv.update_analysis()
 
 	def navigate_to_rip(self):
 		if self.debug_view is not None:
