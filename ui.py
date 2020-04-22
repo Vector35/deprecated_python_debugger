@@ -294,7 +294,21 @@ class DebuggerUI:
 							if len(funcs) == 0:
 								raise Exception("Local rip is not at a function?")
 
-							funcs[0].set_user_indirect_branches(local_rip, [(self.state.remote_arch, local_target)])
+							existing_branches = funcs[0].get_indirect_branches_at(local_rip)
+							# Be sure to include any existing branches in our new list
+							# TODO: This includes auto branches because they are ignored when adding user branches
+							# That seems like a bug with binja core and we're working around it here.
+							user_branches = [(b.dest_arch, b.dest_addr) for b in existing_branches]
+							have_this_addr = False
+							for b in user_branches:
+								if b[0] == self.state.remote_arch and b[1] == local_target:
+									# TODO: Will this ever happen? This means the target is a branch target but not analyzed
+									have_this_addr = True
+
+							if not have_this_addr:
+								user_branches.append((self.state.remote_arch, local_target))
+
+							funcs[0].set_user_indirect_branches(local_rip, list(user_branches))
 							self.state.bv.update_analysis()
 
 	def navigate_to_rip(self):
