@@ -242,52 +242,55 @@ class DebuggerUI:
 		if local_rip < self.state.bv.start or local_rip >= self.state.bv.end:
 			return
 
-		# if executing where a function isn't defined, define one!
 		if self.state.bv.read(local_rip, 1) is None:
-			raise Exception("Local address that is not local?")
-		else:
-			# If there's already a function here, then we have already been here
+			raise Exception('cannot read from local address 0x%X' % local_rip)
+
+		update_analysis = False
+		try:
+			# if executing where a function isn't defined, define one!
 			if len(self.state.bv.get_functions_containing(local_rip)) == 0:
 				#print('adding function at: 0x%X' % local_rip)
 				self.state.bv.add_function(local_rip)
+				update_analysis = True
+
+			# analyze current instruction through LLIL
+			remote_rip = self.state.ip
+			llil = self.state.remote_arch.get_low_level_il_from_bytes(self.state.memory_view.read(remote_rip, self.state.remote_arch.max_instr_length), remote_rip)
+			call = llil.operation == LowLevelILOperation.LLIL_CALL
+			jump = llil.operation == LowLevelILOperation.LLIL_JUMP or llil.operation == LowLevelILOperation.LLIL_JUMP_TO
+			jump_indirect = jump and not (llil.operands[0].operation in [LowLevelILOperation.LLIL_CONST, LowLevelILOperation.LLIL_CONST_PTR])
+
+			if not (call or jump):
+				return
+
+			remote_target = self.evaluate_llil(self.state, llil.dest)
+
+			local_target = self.state.memory_view.remote_addr_to_local(remote_target)
+			if local_target < self.state.bv.start or local_target >= self.state.bv.end:
+				return
+
+			# if call target is within bv, and no function, make one
+			if call and (not self.state.bv.get_functions_containing(local_target)):
+				self.state.bv.add_function(local_target)
+				update_analysis = True
+
+			# if jump target isn't in analysis's indirect jumps, add it
+			if jump_indirect:
+				for func in self.state.bv.get_functions_containing(local_rip):
+					# get auto and user branches, autos shadowed by user
+					branches = [(b.dest_arch, b.dest_addr) for b in func.get_indirect_branches_at(local_rip)]
+					new_branch = (self.state.remote_arch, local_target)
+					if not new_branch in branches:
+						#print('adding indirect branch target: 0x%X' % (new_branch[1]))
+						branches.append(new_branch)
+						func.set_user_indirect_branches(local_rip, list(branches))
+						update_analysis = True
+		except NotImplementedError as e:
+			raise Exception("llil eval failed: {}".format(e))
+		finally:
+			if update_analysis:
 				self.state.bv.update_analysis()
 
-		# analyze current instruction through LLIL
-		remote_rip = self.state.ip
-		llil = self.state.remote_arch.get_low_level_il_from_bytes(self.state.memory_view.read(remote_rip, self.state.remote_arch.max_instr_length), remote_rip)
-		call = llil.operation == LowLevelILOperation.LLIL_CALL
-		jump = llil.operation == LowLevelILOperation.LLIL_JUMP or llil.operation == LowLevelILOperation.LLIL_JUMP_TO
-		jump_indirect = jump and not (llil.operands[0].operation in [LowLevelILOperation.LLIL_CONST, LowLevelILOperation.LLIL_CONST_PTR])
-
-		if not (call or jump):
-			return
-
-		# evaluate IL to get remote target, validate
-		try:
-			remote_target = self.evaluate_llil(self.state, llil.dest)
-		except e:
-			raise Exception("llil eval failed: {}".format(e))
-
-		local_target = self.state.memory_view.remote_addr_to_local(remote_target)
-		if local_target < self.state.bv.start or local_target >= self.state.bv.end:
-			return
-
-		# if target (call or jump) is within bv, and no function, make one
-		if not self.state.bv.get_functions_containing(local_target):
-			self.state.bv.add_function(local_target)
-			self.state.bv.update_analysis()
-
-		# if target target isn't in analysis's indirect jumps, add it
-		if jump_indirect:
-			for func in self.state.bv.get_functions_containing(local_rip):
-				# get auto and user branches, autos shadowed by user
-				branches = [(b.dest_arch, b.dest_addr) for b in func.get_indirect_branches_at(local_rip)]
-				new_branch = (self.state.remote_arch, local_target)
-				if not new_branch in branches:
-					#print('adding indirect branch target: 0x%X' % (new_branch[1]))
-					branches.append(new_branch)
-					func.set_user_indirect_branches(local_rip, list(branches))
-					self.state.bv.update_analysis()
 
 	def navigate_to_rip(self):
 		if self.debug_view is not None:
