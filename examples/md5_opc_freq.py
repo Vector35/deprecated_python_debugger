@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
 # demonstrate use of headless debugger to count opcode frequency for an md5 calculation
+#
+# you probably want to run sometimes like:
+# $ ./md5_opc_freq.py ../testbins/md5/md5_x64-macos
 
 import os
 import sys
