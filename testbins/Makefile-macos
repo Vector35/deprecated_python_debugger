@@ -1,6 +1,6 @@
 # make -f Makefile-macosos
 
-TARGETS = helloworld_x64-macos exitcode_x64-macos helloworld_loop_x64-macos helloworld_thread_x64-macos helloworld_func_x64-macos helloworld_recursion_x64-macos helloworld_pie_x64-macos helloworld_thread_pie_x64-macos helloworld_loop_pie_x64-macos helloworld_func_pie_x64-macos helloworld_recursion_pie_x64-macos asmtest_x64-macos hello_x64-macos nopspeed_x64-macos cat_x64-macos commandline_test_x64-macos helloworld_objc_x64-macos helloworld_virtual_x64-macos do_exception_x64-macos undiscovered_func_x64-macos many_stdlib_calls_x64-macos analysis_propagation_x64-macos missing_switch_case_x64-macos
+TARGETS = helloworld_x64-macos exitcode_x64-macos helloworld_loop_x64-macos helloworld_thread_x64-macos helloworld_func_x64-macos helloworld_recursion_x64-macos helloworld_pie_x64-macos helloworld_thread_pie_x64-macos helloworld_loop_pie_x64-macos helloworld_func_pie_x64-macos helloworld_recursion_pie_x64-macos asmtest_x64-macos hello_x64-macos nopspeed_x64-macos cat_x64-macos commandline_test_x64-macos helloworld_objc_x64-macos helloworld_virtual_x64-macos do_exception_x64-macos undiscovered_func_x64-macos undiscovered_func2_x64-macos many_stdlib_calls_x64-macos analysis_propagation_x64-macos missing_switch_case_x64-macos
 
 all: $(TARGETS)
 
@@ -72,6 +72,12 @@ missing_switch_case_x64-macos: missing_switch_case_x64.asm
 undiscovered_func_x64-macos: undiscovered_func_x64.asm
 	nasm -f macho64 -DOS_IS_MACOS undiscovered_func_x64.asm -o undiscovered_func_x64-macos.o
 	ld -macosx_version_min 10.7.0 -lSystem undiscovered_func_x64-macos.o -o undiscovered_func_x64-macos
+
+undiscovered_func2_x64-macos: undiscovered_func2_x64.asm
+	nasm -f macho64 -DOS_IS_MACOS undiscovered_func2_x64.asm -o undiscovered_func2_x64-macos.o
+	ld -macosx_version_min 10.7.0 -lSystem undiscovered_func2_x64-macos.o -o undiscovered_func2_x64-macos
+	strip undiscovered_func2_x64-macos
+	./rm_func_starts.py ./undiscovered_func2_x64-macos
 
 do_exception_x64-macos: do_exception.c
 	gcc -Wl,-no_pie -DARCH_IS_X64 do_exception.c -o do_exception_x64-macos
