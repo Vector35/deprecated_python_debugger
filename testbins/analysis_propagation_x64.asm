@@ -13,6 +13,8 @@
 default rel
 
 	global start
+	global function_with_indirect_call
+	global function_with_switch
 	section .text
 
 start:
