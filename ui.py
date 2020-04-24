@@ -2,7 +2,7 @@ from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
 from binaryninja.plugin import PluginCommand
-from binaryninja import Endianness, HighlightStandardColor, execute_on_main_thread_and_wait, LowLevelILOperation, BinaryReader
+from binaryninja import Endianness, HighlightStandardColor, execute_on_main_thread, execute_on_main_thread_and_wait, LowLevelILOperation, BinaryReader
 from binaryninja.settings import Settings
 from binaryninja.log import log_warn, log_error, log_debug
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, ViewType, ViewFrame
@@ -415,7 +415,7 @@ class DebuggerUI:
 		def on_stdout_main_thread(output):
 			console_widget = self.widget('Debugger Console')
 			console_widget.notifyStdout(output)
-		execute_on_main_thread_and_wait(lambda: on_stdout_main_thread(output))
+		execute_on_main_thread(lambda: on_stdout_main_thread(output))
 
 #------------------------------------------------------------------------------
 # right click plugin
