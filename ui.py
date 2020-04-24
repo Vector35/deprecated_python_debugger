@@ -194,7 +194,6 @@ class DebuggerUI:
 			)
 		function.set_comment_at(local_rip, annotation)
 
-
 	def evaluate_llil(self, state, llil):
 		# Interpreter for LLIL instructions, using data from state
 		if llil.operation == LowLevelILOperation.LLIL_CONST:
@@ -258,7 +257,7 @@ class DebuggerUI:
 			llil = self.state.remote_arch.get_low_level_il_from_bytes(self.state.memory_view.read(remote_rip, self.state.remote_arch.max_instr_length), remote_rip)
 			call = llil.operation == LowLevelILOperation.LLIL_CALL
 			jump = llil.operation == LowLevelILOperation.LLIL_JUMP or llil.operation == LowLevelILOperation.LLIL_JUMP_TO
-			jump_indirect = jump and not (llil.operands[0].operation in [LowLevelILOperation.LLIL_CONST, LowLevelILOperation.LLIL_CONST_PTR])
+			indirect = (call or jump) and llil.operands[0].operation not in [LowLevelILOperation.LLIL_CONST, LowLevelILOperation.LLIL_CONST_PTR]
 
 			if not (call or jump):
 				return
@@ -274,8 +273,18 @@ class DebuggerUI:
 				self.state.bv.add_function(local_target)
 				update_analysis = True
 
+			# if call is indirect, optionally annotate the destination
+			if call and indirect and Settings().get_bool("debugger.extra_annotations"):
+				for func in self.state.bv.get_functions_containing(local_rip):
+					annotation = 'called 0x%X' % remote_target
+					comment = func.get_comment_at(local_rip)
+					if not annotation in comment.split('\n'):
+						if comment:
+							annotation = '\n'+annotation
+						func.set_comment_at(local_rip, comment+annotation)
+
 			# if jump target isn't in analysis's indirect jumps, add it
-			if jump_indirect:
+			if jump and indirect:
 				for func in self.state.bv.get_functions_containing(local_rip):
 					# get auto and user branches, autos shadowed by user
 					branches = [(b.dest_arch, b.dest_addr) for b in func.get_indirect_branches_at(local_rip)]
