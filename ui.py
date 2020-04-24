@@ -177,15 +177,15 @@ class DebuggerUI:
 		function = self.state.bv.get_function_at(local_rip)
 		if not function:
 			return
-		annotation = "At {}:\n\n".format(datetime.datetime.now().isoformat())
+		annotation = "timestamp: {}\n\n".format(datetime.datetime.now().strftime('%H:%M:%S.%f'))
 		address_size = self.state.remote_arch.address_size
 		for reg in self.regs:
 			if address_size*8 == reg['bits']:
-				annotation += " {reg:>4} = {value:0{valuewidth}x}\n".format(reg=reg['name'], value=reg['value'], valuewidth=address_size*2)
-		annotation += "\n\nStack:\n\n"
+				annotation += " {reg:>8} = {value:0{valuewidth}x}\n".format(reg=reg['name'], value=reg['value'], valuewidth=address_size*2)
+		annotation += "\nStack:\n"
 		# Read up and down from rsp
-		for entry in self.stack:
-			annotation += " {offset} {value:>{address_size}s} {address:x} {refs}\n".format(
+		for entry in self.stack[0:16]:
+			annotation += " {offset:>2} {value:>{address_size}s} {address:x} {refs}\n".format(
 				offset=entry['offset'],
 				value=entry['value'].hex(),
 				address=entry['address'],
