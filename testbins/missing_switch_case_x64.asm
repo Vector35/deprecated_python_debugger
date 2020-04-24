@@ -18,6 +18,13 @@ default rel
 	start:
 %endif
 
+%ifdef OS_IS_WINDOWS
+	global WinMain
+	extern ExitProcess, GetStdHandle, WriteConsoleA
+	section .text
+	WinMain:
+%endif
+
 start:
 	; get pointer past switch constraint
 	lea		rbx, [function_with_switch]
@@ -57,6 +64,11 @@ start:
 	mov		rax, 0x2000001 ; exit
 	mov		rdi, 0
 	syscall
+%endif
+
+%ifdef OS_IS_WINDOWS
+    mov		rcx, 0
+    call    ExitProcess
 %endif
 
 function_with_switch:

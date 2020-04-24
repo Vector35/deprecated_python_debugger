@@ -20,6 +20,13 @@ default rel
 	start:
 %endif
 
+%ifdef OS_IS_WINDOWS
+	global WinMain
+	extern ExitProcess, GetStdHandle, WriteConsoleA
+	section .text
+	WinMain:
+%endif
+
 	mov		rcx, 4
 
 .next:
@@ -72,6 +79,11 @@ default rel
 	mov		rax, 0x2000001 ; exit
 	mov		rdi, 0
 	syscall
+%endif
+
+%ifdef OS_IS_WINDOWS
+    mov		rcx, 0
+    call    ExitProcess
 %endif
 
 sub_00:
