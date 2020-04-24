@@ -6,8 +6,17 @@
 
 default rel
 
+%ifdef OS_IS_LINUX
+	global _start
+	section .text
+	_start:
+%endif
+
+%ifdef OS_IS_MACOS
 	global start
 	section .text
+	start:
+%endif
 
 start:
 	; get pointer past switch constraint
@@ -36,11 +45,19 @@ start:
 	mov		rdi, 3
 	call	function_with_switch
 
-	; done
+; exit
+
+%ifdef OS_IS_LINUX
+	mov		rdi, 0 ; arg0: status
+	mov		rax, 60 ; __NR_exit
+	syscall
+%endif
+
+%ifdef OS_IS_MACOS
 	mov		rax, 0x2000001 ; exit
 	mov		rdi, 0
 	syscall
-	ret
+%endif
 
 function_with_switch:
 	; 00000000: 0x48, 0x89, 0xf9
