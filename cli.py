@@ -64,7 +64,7 @@ def disasm(data, addr):
 	arch_dis = get_arch_dis()
 
 	if 'binaryninja' in sys.modules:
-		return utils.disasm1(data, addr, arch_dis)
+		return utils.disasm(data, addr, arch_dis)
 	else:
 		import capstone
 		offset = 0
@@ -142,9 +142,9 @@ def context_display(pkt_T=None):
 		print(r('rip'), end='')
 
 		if 'rflags' in adapter.reg_list():
-			print(r('rflags'))
+			print(r(' rflags'))
 		else:
-			print(r('eflags'))
+			print(r(' eflags'))
 	elif arch == 'x86':
 		print(e('eax'), e('ebx'), e('ecx'), e('edx'))
 		print(e('esi'), e('edi'), e('ebp'), e('esp'))
