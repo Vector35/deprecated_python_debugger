@@ -14,18 +14,22 @@ RED = '\x1B[31m'
 GREEN = '\x1B[32m'
 NORMAL = '\x1B[0m'
 
-port = 31337
 if sys.argv[1:]:
 	port = int(sys.argv[1])
+	filter_expression = 'port %d' % port
+	ports = [port]
+else:
+	filter_expression = '(port 31337) or (port 31338) or (port 31339) or (port 31340)'
+	ports = [31337, 31338, 31339, 31340]
 
-cap = pyshark.LiveCapture(interface='lo', bpf_filter='(port 31337) or (port 31338) or (port 31339) or (port 31340)')
+cap = pyshark.LiveCapture(interface='lo', bpf_filter=filter_expression)
 
 for pkt in cap.sniff_continuously():
 	if not hasattr(pkt.tcp, 'payload'):
 		continue
 
 	srcport = int(str(pkt.tcp.srcport), 10)
-	if srcport == port:
+	if srcport in ports:
 		print(RED + '<- ', end='')
 	else:
 		print(GREEN + '-> ', end='')

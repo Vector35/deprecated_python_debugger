@@ -32,7 +32,7 @@ context_last = {}
 def get_arch_dis():
 	arch = adapter.target_arch()
 
-	if arch in ['x86', 'x86_64', 'aarch64']:
+	if arch in ['x86', 'x86_64', 'aarch64', 'z80']:
 		return arch
 	elif arch in ['arm', 'armv7', 'thumb', 'thumb2']:
 		cpsr = adapter.reg_read('cpsr')
@@ -47,8 +47,12 @@ def disasm1(data, addr):
 	if not data: return
 	arch_dis = get_arch_dis()
 
-	if 'binaryninja' in sys.modules:
-		return utils.disasm1(data, addr, arch_dis)
+	#if 'binaryninja' in sys.modules:
+	#	return utils.disasm1(data, addr, arch_dis)
+	if arch == 'z80':
+		from z80dis import z80
+		decoded = z80.decode(data, addr)
+		return (z80.disasm(decoded), decoded.len)
 	else:
 		import capstone
 		if arch_dis == 'x86_64':
@@ -63,8 +67,17 @@ def disasm(data, addr):
 	if not data: return
 	arch_dis = get_arch_dis()
 
-	if 'binaryninja' in sys.modules:
-		return utils.disasm(data, addr, arch_dis)
+	#if 'binaryninja' in sys.modules:
+	#	return utils.disasm(data, addr, arch_dis)
+	if arch == 'z80':
+		from z80dis import z80
+		lines = []
+		while data:
+			decoded = z80.decode(data, addr)
+			lines.append(z80.disasm(decoded))
+			data = data[decoded.len:]
+			addr += decoded.len
+		return '\n'.join(lines)
 	else:
 		import capstone
 		offset = 0
@@ -125,15 +138,21 @@ def context_display(pkt_T=None):
 	global adapter
 	global context_last
 
-	tid = adapter.thread_selected()
-	print('thread 0x%X:' % tid)
+	try:
+		tid = adapter.thread_selected()
+		print('thread 0x%X:' % tid)
+	except DebugAdapter.GeneralError:
+		pass
 
 	def r(reg, fmt='%016X'):
 		return (BROWN+reg+NORMAL+'='+fmt) % adapter.reg_read(reg.strip())
 	def e(reg, fmt='%08X'):
 		return (BROWN+reg+NORMAL+'='+fmt) % adapter.reg_read(reg.strip())
+	def s(reg, fmt='%04X'):
+		return (BROWN+reg+NORMAL+'='+fmt) % adapter.reg_read(reg.strip())
 
 	arch = adapter.target_arch()
+
 	if arch == 'x86_64':
 		print(r('rax'), r('rbx'), r('rcx'), r('rdx'))
 		print(r('rsi'), r('rdi'), r('rbp'), r('rsp'))
@@ -166,9 +185,16 @@ def context_display(pkt_T=None):
 		print(e(' r8'), e(' r9'), e('r10'), e('r11'))
 		print(e('r12'), e(' sp'), e(' lr'))
 		print(e(' pc'), e(' cpsr'), cpsr_tostr(cpsr))
+	elif arch == 'z80':
+		print(s(' af'), s('af\''))
+		print(s(' bc'), s('bc\''))
+		print(s(' de'), s('de\''))
+		print(s(' hl'), s('hl\''))
+		print(s(' ix'), s(' iy'))
+		print(s(' sp'), s(' pc'))
 
-	pc_name = {'aarch64':'pc', 'arm':'pc', 'x86_64':'rip', 'x86':'eip'}[arch]
-	pc_fmt = {'aarch64':'%016X', 'arm':'%08X', 'x86_64':'%016X', 'x86':'%08X'}[arch]
+	pc_name = {'aarch64':'pc', 'arm':'pc', 'x86_64':'rip', 'x86':'eip', 'z80':'pc'}[arch]
+	pc_fmt = {'aarch64':'%016X', 'arm':'%08X', 'x86_64':'%016X', 'x86':'%08X', 'z80':'%04X'}[arch]
 	pc = adapter.reg_read(pc_name)
 
 	try:
@@ -361,7 +387,10 @@ if __name__ == '__main__':
 			elif text == 'target':
 				print('arch: %s' % adapter.target_arch())
 				print('path: %s' % adapter.target_path())
-				print(' pid: 0x%X (%d)' % (adapter.target_pid(), adapter.target_pid()))
+				if adapter.target_pid() != None:
+					print(' pid: 0x%X (%d)' % (adapter.target_pid(), adapter.target_pid()))
+				else:
+					print(' pid: <unavailable>')
 				print('base: 0x%X' % adapter.target_base())
 
 			# quit, detach, quit+detach

@@ -68,7 +68,7 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		# acquire pid as first tid
 		reply = self.rspConn.tx_rx('?')
 		tdict = rsp.packet_T_to_dict(reply)
-		self.tid = tdict['thread']
+		self.tid = tdict.get('thread', None)
 		self.target_pid_ = self.tid
 
 	def mem_modules(self, cache_ok=True):
