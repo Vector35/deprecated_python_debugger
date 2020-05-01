@@ -48,6 +48,44 @@ def connect(host, port):
 
 	raise ConnectionRefusedError
 
+def connect_sense(address, port):
+	# connect to gdbserver, sense environment, return appropriate adapter
+	sock = gdblike.connect(address, port)
+	rsp_conn = rsp.RspConnection(sock)
+
+	adapt = None
+	try:
+		# negotiate, get xml
+		rsp_conn.tx_rx('Hg0')
+		rsp_conn.negotiate('')
+		xml = rsp_conn.get_xml('target.xml')
+
+		# choose adapter based on feature name,
+		# fallback to "gdblike"
+		root = ET.fromstring(xml)
+		feature = root.find('feature')
+		if feature:
+			feature_name = feature.get('name')
+			if feature_name:
+				# select adapter type based on feature name
+				if feature_name == 'mame.z80':
+					adapt = mame_coleco.DebugAdapterMameColeco()
+				elif feature_name == 'com.apple.debugserver.x86_64':
+					adapt = lldb.DebugAdapterLLDB
+				else:
+					return None
+		if not adapt:
+			adapt = gdblike.DebugAdapterGdbLike
+
+		adapt.setup()
+		adapt.connect_continued(sock, rsp_conn)
+		ok = True
+		return adapt
+
+	finally:
+		if not ok:
+			sock.close()
+
 def preexec():
 	os.setpgrp()
 
