@@ -15,6 +15,7 @@ from binascii import hexlify, unhexlify
 import colorama
 
 sys.path.append('..')
+import debugger.gdblike as gdblike
 import debugger.gdb as gdb
 import debugger.utils as utils
 import debugger.DebugAdapter as DebugAdapter
@@ -72,11 +73,22 @@ def disasm(data, addr):
 	if arch == 'z80':
 		from z80dis import z80
 		lines = []
-		while data:
-			decoded = z80.decode(data, addr)
-			lines.append(z80.disasm(decoded))
-			data = data[decoded.len:]
+
+		offset = 0
+		while offset < len(data):
+			try:
+				decoded = z80.decode(data[offset:], addr)
+			except Exception:
+				break
+
+			addrstr = '%s%04X%s' % (GREEN, addr+offset, NORMAL)
+			bytestr = hexlify(data[offset:offset+decoded.len]).decode('utf-8').ljust(8)
+			asmstr = z80.disasm(decoded)
+			lines.append('%s: %s %s' % (addrstr, bytestr, asmstr))
+
 			addr += decoded.len
+			offset += decoded.len
+
 		return '\n'.join(lines)
 	else:
 		import capstone
@@ -265,9 +277,7 @@ if __name__ == '__main__':
 	arg1 = sys.argv[1]
 	if re.match(r'^.*:\d+$', arg1):
 		(host, port) = arg1.split(':')
-		adapter = gdb.DebugAdapterGdb()
-		adapter.setup()
-		adapter.connect(host, int(port))
+		adapter = gdblike.connect_sense(host, int(port))
 	else:
 		if '~' in arg1:
 			arg1 = os.expanduser(arg1)
@@ -405,6 +415,8 @@ if __name__ == '__main__':
 			else:
 				print('unrecognized: %s' % text)
 
+		except NotImplementedError:
+			print('not implemented')
 		except KeyboardInterrupt as e:
 			print("ctrl+c detected! breaking in!\n")
 			break_into()

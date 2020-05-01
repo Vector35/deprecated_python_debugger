@@ -8,6 +8,7 @@ import struct
 import socket
 import binascii
 import xml.parsers.expat
+import xml.etree.ElementTree as ET
 
 from . import rsp
 from . import DebugAdapter
@@ -50,7 +51,7 @@ def connect(host, port):
 
 def connect_sense(address, port):
 	# connect to gdbserver, sense environment, return appropriate adapter
-	sock = gdblike.connect(address, port)
+	sock = connect(address, port)
 	rsp_conn = rsp.RspConnection(sock)
 
 	adapt = None
@@ -69,12 +70,15 @@ def connect_sense(address, port):
 			if feature_name:
 				# select adapter type based on feature name
 				if feature_name == 'mame.z80':
+					from . import mame_coleco
 					adapt = mame_coleco.DebugAdapterMameColeco()
-				elif feature_name == 'com.apple.debugserver.x86_64':
+				elif feature_name.startswith('com.apple.debugserver'): # eg 'com.apple.debugserver.x86_64'
+					from . import lldb
 					adapt = lldb.DebugAdapterLLDB
 				else:
 					return None
 		if not adapt:
+			# TODO: can we "see" this if we're positioned above?
 			adapt = gdblike.DebugAdapterGdbLike
 
 		adapt.setup()
@@ -83,7 +87,7 @@ def connect_sense(address, port):
 		return adapt
 
 	finally:
-		if not ok:
+		if not adapt:
 			sock.close()
 
 def preexec():
@@ -447,9 +451,9 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 		reply = self.rspConn.tx_rx('?')
 		context = rsp.packet_T_to_dict(reply)
-		if not 'thread' in context:
-			raise DebugAdapter.GeneralError('determing thread responsible for stop')
-		self.tid = context.get('thread')
+		#if not 'thread' in context:
+		#	raise DebugAdapter.GeneralError('determing thread responsible for stop')
+		self.tid = context.get('thread', 0)
 
 	def get_remote_file(self, fpath):
 		#print('get_remote_file(%s)' % fpath)
@@ -633,7 +637,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			# https://sourceware.org/gdb/current/onlinedocs/gdb/Stop-Reply-Packets.html#Stop-Reply-Packets
 			if reply[0] == 'T':
 				tdict = rsp.packet_T_to_dict(reply)
-				self.active_thread_tid = tdict['thread']
+				self.active_thread_tid = tdict.get('thread', 0)
 				(reason, reason_data) = self.thread_stop_pkt_to_reason(tdict)
 
 			# exit status
