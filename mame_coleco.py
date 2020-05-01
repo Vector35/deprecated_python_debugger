@@ -59,9 +59,6 @@ class DebugAdapterMameColeco(gdblike.DebugAdapterGdbLike):
 		self.tid = 0
 		self.target_pid_ = 0
 
-	def mem_modules(self, cache_ok=True):
-		raise NotImplementedError('no module list on ColecoVision')
-
 	def go(self):
 		self.reg_cache = {}
 		(reason, reason_data) = self.go_generic('c')
@@ -73,6 +70,12 @@ class DebugAdapterMameColeco(gdblike.DebugAdapterGdbLike):
 		(reason, reason_data) = self.go_generic('s')
 		self.handle_stop(reason, reason_data)
 		return (reason, reason_data)
+
+	# reg read
+	def reg_read(self, name):
+		# if IL evaluated (to compute next instruction), the disassembler gives uppercase register names
+		# convert to lowercase names mame expects
+		return gdblike.DebugAdapterGdbLike.reg_read(self, name.lower())
 
 	# thread stuff
 	def thread_list(self):
@@ -86,7 +89,10 @@ class DebugAdapterMameColeco(gdblike.DebugAdapterGdbLike):
 			raise DebugAdapter.GeneralError('mame_coleco has only one implicit thread: 0')
 
 	#
-	def mem_modules(self):
+	def target_base(self):
+		return 0x8000
+
+	def mem_modules(self, cache_ok=True):
 		#[0000, 2000) - BIOS ROM
 		#[2000, 4000) - Expansion Port
 		#[4000, 6000) - Expansion Port

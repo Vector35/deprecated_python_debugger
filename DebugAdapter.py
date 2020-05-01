@@ -21,6 +21,7 @@ class ADAPTER_TYPE(Enum):
 	REMOTE_DBGENG = auto()
 	REMOTE_GDB = auto()
 	REMOTE_LLDB = auto()
+	REMOTE_SENSE = auto()
 
 	@staticmethod
 	def use_exec(adapter_type):
@@ -36,7 +37,8 @@ class ADAPTER_TYPE(Enum):
 		return adapter_type in [
 			ADAPTER_TYPE.REMOTE_DBGENG,
 			ADAPTER_TYPE.REMOTE_GDB,
-			ADAPTER_TYPE.REMOTE_LLDB
+			ADAPTER_TYPE.REMOTE_LLDB,
+			ADAPTER_TYPE.REMOTE_SENSE
 		]
 
 	@staticmethod
@@ -50,6 +52,7 @@ class ADAPTER_TYPE(Enum):
 				ADAPTER_TYPE.REMOTE_DBGENG,
 				ADAPTER_TYPE.REMOTE_GDB,
 				ADAPTER_TYPE.REMOTE_LLDB,
+				ADAPTER_TYPE.REMOTE_SENSE
 			]
 		elif system == 'Linux':
 			return adapter_type in [
@@ -58,6 +61,7 @@ class ADAPTER_TYPE(Enum):
 				ADAPTER_TYPE.REMOTE_DBGENG,
 				ADAPTER_TYPE.REMOTE_GDB,
 				ADAPTER_TYPE.REMOTE_LLDB,
+				ADAPTER_TYPE.REMOTE_SENSE
 			]
 		elif system == 'Darwin':
 			return adapter_type in [
@@ -66,6 +70,7 @@ class ADAPTER_TYPE(Enum):
 				ADAPTER_TYPE.REMOTE_DBGENG,
 				ADAPTER_TYPE.REMOTE_GDB,
 				ADAPTER_TYPE.REMOTE_LLDB,
+				ADAPTER_TYPE.REMOTE_SENSE
 			]
 		else:
 			return False
@@ -93,6 +98,8 @@ def get_new_adapter(adapter_type = ADAPTER_TYPE.DEFAULT, **kwargs):
 		return gdb.DebugAdapterGdb(**kwargs)
 	elif adapter_type == ADAPTER_TYPE.LOCAL_LLDB or adapter_type == ADAPTER_TYPE.REMOTE_LLDB:
 		return lldb.DebugAdapterLLDB(**kwargs)
+	elif adapter_type == ADAPTER_TYPE.REMOTE_SENSE:
+		return lldbDebugAdapterGdbLike(**kwargs)
 	elif adapter_type == ADAPTER_TYPE.DEFAULT:
 		return get_adapter_for_current_system(**kwargs)
 	else:

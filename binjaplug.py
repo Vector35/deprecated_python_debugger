@@ -8,7 +8,7 @@ import tempfile
 
 from binaryninja import Architecture, BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation, core_ui_enabled
 
-from . import DebugAdapter, ProcessView, dbgeng, QueuedAdapter
+from . import DebugAdapter, ProcessView, dbgeng, gdblike, QueuedAdapter
 
 if core_ui_enabled():
     try:
@@ -481,9 +481,7 @@ class DebuggerState:
 			return self.registers['rip']
 		elif self.remote_arch.name == 'x86':
 			return self.registers['eip']
-		elif self.remote_arch.name == 'aarch64':
-			return self.registers['pc']
-		elif self.remote_arch.name in ['arm', 'armv7']:
+		elif self.remote_arch.name in ['aarch64', 'arm', 'armv7', 'Z80']:
 			return self.registers['pc']
 		else:
 			raise NotImplementedError('unimplemented architecture %s' % self.remote_arch.name)
@@ -504,9 +502,7 @@ class DebuggerState:
 			return self.registers['rsp']
 		elif self.remote_arch.name == 'x86':
 			return self.registers['esp']
-		elif self.remote_arch.name == 'aarch64':
-			return self.registers['sp']
-		elif self.remote_arch.name in ['arm', 'armv7']:
+		elif self.remote_arch.name in ['aarch64', 'arm', 'armv7', 'Z80']:
 			return self.registers['sp']
 		else:
 			raise NotImplementedError('unimplemented architecture %s' % self.remote_arch.name)
@@ -668,20 +664,35 @@ class DebuggerState:
 			raise Exception("Tried to attach but already debugging")
 
 		self.connecting = True
-		self.adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
-		if DebugAdapter.ADAPTER_TYPE.use_connect(self.adapter_type):
+
+		# can the remote sense create the appropriate adapter?
+		if self.adapter_type == DebugAdapter.ADAPTER_TYPE.REMOTE_SENSE:
 			try:
-				self.adapter = QueuedAdapter.QueuedAdapter(self.adapter)
-				self.adapter.setup()
-				self.adapter.connect(self.remote_host, self.remote_port)
-				self.connecting = False
+				self.adapter = gdblike.connect_sense(self.remote_host, self.remote_port)
+				if self.adapter:
+					self.adapter = QueuedAdapter.QueuedAdapter(self.adapter)
+					self.connecting = False
 			except Exception as e:
 				self.connecting = False
 				self.adapter = None
 				raise e
-		else:
-			self.connecting = False
-			raise Exception("cannot connect to adapter of type %s" % self.adapter_type)
+
+		if self.connecting:
+			self.adapter = DebugAdapter.get_new_adapter(self.adapter_type, stdout=self.on_stdout)
+
+			if DebugAdapter.ADAPTER_TYPE.use_connect(self.adapter_type):
+				try:
+					self.adapter = QueuedAdapter.QueuedAdapter(self.adapter)
+					self.adapter.setup()
+					self.adapter.connect(self.remote_host, self.remote_port)
+					self.connecting = False
+				except Exception as e:
+					self.connecting = False
+					self.adapter = None
+					raise e
+			else:
+				self.connecting = False
+				raise Exception("cannot connect to adapter of type %s" % self.adapter_type)
 
 		self.memory_view.update_base()
 
