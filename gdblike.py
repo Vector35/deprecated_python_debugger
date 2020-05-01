@@ -61,7 +61,7 @@ def connect_sense(address, port):
 		xml = rsp_conn.get_xml('target.xml')
 
 		# choose adapter based on feature name,
-		# fallback to "gdblike"
+		# fallback to DebugAdapterGdbLike
 		root = ET.fromstring(xml)
 		feature = root.find('feature')
 		if feature:
@@ -498,31 +498,6 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		# done
 		return data
 
-	def get_xml(self, fname):
-		# https://sourceware.org/gdb/current/onlinedocs/gdb/General-Query-Packets.html#qXfer-target-description-read
-		#print('downloading %s' % fname)
-		xml = ''
-		offs = 0
-		pktsize = int(self.rspConn.server_capabilities.get('PacketSize', '1000'), 16)
-		while 1:
-			data = self.rspConn.tx_rx('qXfer:features:read:%s:%X,%X' % (fname, offs, pktsize), 'ack_then_reply')
-			if not data[0] in ['l', 'm']:
-				raise DebugAdapter.GeneralError('acquiring register description xml')
-			if data[1:]:
-				#print('read 0x%X bytes' % len(tmp))
-				tmp = rsp.un_rle(data[1:])
-				xml += tmp
-				offs += len(tmp)
-			if data[0] == 'l':
-				break
-
-		#fpath = '/tmp/' + fname
-		#print('saving %s' % fpath)
-		#with open(fpath, 'w') as fp:
-		#	fp.write(xml)
-
-		return xml
-
 	# See G.2.7 Registers for what's going on here
 	# https://sourceware.org/gdb/current/onlinedocs/gdb/Target-Description-Format.html#Target-Description-Format
 	def reg_info_load(self, force=False):
@@ -562,7 +537,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		p.StartElementHandler = target_xml_start_elem
 		p.EndElementHandler = target_xml_end_elem
 		p.CharacterDataHandler = target_xml_char_data_handler
-		xmltxt = self.get_xml('target.xml')
+		xmltxt = self.rspConn.get_xml('target.xml')
 		#print(xmltxt)
 		p.Parse(xmltxt)
 
@@ -607,7 +582,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 		# parse targets.xml include files
 		for fname in subfiles:
-			xmltxt = self.get_xml(fname)
+			xmltxt = self.rspConn.get_xml(fname)
 			p = xml.parsers.expat.ParserCreate()
 			p.StartElementHandler = search_reg
 			p.Parse(xmltxt)

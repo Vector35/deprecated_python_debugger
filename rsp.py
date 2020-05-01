@@ -168,6 +168,26 @@ class RspConnection():
 		except OSError:
 			raise RspDisconnected('disconnection while transmitting')
 
+	def get_xml(self, fname):
+		# https://sourceware.org/gdb/current/onlinedocs/gdb/General-Query-Packets.html#qXfer-target-description-read
+		#print('downloading %s' % fname)
+		xml = ''
+		offs = 0
+		pktsize = int(self.server_capabilities.get('PacketSize', '1000'), 16)
+		while 1:
+			data = self.tx_rx('qXfer:features:read:%s:%X,%X' % (fname, offs, pktsize), 'ack_then_reply')
+			if not data[0] in ['l', 'm']:
+				raise DebugAdapter.GeneralError('acquiring xml')
+			if data[1:]:
+				#print('read 0x%X bytes' % len(tmp))
+				tmp = un_rle(data[1:])
+				xml += tmp
+				offs += len(tmp)
+			if data[0] == 'l':
+				break
+
+		return xml
+
 #--------------------------------------------------------------------------
 # GDB RSP FUNCTIONS (HIGHER LEVEL)
 #--------------------------------------------------------------------------
@@ -245,4 +265,3 @@ def packet_T_to_dict(data, lookup_reg={}):
 			context[key] = val
 
 	return context
-
