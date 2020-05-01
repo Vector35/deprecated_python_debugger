@@ -50,18 +50,9 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		# connect to gdbserver
 		self.connect('localhost', port)
 
-	def connect(self, address, port):
-		# connect to gdbserver
-		self.sock = gdblike.connect(address, port)
-		self.rspConn = rsp.RspConnection(self.sock)
-
-		# initial commands
-		self.rspConn.tx_rx('Hg0')
-		# if 'multiprocess+' in list here, thread reply is like 'pX.Y' where X is core id, Y is thread id
-		# negotiate server capabilities
-		# TODO: replace these with something sensible, not something copied from a packet dump
-		capabilities = 'swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;xmlRegisters=i386'
-		self.rspConn.negotiate(capabilities)
+	def connect_continued(self, sock, rsp_connect):
+		self.sock = sock
+		self.rspConn = connection
 
 		self.reg_info_load()
 
@@ -70,6 +61,21 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		tdict = rsp.packet_T_to_dict(reply)
 		self.tid = tdict.get('thread', None)
 		self.target_pid_ = self.tid
+
+	def connect(self, address, port):
+		# connect to gdbserver
+		sock = gdblike.connect(address, port)
+		rspConn = rsp.RspConnection(sock)
+
+		# initial commands
+		rspConn.tx_rx('Hg0')
+		# if 'multiprocess+' in list here, thread reply is like 'pX.Y' where X is core id, Y is thread id
+		# negotiate server capabilities
+		# TODO: replace these with something sensible, not something copied from a packet dump
+		capabilities = 'swbreak+;hwbreak+;qRelocInsn+;fork-events+;vfork-events+;exec-events+;vContSupported+;QThreadEvents+;no-resumed+;xmlRegisters=i386'
+		rspConn.negotiate(capabilities)
+
+		self.connect_continued(sock, rspConn)
 
 	def mem_modules(self, cache_ok=True):
 		if cache_ok and self.module_cache:

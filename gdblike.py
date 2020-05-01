@@ -362,7 +362,18 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 		raise NotImplementedError('step over')
 
 	#--------------------------------------------------------------------------
-	# helpers, NOT part of the API
+	# addition to the DebugAdapter API
+	#--------------------------------------------------------------------------
+	def connect_continued(self, sock, rsp_connection):
+		# perform the connection process AFTER negotiation
+		#
+		# this allows code to sense the target, then hand the connection off to
+		# the appropriate adapter
+		#
+		pass
+
+	#--------------------------------------------------------------------------
+	# helpers, NOT part of the strict DebugAdapter API
 	#--------------------------------------------------------------------------
 	def test(self):
 		print('%X' %self.target_base())
