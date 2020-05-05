@@ -52,7 +52,7 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 
 	def connect_continued(self, sock, rsp_connect):
 		self.sock = sock
-		self.rspConn = connection
+		self.rspConn = rsp_connect
 
 		self.reg_info_load()
 
