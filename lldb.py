@@ -41,6 +41,8 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	def exec(self, path, args=[]):
 		if not os.access(path, os.X_OK):
 			raise DebugAdapter.NotExecutableError(path)
+		if subprocess.call(["DevToolsSecurity"]) != 0:
+			raise DebugAdapter.PermissionDeniedError('lldb')
 
 		# resolve path to debugserver
 		path_debugserver = shutil.which('debugserver')

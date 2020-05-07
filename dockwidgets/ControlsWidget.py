@@ -197,6 +197,10 @@ class DebugControlsWidget(QToolBar):
 				except DebugAdapter.NotInstalledError as e:
 					execute_on_main_thread_and_wait(lambda: self.alert_need_install(e.args[0]))
 					execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Debugger Not Installed'))
+				except DebugAdapter.PermissionDeniedError as e:
+					execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Permission denied'))
+					if platform.system() == 'Darwin':
+						res = show_message_box('Error', 'Developer tools need to be enabled to debug programs. This can be authorized either from here or by starting a debugger in Xcode.', MessageBoxButtonSet.OKButtonSet, MessageBoxIcon.ErrorIcon)
 				except Exception as e:
 					execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: ' + ' '.join(e.args)))
 					traceback.print_exc(file=sys.stderr)

@@ -11,6 +11,8 @@ class NotInstalledError(Exception):
 	pass
 class NotExecutableError(Exception):
 	pass
+class PermissionDeniedError(Exception):
+	pass
 
 @unique
 class ADAPTER_TYPE(Enum):
