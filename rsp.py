@@ -62,6 +62,9 @@ class RspConnection():
 			self.acks_enabled = False
 
 	def send_raw(self, data: bytes):
+		print('sending raw!')
+		import traceback
+		traceback.print_stack()
 		self.sock.send(data.encode('utf-8'))
 
 	def send_payload(self, data: str):
