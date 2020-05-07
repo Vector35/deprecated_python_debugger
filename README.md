@@ -1,4 +1,4 @@
-# Debugger (v1.0-beta)
+# Debugger (1.0)
 Author: **Vector35**
 
 _Native debugger support_
@@ -41,6 +41,7 @@ This plugin requires the following minimum version of Binary Ninja:
 ## License
 
 This plugin is released under a MIT license.
+
 ## Metadata Version
 
 2
