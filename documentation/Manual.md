@@ -99,7 +99,7 @@ From the phone, run the appropriate gdbserver on the binary, telling it to liste
 
 BNDP can connect to three backends: gdb, lldb, and dbgeng. The target is decoupled from BNDP in the first two modes, communicating using the [RSP protocol](https://sourceware.org/gdb/current/onlinedocs/gdb/Remote-Protocol.html) over a socket. Theoretically any platform for which a gdbserver exists can be debugged. In dbgeng mode, BNDP is runtime linked to [Windows debugger engine](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/introduction) and can debug local binaries.
 
-![Screen Shot 2020-05-07 at 3.32.06 PM](/Users/andrewl/Library/Application Support/typora-user-images/Screen Shot 2020-05-07 at 3.32.06 PM.png)
+![](./resources/backend_arch.png)
 
 BNDP is tested on **x64-linux**, **arm-android** and **aarch64-android** binaries in gdb mode, **x64-macos** binaries in lldb mode, and **x64-windows** binaries in dbgeng mode.
 
@@ -111,7 +111,7 @@ Each of the adapters is expected to provide some primitive operations, like read
 
 With classes and inheritance, we're able to factor out common behavior among adapters. For instance, GDB and LLDB have much in common, with LLDB speaking [an augmented RSP protocol](https://github.com/llvm-mirror/lldb/blob/master/docs/lldb-gdb-remote.txt). The current class diagram has plenty of room for an additional adapter and its corresponding backend:
 
-![Screen Shot 2020-05-07 at 3.34.37 PM](/Users/andrewl/Library/Application Support/typora-user-images/Screen Shot 2020-05-07 at 3.34.37 PM.png)
+![](./resources/adapter_class_diagram.png)
 
 Higher level operations like "step over" are provided by some backends (like dbgeng) but not others (like gdb and lldb). For these, the operation is synthesized with primitive operations. "Step over" might involve disassembling to detect call or loop instructions and setting a one-shot breakpoint. "Go up" might involve reading the stack and setting a one-shot breakpoint at the return address.
 
