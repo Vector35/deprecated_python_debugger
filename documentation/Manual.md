@@ -7,9 +7,42 @@ Binary Ninja Debugger Plugin (BNDP) is a plugin for Binary Ninja implementing de
 
 # Installation
 
-Please refer to the "Installation Instructions" section from `BNDP_ROOT/README.md`.
+## Host Requirements
 
-# Usage
+* Processor: [x86-64](https://en.wikipedia.org/wiki/X86-64)
+* OS: one of
+  * MacOS: 64-bit 10.14 "Mojave" or 10.15 "Catalina"
+  * Linux: 64-bit Ubuntu (most recent LTS or latest stable)
+  * Windows: 64-bit 10
+* Python: 3.7.4
+* Binary Ninja: at least version 1.3.2085
+
+## Plugin Acquisition and Installation
+
+BNDP is a python package and is acquired via github (http://github.com/vector35/debugger), by the Plugin Manager from within Binary Ninja, or by ordinary file and directory copying.
+
+It must be placed in the Binary Ninja plugin path, which varies based on platform. Please refer to [Using Plugins](https://docs.binary.ninja/getting-started.html#using-plugins) section within the [Getting Started Guide](https://docs.binary.ninja/getting-started.html) in the [Binary Ninja User Documentation](https://docs.binary.ninja/).
+
+## Platform Specific Considerations
+
+### Android Phones
+
+BNDP can debug armv7 and aarch64 targets by communicating with an appropriate gdbserver. We assume familiarity with the Android software development kit (SDK), native development kit (NDK) and the [Android Debug Bridge](https://developer.android.com/studio/command-line/adb). The servers from NDK version r15c were tested:
+
+```
+adb push ~/android-ndk-r15c/prebuilt/android-arm64/gdbserver/gdbserver /data/local/tmp/gdbserver_aarch64
+adb push ~/android-ndk-r15c/prebuilt/android-arm/gdbserver/gdbserver /data/local/tmp/gdbserver_armv7
+```
+
+Connect your local machine's 31337 to the phone's 31337 with `adb forward tcp:31337 tcp:31337`.
+
+From the phone, run the appropriate gdbserver on the binary, telling it to listen on 31337, eg: `./gdbserver_aarch64 :31337 ./hello_aarch64-android`.
+
+### MacOS
+
+Developer mode is required, so a dialogue may have to be affirmed upon first launch of `lldb` and `/usr/sbin` must be in path so that `DevToolsSecurity` can be executed.
+
+# Use
 
 ## GUI Mode
 
@@ -68,30 +101,35 @@ See `BNDP_ROOT/cli.py`  for an interactive console debugger.
 
 ## Automated Tests
 
-Enter `BNDP_ROOT/testbins`  and build the test binaries with the appropriate call for your environment:
+### Build Environment Requirements
 
-```
-make -f Makefile-linux
-make -f Makefile-macos
-nmake -f Makefile-win
-```
+Building the tests requires an assembler, compiler, and make utility:
 
-Then execute `BNDP_ROOT/test.py`.
+| OS      | assembler        | compiler                                                     | make                                                         |
+| ------- | ---------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| MacOS   | Nasm v2.14.02    | Clang 11.0.0                                                 | GNU Make 3.8.1                                               |
+| Linux   | Nasm v2.13.02    | GCC 7.5.0                                                    | GNU Make 4.1                                                 |
+| Windows | Nasm v2.14.03rc2 | Visual Studio 2017<br />Microsoft (R) C/C++ Optimizing Compiler Version 19.15.26730 for x64 | nmake<br />Microsoft (R) Program Maintenance Utility Version 14.15.26730.0 |
 
-## Platform Specific Considerations
+These versions are used during development but are likely flexible.
 
-### Android
+### Build Steps
 
-Get gdbserver onto the phone, pushing both architectures. The servers from NDK version r15c were tested:
+All builds use make (nmake for Windows) and a shell (“x64 Native Tools Command Prompt for VS 2017” for Windows). Change to the debugger/testbins directory and run make/nmake, specifying the appropriate Makefile:
 
-```
-adb push ~/android-ndk-r15c/prebuilt/android-arm64/gdbserver/gdbserver /data/local/tmp/gdbserver_aarch64
-adb push ~/android-ndk-r15c/prebuilt/android-arm/gdbserver/gdbserver /data/local/tmp/gdbserver_armv7
-```
+| OS      | steps                                                        |
+| ------- | ------------------------------------------------------------ |
+| MacOS   | $ cd BNDP_ROOT/testbins<br />$ make -f Makefile-macos        |
+| Linux   | $ cd BNDP_ROOT/testbins<br />$ make -f Makefile-linux        |
+| Windows | c:\\> cd BNDP_ROOT\\testbins<br />c:\BNDP_ROOT\testbins> nmake -f Makefile-win64 |
 
-Connect your local machine's 31337 to the phone's 31337 with `adb forward tcp:31337 tcp:31337`.
+### Python Requirements
 
-From the phone, run the appropriate gdbserver on the binary, telling it to listen on 31337, eg: `./gdbserver_aarch64 :31337 ./hello_aarch64-android`.
+The python package `colorama` is required and can be installed with: `pip3 install colorama`.
+
+### Running
+
+Simply execute  `BNDP_ROOT/test.py`.
 
 # Internals
 
@@ -135,6 +173,8 @@ The stubs implemented by gdbserver and debugserver will not step over an address
 
 ## GDB vs. LLDB
 
+The following differences were noted during development and are not an exhaustive list:
+
 lldb has single reg reads with 'p' packet, but in gdb registers must be read in group with 'g' packet.
 
 lldb can have its registers polled with 'qRegisterInfo' packet, but gdb uses only XML target description.
@@ -170,18 +210,4 @@ Use wireshark.
 Monitoring, then mimicing behavior from working tools is often faster than starting at the docs:
 
 `(lldb) process connect connect://localhost:31337`
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
