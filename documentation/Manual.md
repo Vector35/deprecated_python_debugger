@@ -1,9 +1,17 @@
 # Binary Ninja Debugger Manual
 
+## Document Conventions
+
+Terms in **bold** can be found in the Glossary section. Strings `highlighted` refer to code, paths, or commands executed at a terminal.
+
+`BNDP_ROOT` refers to the path where the debugger is installed.
+
+## Table of Contents
+
 [toc]
 # Introduction
 
-Binary Ninja Debugger Plugin (BNDP) is a plugin for Binary Ninja implementing debug functionality. It can be used from within the GUI or outside (headless). It officially supports 64-bit Windows, Linux, and MacOS targets. Its extensible design makes it easily adapted to other platforms.
+Binary Ninja Debugger Plugin (**BNDP**) is a plugin for Binary Ninja implementing debug functionality. It can be used from within the GUI or outside (headless). It officially supports 64-bit Windows, Linux, and MacOS targets. Its extensible design makes it easily adapted to other platforms.
 
 # Installation
 
@@ -131,11 +139,21 @@ The python package `colorama` is required and can be installed with: `pip3 insta
 
 Simply execute  `BNDP_ROOT/test.py`.
 
-# Internals
+# Design
 
-## Multiplatform Architecture
+## Overview
 
-BNDP can connect to three backends: gdb, lldb, and dbgeng. The target is decoupled from BNDP in the first two modes, communicating using the [RSP protocol](https://sourceware.org/gdb/current/onlinedocs/gdb/Remote-Protocol.html) over a socket. Theoretically any platform for which a gdbserver exists can be debugged. In dbgeng mode, BNDP is runtime linked to [Windows debugger engine](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/introduction) and can debug local binaries.
+BNDP is a convenient means to interact with various debugger **backends**. It does not instrument targets itself.
+
+The backends vary considerably, so a large part of BNDP's task is to present a unified interface by which these backends can be used.
+
+This is achieved using debug **adapters**, named so because they adapt whatever ideosyncracies a backend has to the ideal interface we envision in `DebugAdapter.py`. Each adaptation of a backend is a subclass of `DebugAdapter`, for example `DebugAdapterGdb` and `DebugAdapterLLDB` communicate with gdb and lldb backends, respectively.
+
+## Standard Backends
+
+BNDP can connect to three **backends**: gdb/gdbserver, lldb/debugserver, and **dbgeng**. The target is decoupled from BNDP in the first two modes, communicating using the [RSP protocol](https://sourceware.org/gdb/current/onlinedocs/gdb/Remote-Protocol.html) over a socket. Theoretically any platform for which a gdbserver exists can be debugged. In dbgeng mode, BNDP is runtime linked to [Windows debugger engine](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/introduction) and can debug local binaries.
+
+The gdb backend isn't a single piece of software or even a reliable behavior. It's a specification, and developers who wish to expose debug functionality are free to implement whatever subset of the specification they choose. For example, the Multiple Arcade Machine Emulator (MAME), BOCHS emulator, and VMware have the option to expose a gdb interface. So further adaptation is require depending on the gdb backend implementation. For example, we have `DebugAdapterMameColeco` for the gdb backend implemented by MAME when it's emulating a ColecoVision system with Z80 processor.
 
 ![](./resources/backend_arch.png)
 
@@ -143,31 +161,111 @@ BNDP is tested on **x64-linux**, **arm-android** and **aarch64-android** binarie
 
 You should have success on the 32-bit x86 versions of the above binaries, but they're not as rigorously tested as 64-bit.
 
-## DebugAdapter And Its Subclasses
+## DebugAdapter and its Subclasses
 
 Each of the adapters is expected to provide some primitive operations, like reading registers, stepping, breakpoints, etc. The comprehensive, but still short, list is the abstract functions in class DebugAdapter in [DebugAdapter.py](https://github.com/Vector35/debugger/blob/master/DebugAdapter.py).
 
-With classes and inheritance, we're able to factor out common behavior among adapters. For instance, GDB and LLDB have much in common, with LLDB speaking [an augmented RSP protocol](https://github.com/llvm-mirror/lldb/blob/master/docs/lldb-gdb-remote.txt). The current class diagram has plenty of room for an additional adapter and its corresponding backend:
+With classes and inheritance, we're able to factor out common behavior among adapters. For instance, GDB and LLDB have much in common, with LLDB speaking [an augmented RSP protocol](https://github.com/llvm-mirror/lldb/blob/master/docs/lldb-gdb-remote.txt). The current class diagram has plenty of room for an additional adapter and its corresponding **backend**:
 
 ![](./resources/adapter_class_diagram.png)
 
-Higher level operations like "step over" are provided by some backends (like dbgeng) but not others (like gdb and lldb). For these, the operation is synthesized with primitive operations. "Step over" might involve disassembling to detect call or loop instructions and setting a one-shot breakpoint. "Go up" might involve reading the stack and setting a one-shot breakpoint at the return address.
+Higher level operations like "step over" are provided by some backends (like **dbgeng**) but not others (like gdb and lldb). For these, the operation is synthesized with primitive operations. "Step over" might involve disassembling to detect call or loop instructions and setting a one-shot breakpoint. "Go up" might involve reading the stack and setting a one-shot breakpoint at the return address.
 
-## DebugProcessView
+## UI: DebugProcessView
 
 `DebugProcessView` is a specialized `BinaryView` that reads and writes its memory from the connected `DebugAdapter`. When the adapter is not present, all reads/writes will return `None` to indicate an error. To save on data transfer, `DebugProcessView` caches all reads from the adapter. Whenever the debugger executes instructions or writes data it will call `mark_dirty` on the `DebugProcessView` and clear the cached data.
 
 `DebugProcessView` provides two functions, `local_addr_to_remote` and `remote_addr_to_local` which will translate addresses for use in binaries that are compiled with Position Independent Code. **Local addresses** correspond to the loaded `BinaryView` analysis and **remote addresses** represent addresses in the debugged binary, which may be relocated in PIE executables.
 
-# For Developers
+# API
 
-## The DebugAdapter Ideal
+Prerequisite reading: "Design" section
 
-The DebugAdapter wants to present a general debug interface, hiding the ideosyncracies of whatever backend it is connected to. Often you will have to "shape" the behavior of the backend to aim for this ideal.
+The API is centered around the `DebugAdapter` class. You can subclass it to interface with a new **backend**.
+
+You can use existing subclasses `DebugAdapterGdbLike`, `DebugAdapterGdb`, `DebugAdapterLLDB`, and `DebugAdapterMameColeco` to connect to already tested backends.
+
+You can programmatically debug targets by using `DebugAdapter` methods.
+
+## DebugAdapter Methods
+
+### Initialization Methods
+
+Some **backends** need to perform some initialization before acquiring a target. For example, **dbgeng** needs to acquire COM interfaces.
+
+```
+	def setup()
+	def teardown()
+```
+
+### Session Start/Stop Methods
+
+These functions start and end a session. A session can be started by executing a target,, attaching to a target, or connecting to a listening **backend**. Detaching, when possible, means disconnecting the debugger and allowing the target to resume execution. Quitting means to end the session entirely.
+
+```
+	def exec(self, path, args=[])
+	def attach(self, pid)
+	def connect(self, server, port)
+	def detach(self)
+	def quit(self)
+```
+
+### Target Info Methods
+
+Acquire the target's architecture, execution path, process ID, and load address. Note that these are not always applicable for certain targets. For example, pid does not make sense when connected to a full system BOCHS emulation.
+
+```
+	def target_arch(self)
+	def target_path(self)
+	def target_pid(self)
+	def target_base(self)
+```
+
+See `BNDP_ROOT/DebugAdapter.py`.
+
+### Thread  Methods
+```
+	def thread_list(self):
+	def thread_selected(self):
+	def thread_select(self, tidx):
+```
+
+### Breakpoint  Methods
+```
+	def breakpoint_set(self, address)
+	def breakpoint_clear(self, address)
+	def breakpoint_list(self)
+```
+
+### Register Methods
+```
+	def reg_read(self, reg)
+	def reg_write(self, reg, value)
+	def reg_list(self)
+	def reg_bits(self, reg)
+```
+
+### Memory Methods
+```
+	def mem_read(self, address, length)
+	def mem_write(self, address, data)
+	def mem_modules(self, cache_ok=True)
+```
+
+### Execution Control Methods
+```
+	def go(self):
+	def step_into(self):
+	def step_over(self):
+```
+
+## Subclassing DebugAdapter
+
+The DebugAdapter wants to present a general debug interface, hiding the ideosyncracies of whatever **backend** it is connected to. Often you will have to "shape" the behavior of the backend to aim for this ideal.
 
 For example, in Windows, setting a breakpoint always succeeds, no matter the address. It's only at the next go/step/step that bad addresses will raise a write exception because that's when the engine actually writes the 0xCC byte. But the designed behavior of `breakpoint_set()` in DebugAdapter is to write immediately, and provide instant response to the caller if the breakpoint wasn't set correctly. So a `WriteProcessMemory()` is used as a probe, and if it succeeds, the adapter pretends the breakpoint is as good as set.
 
-On Windows, `step over` is available from the dbgeng backend, but with gdbserver and debugserver as backends, it is not. To attain this behavior, `step over` is synthesized by setting a temporary breakpoint at the following instruction, which requires analyzing the current instruction for length and branch behavior.
+On Windows, `step over` is available from the **dbgeng** backend, but with gdbserver and debugserver as backends, it is not. To attain this behavior, `step over` is synthesized by setting a temporary breakpoint at the following instruction, which requires analyzing the current instruction for length and branch behavior.
 
 The stubs implemented by gdbserver and debugserver will not step over an address that has a breakpoint. The program counter will remain the same and a breakpoint event will occur. The breakpoint must be temporarily cleared. The MAME stub, however, has no such restriction.
 
@@ -183,7 +281,7 @@ lldb has single reg writes with 'P' packet, gdb doesn't, and registers must be w
 
 lldb can list solibs and executable image with 'jGetLoadedDynamicLibrariesInfos' packet, gdb still looks to /proc/pid/maps.
 
-## Debugging the Debugger
+## Troubleshooting new GDB Backends
 
 ### General Tips
 
@@ -210,4 +308,12 @@ Use wireshark.
 Monitoring, then mimicing behavior from working tools is often faster than starting at the docs:
 
 `(lldb) process connect connect://localhost:31337`
+
+# Glossary
+
+**backend** - This is the code that is actually instrumenting (eg: writing breakpoint bytes, setting the trap flag) in targets. Examples are Microsoft's [debugger engine](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugger-engine-overview), gdbserver, debugserver, or MAME.
+
+**BNDP** - Binary Ninja Debugger Plugin
+
+**dbgeng** - Microsoft's [debugger engine](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugger-engine-overview).
 
