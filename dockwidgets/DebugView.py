@@ -297,6 +297,13 @@ class DebugView(QWidget, View):
 			line_addr = start_ip + total_read
 			(insn_tokens, length) = arch_dis.get_instruction_text(data[total_read:], line_addr)
 
+			# terrible libshiboken workaround
+			for tok in insn_tokens:
+				if tok.type == InstructionTextTokenType.PossibleAddressToken and (tok.value & 0x80000000) and tok.size == 4:
+					#print('fixing %s' % ''.join(map(str,insn_tokens)))
+					tok.size = 8
+					tok.value &= 0x7FFFFFFFFFFFFFFF
+
 			if insn_tokens is None:
 				insn_tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "??")]
 				length = arch_dis.instr_alignment
@@ -336,16 +343,6 @@ class DebugView(QWidget, View):
 			lines.append(line)
 
 			total_read += length
-
-		# terrible workaround for libshiboken conversion issue
-		for line in lines:
-			# line is LinearDisassemblyLine
-			last_tok = line.contents.tokens[-1]
-			#if last_tok.type != InstructionTextTokenType.PossibleAddressToken: continue
-			#if last_tok.width != 18: continue # strlen("0xFFFFFFFFFFFFFFF0")
-			if last_tok.size != 8: continue
-			#print('fixing: %s' % line)
-			last_tok.value &= 0x7FFFFFFFFFFFFFFF
 
 		self.binary_text.setLines(lines)
 
