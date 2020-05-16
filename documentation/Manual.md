@@ -6,9 +6,47 @@ Terms in **bold** can be found in the Glossary section. Strings `highlighted` re
 
 `BNDP_ROOT` refers to the path where the debugger is installed.
 
-## Table of Contents
+# Table of contents
 
-[toc]
+1. [Introduction](#introduction)
+2. [Installation](#installation)
+    - [Host Requirements](#host-requirements)
+    - [Plugin Acquisition and Installation](#plugin-acquisition-and-installation)
+    - [Platform Specific Considerations](#platform-specific-considerations)
+        * [Android Phones](#android-phones)
+        * [MacOS](#macos)
+3. [Use](#use)
+    - [GUI Mode](#gui-mode)
+    - [Headless Mode](#headless-mode)
+    - [Automated Tests](#automated-tests)
+        * [Build Environment Requirements](#build-environment-requirements)
+        * [Build Steps](#build-steps)
+        * [Python Requirements](#python-requirements)
+        * [Running](#running)
+4. [Design](#design)
+    - [Overview](#overview)
+    - [Standard Backends](#standard-backends)
+    - [DebugAdapter and its Subclasses](#debugadapter-and-its-subclasses)
+    - [UI: DebugProcessView](#ui-debugprocessview)
+5. [API](#api)
+    - [DebugAdapter Methods](#debugadapter-methods)
+        * [Initialization Methods](#initialization-methods)
+        * [Session Start/Stop Methods](#session-startstop-methods)
+        * [Target Info Methods](#target-info-methods)
+        * [Thread Methods](#thread-methods)
+        * [Breakpoint Methods](#breakpoint-methods)
+        * [Register Methods](#register-methods)
+        * [Memory Methods](#memory-methods)
+        * [Execution Control Methods](#execution-control-methods)
+    - [Subclassing DebugAdapter](#subclassing-debugadapter)
+    - [GDB vs. LLDB](#gdb-vs-lldb)
+    - [Troubleshooting new GDB Backends](#troubleshooting-new-gdb-backends)
+        * [General Tips](#general-tips)
+        * [Network Monitoring](#network-monitoring)
+        * [Executing Backends Manually](#executing-backends-manually)
+        * [Executing Client Manually](#executing-client-manually)
+6. [Glossary](#glossary)
+
 # Introduction
 
 Binary Ninja Debugger Plugin (**BNDP**) is a plugin for Binary Ninja implementing debug functionality. It can be used from within the GUI or outside (headless). It officially supports 64-bit Windows, Linux, and MacOS targets. Its extensible design makes it easily adapted to other platforms.
@@ -27,7 +65,7 @@ Binary Ninja Debugger Plugin (**BNDP**) is a plugin for Binary Ninja implementin
 
 ## Plugin Acquisition and Installation
 
-BNDP is a python package and is acquired via github (http://github.com/vector35/debugger), by the Plugin Manager from within Binary Ninja, or by ordinary file and directory copying.
+BNDP is a python package and is acquired via GitHub (http://github.com/vector35/debugger), by the Plugin Manager from within Binary Ninja, or by ordinary file and directory copying.
 
 It must be placed in the Binary Ninja plugin path, which varies based on platform. Please refer to [Using Plugins](https://docs.binary.ninja/getting-started.html#using-plugins) section within the [Getting Started Guide](https://docs.binary.ninja/getting-started.html) in the [Binary Ninja User Documentation](https://docs.binary.ninja/).
 
@@ -62,17 +100,17 @@ A view with debugger-related menu items will appear:
 
 ![](./resources/gui2.png)
 
-Click the dropdown menu arrow near `Run` for additional settings. Click `Run` to execute the target. The other buttons will activate if the target is initialized successfully. Buttons `Resume`, `Step Into`, etc. work as expected. To set a breakpoint, select an address, right click, choose Debugger, then `Toggle Breakpoint`.
+Click the drop-down menu arrow near `Run` for additional settings. Click `Run` to execute the target. The other buttons will activate if the target is initialized successfully. Buttons `Resume`, `Step Into`, etc. work as expected. To set a breakpoint, select an address, right click, choose Debugger, then `Toggle Breakpoint`.
 
 ![](./resources/gui3.png)
 
-The same step is used to clear the breakpoint. To view modules, registers, etc. select `View` from the applicatation's main menu and then the desired view:
+The same step is used to clear the breakpoint. To view modules, registers, etc. select `View` from the application's main menu and then the desired view:
 
 ![](./resources/gui4.png)
 
 ## Headless Mode
 
-The API attempts to hide target details behing a uniform interface called DebugAdapter. Start by importing the parent DebugAdapter and the appropriate child for your platform and creating an instance:
+The API attempts to hide target details behind a uniform interface called DebugAdapter. Start by importing the parent DebugAdapter and the appropriate child for your platform and creating an instance:
 
 ```python
 from debugger import DebugAdapter, lldb
@@ -147,7 +185,7 @@ BNDP is a convenient means to interact with various debugger **backends**. It do
 
 The backends vary considerably, so a large part of BNDP's task is to present a unified interface by which these backends can be used.
 
-This is achieved using debug **adapters**, named so because they adapt whatever ideosyncracies a backend has to the ideal interface we envision in `DebugAdapter.py`. Each adaptation of a backend is a subclass of `DebugAdapter`, for example `DebugAdapterGdb` and `DebugAdapterLLDB` communicate with gdb and lldb backends, respectively.
+This is achieved using debug **adapters**, named so because they adapt whatever idiosyncrasies a backend has to the ideal interface we envision in `DebugAdapter.py`. Each adaptation of a backend is a subclass of `DebugAdapter`, for example `DebugAdapterGdb` and `DebugAdapterLLDB` communicate with gdb and lldb backends, respectively.
 
 ## Standard Backends
 
@@ -179,7 +217,7 @@ Higher level operations like "step over" are provided by some backends (like **d
 
 # API
 
-Prerequisite reading: "Design" section
+Prerequisite reading: [Design](#Design)
 
 The API is centered around the `DebugAdapter` class. You can subclass it to interface with a new **backend**.
 
@@ -212,7 +250,7 @@ These functions start and end a session. A session can be started by executing a
 
 ### Target Info Methods
 
-Acquire the target's architecture, execution path, process ID, and load address. Note that these are not always applicable for certain targets. For example, pid does not make sense when connected to a full system BOCHS emulation.
+Acquire the target's architecture, execution path, process ID, and load address. Note that these are not always applicable for certain targets. For example, PID does not make sense when connected to a full system BOCHS emulation.
 
 ```
 	def target_arch(self)
@@ -223,14 +261,14 @@ Acquire the target's architecture, execution path, process ID, and load address.
 
 See `BNDP_ROOT/DebugAdapter.py`.
 
-### Thread  Methods
+### Thread Methods
 ```
 	def thread_list(self):
 	def thread_selected(self):
 	def thread_select(self, tidx):
 ```
 
-### Breakpoint  Methods
+### Breakpoint Methods
 ```
 	def breakpoint_set(self, address)
 	def breakpoint_clear(self, address)
@@ -261,7 +299,7 @@ See `BNDP_ROOT/DebugAdapter.py`.
 
 ## Subclassing DebugAdapter
 
-The DebugAdapter wants to present a general debug interface, hiding the ideosyncracies of whatever **backend** it is connected to. Often you will have to "shape" the behavior of the backend to aim for this ideal.
+The DebugAdapter wants to present a general debug interface, hiding the idiosyncrasies of whatever **backend** it is connected to. Often you will have to "shape" the behavior of the backend to aim for this ideal.
 
 For example, in Windows, setting a breakpoint always succeeds, no matter the address. It's only at the next go/step/step that bad addresses will raise a write exception because that's when the engine actually writes the 0xCC byte. But the designed behavior of `breakpoint_set()` in DebugAdapter is to write immediately, and provide instant response to the caller if the breakpoint wasn't set correctly. So a `WriteProcessMemory()` is used as a probe, and if it succeeds, the adapter pretends the breakpoint is as good as set.
 
@@ -273,13 +311,10 @@ The stubs implemented by gdbserver and debugserver will not step over an address
 
 The following differences were noted during development and are not an exhaustive list:
 
-lldb has single reg reads with 'p' packet, but in gdb registers must be read in group with 'g' packet.
-
-lldb can have its registers polled with 'qRegisterInfo' packet, but gdb uses only XML target description.
-
-lldb has single reg writes with 'P' packet, gdb doesn't, and registers must be written in group with 'G' packet.
-
-lldb can list solibs and executable image with 'jGetLoadedDynamicLibrariesInfos' packet, gdb still looks to /proc/pid/maps.
+- lldb has single reg reads with 'p' packet, but in gdb registers must be read in group with 'g' packet.
+- lldb can have its registers polled with 'qRegisterInfo' packet, but gdb uses only XML target description.
+- lldb has single reg writes with 'P' packet, gdb doesn't, and registers must be written in group with 'G' packet.
+- lldb can list `so` libs and executable image with 'jGetLoadedDynamicLibrariesInfos' packet, gdb still looks to /proc/pid/maps.
 
 ## Troubleshooting new GDB Backends
 
@@ -289,31 +324,33 @@ Prove functionality first with `BNDP_ROOT/cli.py` then with the GUI.
 
 ### Network Monitoring
 
-For gdbserver and debugserver, monitoring packets can be indispensible.
+For gdbserver and debugserver, monitoring packets can be indispensable.
 
-Use tcpdump: `tcpdump -i lo0 -A -s0 'port 31337'`.
-Use `./tools/sniffrsp.py` to monitor traffic between you and gdbserver/debugserver.
-Use wireshark.
+- Use tcpdump: `tcpdump -i lo0 -A -s0 'port 31337'`
+- Use `./tools/sniffrsp.py` to monitor traffic between you and gdbserver/debugserver
+- Use wireshark
 
 ### Executing Backends Manually
 
-`$ debugserver localhost:31337 ./testbins/asmtest`
-
-`$ gdbserver --once --no-startup-with-shell localhost:31337 ./testbins/asmtest`
-
-`mame -v coleco -video soft -cart /path/to/DACMAN.ROM -window -nomax -resolution 560x432 -debugger gdbstub -debug
+```
+$ debugserver localhost:31337 ./testbins/asmtest
+$ gdbserver --once --no-startup-with-shell localhost:31337 ./testbins/asmtest
+mame -v coleco -video soft -cart /path/to/DACMAN.ROM -window -nomax -resolution 560x432 -debugger gdbstub -debug
+```
 
 ### Executing Client Manually
 
-Monitoring, then mimicing behavior from working tools is often faster than starting at the docs:
+Monitoring, then mimicking behavior from working tools is often faster than starting at the docs:
 
-`(lldb) process connect connect://localhost:31337`
+```
+(lldb) process connect connect://localhost:31337
+```
 
 # Glossary
 
-**backend** - This is the code that is actually instrumenting (eg: writing breakpoint bytes, setting the trap flag) in targets. Examples are Microsoft's [debugger engine](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugger-engine-overview), gdbserver, debugserver, or MAME.
-
-**BNDP** - Binary Ninja Debugger Plugin
-
-**dbgeng** - Microsoft's [debugger engine](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugger-engine-overview).
-
+- *backend*  
+This is the code that is actually instrumenting (eg: writing breakpoint bytes, setting the trap flag) in targets. Examples are Microsoft's [debugger engine](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugger-engine-overview), gdbserver, debugserver, or MAME.
+- *BNDP*  
+Binary Ninja Debugger Plugin
+- *dbgeng*  
+Microsoft's [debugger engine](https://docs.microsoft.com/en-us/windows-hardware/drivers/debugger/debugger-engine-overview).
