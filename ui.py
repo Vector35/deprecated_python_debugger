@@ -1,6 +1,7 @@
 from PySide2 import QtCore
 from PySide2.QtCore import Qt
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
+from PySide2.QtGui import QDesktopServices
 from binaryninja.plugin import PluginCommand
 from binaryninja import Endianness, HighlightStandardColor, execute_on_main_thread, execute_on_main_thread_and_wait, LowLevelILOperation, BinaryReader
 from binaryninja.settings import Settings
@@ -10,6 +11,8 @@ from .dockwidgets import BreakpointsWidget, RegistersWidget, StackWidget, Thread
 from . import binjaplug
 import datetime
 import traceback
+import os
+import pathlib
 
 class DebuggerUI:
 	def __init__(self, state):
@@ -599,6 +602,11 @@ def valid_control_step_return(bv):
 # Load plugin commands and actions
 #------------------------------------------------------------------------------
 
+def helpDocs(context):
+	docPath = os.path.join(os.path.dirname(__file__), "Documentation")
+	URLPath = pathlib.Path(os.path.join(docPath, "Manual.html")).as_uri()
+	QDesktopServices.openUrl(URLPath)
+
 def initialize_ui():
 	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Debugger Breakpoints", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Debugger Registers", Qt.RightDockWidgetArea, Qt.Vertical, False)
@@ -610,6 +618,7 @@ def initialize_ui():
 	PluginCommand.register_for_address("Debugger\\Toggle Breakpoint", "sets/clears breakpoint at right-clicked address", cb_bp_toggle, is_valid=valid_bp_toggle)
 
 	PluginCommand.register("Debugger\\Process\\Run", "Start new debugging session", cb_process_run, is_valid=valid_process_run)
+	PluginCommand.register("Debugger\\User Documentation", "Open Debugger Documentation", helpDocs, is_valid=valid_process_run)
 	PluginCommand.register("Debugger\\Process\\Restart", "Restart debugging session", cb_process_restart, is_valid=valid_process_restart)
 	PluginCommand.register("Debugger\\Process\\Quit", "Terminate debugged process and end session", cb_process_quit, is_valid=valid_process_quit)
 	# PluginCommand.register("Debugger\\Process\\Attach", "Attach to running process", cb_process_attach, is_valid=valid_process_attach)
