@@ -297,12 +297,10 @@ class DebugView(QWidget, View):
 			line_addr = start_ip + total_read
 			(insn_tokens, length) = arch_dis.get_instruction_text(data[total_read:], line_addr)
 
-			# terrible libshiboken workaround
+			# terrible libshiboken workaround, see #101
 			for tok in insn_tokens:
-				if tok.type == InstructionTextTokenType.PossibleAddressToken and (tok.value & 0x80000000) and tok.size == 4:
-					#print('fixing %s' % ''.join(map(str,insn_tokens)))
-					tok.size = 8
-					tok.value &= 0x7FFFFFFFFFFFFFFF
+				if tok.value.bit_length() == 64:
+					tok.value ^= 0x8000000000000000
 
 			if insn_tokens is None:
 				insn_tokens = [InstructionTextToken(InstructionTextTokenType.TextToken, "??")]
