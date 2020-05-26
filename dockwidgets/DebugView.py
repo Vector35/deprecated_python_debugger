@@ -135,6 +135,15 @@ class DebugView(QWidget, View):
 
 		self.add_scripting_ref()
 
+		# set initial breakpoint when view is switched
+		if self.debug_state.bv and self.debug_state.bv.entry_point:
+			local_entry_offset = self.debug_state.bv.entry_point - self.debug_state.bv.start
+			if not self.debug_state.breakpoints.contains_offset(self.debug_state.bv.file.original_filename, local_entry_offset):
+				self.debug_state.breakpoints.add_offset(self.debug_state.bv.file.original_filename, local_entry_offset)
+				if self.debug_state.ui is not None:
+					self.debug_state.ui.breakpoint_tag_add(self.debug_state.bv.entry_point)
+					self.debug_state.ui.update_breakpoints()
+
 	def add_scripting_ref(self):
 		# Hack: The interpreter is just a thread, so look through all threads
 		# and assign our state to the interpreter's locals
