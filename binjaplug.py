@@ -461,14 +461,6 @@ class DebuggerState:
 		else:
 			self.ui = None
 
-		if self.bv and self.bv.entry_point:
-			local_entry_offset = self.bv.entry_point - self.bv.start
-			if not self.breakpoints.contains_offset(self.bv.file.original_filename, local_entry_offset):
-				self.breakpoints.add_offset(self.bv.file.original_filename, local_entry_offset)
-				if self.ui is not None:
-					self.ui.breakpoint_tag_add(self.bv.entry_point)
-					self.ui.update_breakpoints()
-
 	#--------------------------------------------------------------------------
 	# Convenience Functions
 	#--------------------------------------------------------------------------
