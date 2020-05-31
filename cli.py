@@ -392,6 +392,10 @@ if __name__ == '__main__':
 
 					if reason == DebugAdapter.STOP_REASON.STDOUT_MESSAGE:
 						print('stdout: ', data)
+					elif reason == DebugAdapter.STOP_REASON.BACKEND_DISCONNECTED:
+						print('backend disconnected, process was likely killed')
+						user_goal = 'quit'
+						break
 					elif reason == DebugAdapter.STOP_REASON.PROCESS_EXITED:
 						print('process exited, return code=%d' % data)
 						user_goal = 'quit'

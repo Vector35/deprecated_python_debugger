@@ -128,6 +128,11 @@ class RspConnection():
 				ack_received = False
 				while 1:
 					peek1 = self.sock.recv(1, socket.MSG_PEEK)
+
+					if peek1 == b'':
+						# this happens in lldb/debugserver if target is killed (eg: ctrl+c)
+						raise RspDisconnected('recv() returned empty, backend disconnected')
+
 					if peek1 == b'+':
 						if ack_received:
 							raise RspGeneralError('received two acks, somethings wrong')
