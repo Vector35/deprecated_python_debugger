@@ -24,7 +24,7 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 	# API
 	#--------------------------------------------------------------------------
 
-	def exec(self, path, args=[]):
+	def exec(self, path, args=[], **kwargs):
 		if not os.access(path, os.X_OK):
 			raise DebugAdapter.NotExecutableError(path)
 

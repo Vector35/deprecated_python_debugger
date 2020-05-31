@@ -275,9 +275,11 @@ if __name__ == '__main__':
 	if not sys.argv[1:]:
 		raise Exception('specify target on command line')
 	arg1 = sys.argv[1]
+	# does it look like <server>:<port> ?
 	if re.match(r'^.*:\d+$', arg1):
 		(host, port) = arg1.split(':')
 		adapter = gdblike.connect_sense(host, int(port))
+	# otherwise treat as a path
 	else:
 		if '~' in arg1:
 			arg1 = os.expanduser(arg1)
@@ -287,7 +289,13 @@ if __name__ == '__main__':
 
 		adapter = DebugAdapter.get_adapter_for_current_system()
 		adapter.setup()
-		adapter.exec(arg1, '')
+
+		target = arg1
+		target_args = ['']
+		if '--terminal' in sys.argv[2:]:
+			adapter.exec(arg1, target_args, terminal=True)
+		else:
+			adapter.exec(arg1, target_args)
 
 	arch = adapter.target_arch()
 

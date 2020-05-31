@@ -1,3 +1,4 @@
+import os
 import platform
 from enum import Enum, auto, unique
 
@@ -107,6 +108,17 @@ def get_new_adapter(adapter_type = ADAPTER_TYPE.DEFAULT, **kwargs):
 	else:
 		raise Exception('unsupported adapter type: %s' % adapter_type)
 
+def new_terminal(cmdline):
+	plat_sys = platform.system()
+	if plat_sys == 'Darwin':
+		cmd = ''
+		cmd += 'osascript -e \'tell app "Terminal" to do script "%s"\'' % cmdline
+		cmd += ' -e \'activate application "Terminal"\''
+		print(cmd)
+		os.system(cmd)
+	else:
+		raise Exception('unable to start new terminal window in system: %s' % plat_sys)
+
 @unique
 class STOP_REASON(Enum):
 	UNKNOWN = 0
@@ -186,7 +198,7 @@ class DebugAdapter:
 		raise NotImplementedError('')
 
 	# session start/stop
-	def exec(self, path, args=[]):
+	def exec(self, path, args=[], **kwargs):
 		raise NotImplementedError('')
 	def attach(self, pid):
 		raise NotImplementedError('')

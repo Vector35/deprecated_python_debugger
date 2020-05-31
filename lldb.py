@@ -38,7 +38,7 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 	#--------------------------------------------------------------------------
 
 	# session start/stop
-	def exec(self, path, args=[]):
+	def exec(self, path, args=[], **kwargs):
 		if not os.access(path, os.X_OK):
 			raise DebugAdapter.NotExecutableError(path)
 		if subprocess.call(["DevToolsSecurity"]) != 0:
@@ -58,10 +58,20 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 			raise Exception('no available ports')
 
 		# invoke debugserver
-		dbg_args = [path_debugserver, 'localhost:%d'%port, path, '--']
-		dbg_args.extend(args)
 		try:
-			subprocess.Popen(dbg_args, stdin=None, stdout=None, stderr=None, preexec_fn=gdblike.preexec)
+			if kwargs.get('terminal', False):
+				dbg_args = [path_debugserver]
+				dbg_args.extend(['--stdio-path', '/dev/stdin'])
+				dbg_args.extend(['--stdout-path', '/dev/stdout'])
+				dbg_args.extend(['--stderr-path', '/dev/stderr'])
+				dbg_args.extend(['localhost:%d'%port, path, '--'])
+				dbg_args.extend(args)
+				# TODO: test for, escape problematic target arguments requested by user
+				DebugAdapter.new_terminal(' '.join(dbg_args))
+			else:
+				dbg_args = [path_debugserver, 'localhost:%d'%port, path, '--']
+				dbg_args.extend(args)
+				subprocess.Popen(dbg_args, stdin=None, stdout=None, stderr=None, preexec_fn=gdblike.preexec)
 		except Exception:
 			raise Exception('invoking debugserver (used path: %s)' % path_debugserver)
 
