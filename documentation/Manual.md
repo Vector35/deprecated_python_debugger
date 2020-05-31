@@ -332,9 +332,18 @@ For gdbserver and debugserver, monitoring packets can be indispensable.
 
 ### Executing Backends Manually
 
+LLDB:
 ```
 $ debugserver localhost:31337 ./testbins/asmtest
+```
+
+GDB:
+```
 $ gdbserver --once --no-startup-with-shell localhost:31337 ./testbins/asmtest
+```
+
+MAME:
+```
 mame -v coleco -video soft -cart /path/to/DACMAN.ROM -window -nomax -resolution 560x432 -debugger gdbstub -debug
 ```
 
@@ -342,8 +351,14 @@ mame -v coleco -video soft -cart /path/to/DACMAN.ROM -window -nomax -resolution 
 
 Monitoring, then mimicking behavior from working tools is often faster than starting at the docs:
 
+LLDB:
 ```
 (lldb) process connect connect://localhost:31337
+```
+
+GDB:
+```
+(gdb) target remote localhost:31337
 ```
 
 # Glossary
