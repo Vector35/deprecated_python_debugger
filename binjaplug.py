@@ -447,6 +447,7 @@ class DebuggerState:
 		self.adapter_type = list(DebugAdapter.ADAPTER_TYPE)[get_metadata('debugger.adapter_type', DebugAdapter.ADAPTER_TYPE.DEFAULT.value)]
 		self.remote_host = get_metadata('debugger.remote_host', 'localhost')
 		self.remote_port = get_metadata('debugger.remote_port', 31337)
+		self.request_terminal_emulator = get_metadata('debugger.request_terminal_emulator', False)
 
 		# Convenience
 		self.registers = DebuggerRegisters(self)
@@ -631,7 +632,7 @@ class DebuggerState:
 			try:
 				self.adapter = QueuedAdapter.QueuedAdapter(self.adapter)
 				self.adapter.setup()
-				self.adapter.exec(fpath, self.command_line_args)
+				self.adapter.exec(fpath, self.command_line_args, terminal=self.request_terminal_emulator)
 				self.connecting = False
 			except Exception as e:
 				self.connecting = False

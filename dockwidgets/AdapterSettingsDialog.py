@@ -1,7 +1,7 @@
 from PySide2 import QtCore
 from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize
 from PySide2.QtGui import QPalette, QFontMetricsF
-from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QDialog, QPushButton, QFormLayout, QLineEdit, QLabel, QMenu
+from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QDialog, QPushButton, QFormLayout, QLineEdit, QLabel, QMenu, QCheckBox
 
 import binaryninjaui
 from binaryninja import BinaryView, Settings, SettingsScope
@@ -47,12 +47,14 @@ class AdapterSettingsDialog(QDialog):
 		self.argumentsEntry = QLineEdit(self)
 		self.addressEntry = QLineEdit(self)
 		self.portEntry = QLineEdit(self)
+		self.requestTerminalEmulator = QCheckBox(self)
 
 		self.formLayout = QFormLayout()
 		self.formLayout.addRow("Adapter Type", self.adapterEntry)
 		self.formLayout.addRow("Command Line Arguments", self.argumentsEntry)
 		self.formLayout.addRow("Address", self.addressEntry)
 		self.formLayout.addRow("Port", self.portEntry)
+		self.formLayout.addRow("Request Terminal Emulator", self.requestTerminalEmulator)
 
 		buttonLayout = QHBoxLayout()
 		buttonLayout.setContentsMargins(0, 0, 0, 0)
@@ -83,6 +85,9 @@ class AdapterSettingsDialog(QDialog):
 
 		self.argumentsEntry.setText(' ' .join(shlex.quote(arg) for arg in debug_state.command_line_args))
 		self.argumentsEntry.textEdited.connect(lambda: self.updateArguments())
+
+		self.requestTerminalEmulator.setChecked(debug_state.request_terminal_emulator)
+		self.requestTerminalEmulator.stateChanged.connect(lambda: self.apply())
 
 		self.accepted.connect(lambda: self.apply())
 
@@ -115,6 +120,10 @@ class AdapterSettingsDialog(QDialog):
 
 		self.bv.store_metadata('debugger.remote_host', address)
 		self.bv.store_metadata('debugger.remote_port', port)
+
+		request_terminal_emulator = self.requestTerminalEmulator.isChecked()
+		debug_state.request_terminal_emulator = request_terminal_emulator
+		self.bv.store_metadata('debugger.request_terminal_emulator', request_terminal_emulator)
 
 	def updateArguments(self):
 		try:
