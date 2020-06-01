@@ -60,7 +60,6 @@ default rel
 	syscall
 %endif
 
-section .data
 msg:
 	db		"Hello, world!", 0x0a
 	.len:   equ	$ - msg

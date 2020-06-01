@@ -109,12 +109,14 @@ def get_new_adapter(adapter_type = ADAPTER_TYPE.DEFAULT, **kwargs):
 		raise Exception('unsupported adapter type: %s' % adapter_type)
 
 def new_terminal(cmdline):
+	cmd = ''
 	plat_sys = platform.system()
 	if plat_sys == 'Darwin':
-		cmd = ''
 		cmd += 'osascript -e \'tell app "Terminal" to do script "%s"\'' % cmdline
 		cmd += ' -e \'activate application "Terminal"\''
-		print(cmd)
+		os.system(cmd)
+	elif plat_sys == 'Linux':
+		cmd += 'exo-open --launch TerminalEmulator \'%s\'' % cmdline
 		os.system(cmd)
 	else:
 		raise Exception('unable to start new terminal window in system: %s' % plat_sys)

@@ -43,7 +43,10 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 		dbg_args.extend(args)
 		print(' '.join(dbg_args))
 		try:
-			subprocess.Popen(dbg_args, stdin=None, stdout=None, stderr=None, preexec_fn=gdblike.preexec)
+			if kwargs.get('terminal', False):
+				DebugAdapter.new_terminal(' '.join(dbg_args))
+			else:
+				subprocess.Popen(dbg_args, stdin=None, stdout=None, stderr=None, preexec_fn=gdblike.preexec)
 		except Exception:
 			raise Exception('invoking gdbserver (used path: %s)' % path_gdbserver)
 

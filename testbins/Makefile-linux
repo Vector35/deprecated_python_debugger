@@ -1,7 +1,7 @@
 # make -f Makefile-linux
 
-TARGETS_X86 = helloworld_x86-linux helloworld_loop_x86-linux helloworld_thread_x86-linux helloworld_func_x86-linux helloworld_pie_x86-linux helloworld_thread_pie_x86-linux helloworld_loop_pie_x86-linux helloworld_func_pie_x86-linux asmtest_x86-linux do_exception_pie_x86-linux many_stdlib_calls_x86-linux
-TARGETS_X64 = helloworld_x64-linux helloworld_loop_x64-linux helloworld_thread_x64-linux helloworld_func_x64-linux helloworld_pie_x64-linux helloworld_thread_pie_x64-linux helloworld_loop_pie_x64-linux helloworld_func_pie_x64-linux asmtest_x64-linux do_exception_pie_x64-linux many_stdlib_calls_x64-linux hello_x64-linux indirect_calls_x64-linux missing_switch_case_x64-linux
+TARGETS_X86 = helloworld_x86-linux helloworld_loop_x86-linux helloworld_thread_x86-linux helloworld_func_x86-linux helloworld_pie_x86-linux helloworld_thread_pie_x86-linux helloworld_loop_pie_x86-linux helloworld_func_pie_x86-linux asmtest_x86-linux do_exception_pie_x86-linux many_stdlib_calls_x86-linux cat_x86-linux
+TARGETS_X64 = helloworld_x64-linux helloworld_loop_x64-linux helloworld_thread_x64-linux helloworld_func_x64-linux helloworld_pie_x64-linux helloworld_thread_pie_x64-linux helloworld_loop_pie_x64-linux helloworld_func_pie_x64-linux asmtest_x64-linux do_exception_pie_x64-linux many_stdlib_calls_x64-linux hello_x64-linux indirect_calls_x64-linux missing_switch_case_x64-linux cat_x64-linux
 TARGETS_ALL = $(TARGETS_X86) $(TARGETS_X64)
 
 all: $(TARGETS_ALL)
@@ -40,6 +40,9 @@ helloworld_func_pie_x86-linux: helloworld_func.c
 many_stdlib_calls_x86-linux: many_stdlib_calls.c
 	gcc -W -m32 -pie many_stdlib_calls.c -o many_stdlib_calls_x86-linux
 
+cat_x86-linux: cat.c
+	gcc -W -m32 -pie cat.c -o cat_x86-linux
+
 do_exception_pie_x86-linux: do_exception.c
 	gcc -W -m32 -pie -z execstack -g -DARCH_IS_X86 do_exception.c -o do_exception_pie_x86-linux
 
@@ -77,6 +80,9 @@ helloworld_func_pie_x64-linux: helloworld_func.c
 
 many_stdlib_calls_x64-linux: many_stdlib_calls.c
 	gcc -W -pie many_stdlib_calls.c -o many_stdlib_calls_x64-linux
+
+cat_x64-linux: cat.c
+	gcc -W -pie cat.c -o cat_x64-linux
 
 do_exception_pie_x64-linux: do_exception.c
 	gcc -W -pie -z execstack -DARCH_IS_X64 do_exception.c -o do_exception_pie_x64-linux
