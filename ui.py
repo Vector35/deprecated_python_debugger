@@ -27,9 +27,9 @@ class DebuggerUI:
 		threads_widget = self.widget("Debugger Threads")
 		stack_widget = self.widget("Debugger Stack")
 		bp_widget = self.widget("Debugger Breakpoints")
-		console_widget = self.widget('Debugger Console')
+		#console_widget = self.widget('Debugger Console')
 
-		if registers_widget is None or modules_widget is None or threads_widget is None or stack_widget is None or bp_widget is None or console_widget is None:
+		if registers_widget is None or modules_widget is None or threads_widget is None or stack_widget is None or bp_widget is None:
 			# One of the views failed to create, bail
 			log_debug("Creating Debugger UI for view with missing dock widgets!")
 			return
@@ -426,10 +426,11 @@ class DebuggerUI:
 			return self.state.bv.create_tag_type("Breakpoints", "🛑")
 
 	def on_stdout(self, output):
-		def on_stdout_main_thread(output):
-			console_widget = self.widget('Debugger Console')
-			console_widget.notifyStdout(output)
-		execute_on_main_thread(lambda: on_stdout_main_thread(output))
+		#def on_stdout_main_thread(output):
+		#	console_widget = self.widget('Debugger Console')
+		#	console_widget.notifyStdout(output)
+		#execute_on_main_thread(lambda: on_stdout_main_thread(output))
+		pass
 
 #------------------------------------------------------------------------------
 # right click plugin
@@ -613,7 +614,7 @@ def initialize_ui():
 	widget.register_dockwidget(ThreadsWidget.DebugThreadsWidget, "Debugger Threads", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 	widget.register_dockwidget(StackWidget.DebugStackWidget, "Debugger Stack", Qt.LeftDockWidgetArea, Qt.Vertical, False)
 	widget.register_dockwidget(ModulesWidget.DebugModulesWidget, "Debugger Modules", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
-	widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
+	#widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 
 	PluginCommand.register_for_address("Debugger\\Toggle Breakpoint", "sets/clears breakpoint at right-clicked address", cb_bp_toggle, is_valid=valid_bp_toggle)
 
