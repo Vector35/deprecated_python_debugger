@@ -279,8 +279,12 @@ class DebugAdapter:
 	def step_over(self):
 		raise NotImplementedError('')
 
-	# raw pass-thru (meaning depends on adapter)
+	# lower level adapter specific stuff
 	def raw(self, data):
+		raise NotImplementedError('')
+	def set_timeout(self):
+		raise NotImplementedError('')
+	def kill_comms(self):
 		raise NotImplementedError('')
 
 	# send data to process stdin

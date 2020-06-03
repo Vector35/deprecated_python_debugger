@@ -383,6 +383,12 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		return self.thunk_stop_reason()
 
 	# testing
+	def raw(self, data):
+		pass
+
+	def kill_comms(self):
+		pass
+
 	def test(self):
 		pass
 

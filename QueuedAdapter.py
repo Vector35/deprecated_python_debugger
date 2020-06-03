@@ -1,6 +1,6 @@
 import threading
 import traceback
-from queue import Queue
+from queue import Queue, Empty
 from . import DebugAdapter
 
 '''
@@ -24,7 +24,7 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 		self.function_stats = {}
 
 	def __del__(self):
-		stop_worker_thread()
+		pass
 
 	# -------------------------------------------------------------------------
 	# Thread-safe work queue for the adapter. Results and exceptions
@@ -33,33 +33,33 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 	# -------------------------------------------------------------------------
 
 	def worker(self):
-		def perform_task(index, job):
-			# Run it!
+		while True:
+			# Get next job
+			index, job = self.queue.get()
+			if job == 'break':
+				break
+
+			# Get condition variable
 			cond = self.results[index]
+
+			#
 			try:
 				self.queue.task_done()
 				self.results[index] = (True, job())
 			except Exception as e:
+				#print('worker thread got exception: ', e)
 				self.results[index] = (False, e)
+
 			# Signal completion
 			cond.acquire()
 			cond.notify()
 			cond.release()
 
-		while True:
-			# Get next job and its condition var
-			index, block_queue, job = self.queue.get()
+	def submit(self, job):
+		# Submissions to queue fail if thread isn't present
+		if not (self.worker_thread and self.worker_thread.is_alive()):
+			return False
 
-			if job == 'BREAK':
-				perform_task(index, lambda: True)
-				break
-
-			if block_queue:
-				perform_task(index, job)
-			else:
-				threading.Thread(target=lambda: perform_task(index, job)).start()
-
-	def submit(self, job, block_queue=True):
 		# Be sure to atomically increment the index counter
 		with self.lock:
 			index = self.next_index
@@ -72,7 +72,7 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 		self.results[index] = cond
 
 		# Don't block on put() but instead on the condition variable
-		self.queue.put((index, block_queue, job), False)
+		self.queue.put((index, job), False)
 		cond.wait()
 
 		# Condition signalled, collect results
@@ -83,14 +83,6 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 		if not suceeded:
 			raise result
 		return result
-
-	# UI mode: worker thread can persist alongside binary view
-	# headless: scripts need a way to explicitly end this thread
-	def stop_worker_thread(self):
-		if self.worker_thread:
-			self.submit('BREAK')
-			self.worker_thread.join()
-			self.worker_thread = None
 
 	# -------------------------------------------------------------------------
 	# Track statistics for which adapter functions are called the most, and
@@ -133,7 +125,13 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 		return self.submit(lambda: self.adapter.detach())
 	def quit(self):
 		self.record_stat("quit")
-		return self.submit(lambda: self.adapter.quit())
+
+		# set loop break out signal (but thread could be blocking on previous call)
+		self.queue.put((-1, 'break'), False)
+
+		# bypass queue, we rely on underlying adapter's quit() to unblock our thread
+		# (perhaps by closing the socket that our worker thread is recv() on)
+		self.adapter.quit()
 
 	def target_arch(self):
 		self.record_stat("target_arch")
@@ -193,12 +191,11 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 
 	def break_into(self):
 		self.record_stat("break_into")
-		# skip job queue (which is possible waiting in go/step_into/step_over)
+		# skip job queue (which is possibly waiting in go/step_into/step_over)
 		threading.Thread(target=lambda: self.adapter.break_into()).start()
 
 	def go(self):
 		self.record_stat("go")
-		#return self.submit(lambda: self.adapter.go(), block_queue=False)
 		return self.submit(lambda: self.adapter.go())
 	def step_into(self):
 		self.record_stat("step_into")

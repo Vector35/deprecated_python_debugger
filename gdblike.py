@@ -142,15 +142,14 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 	def quit(self):
 		try:
+			self.rspConn.send_raw('\x03')
 			self.rspConn.send_payload('k')
-			self.sock.shutdown(socket.SHUT_RDWR)
-			self.sock.close()
-			self.sock = None
-		except rsp.RspDisconnected:
+		except Exception:
 			pass
-		except OSError:
-			# eg: [Errno 57] Socket is not connected
-			# (example: target has exited, adapter sent code, closed socket already)
+
+		try:
+			self.kill_comms()
+		except Exception:
 			pass
 
 	# target info
@@ -654,9 +653,26 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 		except rsp.RspDisconnected:
 			return (DebugAdapter.STOP_REASON.BACKEND_DISCONNECTED, None)
+		except socket.timeout:
+			raise DebugAdapter.Timeout()
 
 	def raw(self, data):
 		return self.rspConn.tx_rx(data)
+
+	def set_timeout(self, duration=.5):
+		if not self.sock:
+			return False
+
+		self.sock.settimeout(duration)
+
+	def kill_comms(self):
+		if not self.sock:
+			return
+
+		# this should unblock any callers on recv()
+		self.sock.shutdown(socket.SHUT_RDWR)
+		self.sock.close()
+		self.sock = None
 
 	# asynchronously called when inside a "go" to inform us of stdout (and
 	# possibly other stuff)
