@@ -287,8 +287,3 @@ class DebugAdapter:
 	def kill_comms(self):
 		raise NotImplementedError('')
 
-	# send data to process stdin
-	def stdin_write(self, data):
-		raise NotImplementedError('')
-	def stdin_is_writable(self):
-		raise NotImplementedError('')

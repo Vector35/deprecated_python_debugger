@@ -208,9 +208,3 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 		self.record_stat("raw")
 		return self.submit(lambda: self.adapter.raw(data))
 
-	def stdin_write(self, data):
-		self.record_stat("stdin_write")
-		return self.submit(lambda: self.adapter.stdin_write(data))
-	def stdin_is_writable(self, data):
-		self.record_stat("stdin_is_writable")
-		return self.submit(lambda: self.adapter.stdin_is_writable(data))
