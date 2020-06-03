@@ -783,7 +783,7 @@ EASY_CTYPES_SPEC
 int quit(void)
 {
 	int rc = ERROR_UNSPECIFIED;
-	if(g_Client->TerminateCurrentProcess() != S_OK) {
+	if(g_Client->TerminateProcesses() != S_OK) {
 		printf_debug("ERROR: TerminateCurrentProcess() failed\n");
 		goto cleanup;
 	}

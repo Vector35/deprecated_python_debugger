@@ -2,6 +2,7 @@
 
 import os
 import re
+import time
 import socket
 import threading
 from struct import pack, unpack
@@ -175,7 +176,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	#--------------------------------------------------------------------------
 
 	# session start/stop
-	def exec(self, fpath, args):
+	def exec(self, fpath, args, terminal=False):
 		# form command line
 		if '/' in fpath:
 			fpath = fpath.replace('/', '\\')
@@ -198,11 +199,16 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 	def detach(self):
 		self.dll.process_detach()
-		pass
 
 	def quit(self):
-		self.dll.quit()
-		pass
+		self.dll.break_into()
+
+		# target in I/O have measurable time before interrupt request moves them to BREAK state
+		for i in range(20):
+			if self.get_exec_status() == DEBUG_STATUS.BREAK:
+				self.dll.quit()
+				return
+			time.sleep(.1)
 
 	# target info
 	def target_arch(self):
@@ -263,7 +269,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		bpid = c_ulong();
 		rc = pfunc(addr, byref(bpid))
 		if rc != 0:
-			raise DebugAdapter.BreakpointSetError('dll returned %d' % rc)
+			raise DebugAdapter.BreakpointSetError('bp at 0x%X, dll returned %d' % (addr, rc))
 		self.bp_addr_to_id[addr] = bpid.value
 
 	def breakpoint_clear(self, addr):

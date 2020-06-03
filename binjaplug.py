@@ -712,6 +712,7 @@ class DebuggerState:
 			finally:
 				self.adapter = None
 				self.remote_arch = None
+
 		self.memory_dirty()
 
 		# Clean up temporary dumped file
