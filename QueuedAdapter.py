@@ -108,9 +108,9 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 	# -------------------------------------------------------------------------
 
 	def setup(self):
-		return self.submit(lambda: self.adapter.setup())
+		return self.adapter.setup()
 	def teardown(self):
-		return self.submit(lambda: self.adapter.teardown())
+		return self.adapter.teardown()
 	def exec(self, path, args=[], **kwargs):
 		self.record_stat("exec")
 		return self.submit(lambda: self.adapter.exec(path, args, **kwargs))
