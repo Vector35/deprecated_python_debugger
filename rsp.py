@@ -182,7 +182,7 @@ class RspConnection():
 		while 1:
 			data = self.tx_rx('qXfer:features:read:%s:%X,%X' % (fname, offs, pktsize), 'ack_then_reply')
 			if not data[0] in ['l', 'm']:
-				raise DebugAdapter.GeneralError('acquiring xml')
+				raise RspGeneralError('acquiring xml')
 			if data[1:]:
 				#print('read 0x%X bytes' % len(tmp))
 				tmp = un_rle(data[1:])
