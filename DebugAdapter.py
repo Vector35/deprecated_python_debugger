@@ -116,7 +116,8 @@ def new_terminal(cmdline):
 		cmd += ' -e \'activate application "Terminal"\''
 		os.system(cmd)
 	elif plat_sys == 'Linux':
-		cmd += 'exo-open --launch TerminalEmulator \'%s\'' % cmdline
+		#cmd += 'exo-open --launch TerminalEmulator \'%s\'' % cmdline
+		cmd += 'x-terminal-emulator -e %s' % cmdline
 		os.system(cmd)
 	else:
 		raise Exception('unable to start new terminal window in system: %s' % plat_sys)
