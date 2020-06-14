@@ -41,7 +41,7 @@ class DebuggerUI:
 		Settings().register_group("debugger", "Debugger")
 		key = 'debugger.extra_annotations'
 		if not Settings().contains(key):
-			Settings().register_setting(key, '{"description" : "Enables automatic additional annotations to be added to the start of functions that will persist after the debugger has moved away. Must break or step across the start of a function to trigger. Currently uses comments but will be migrated to ephemeral comments when that system is finished.", "title" : "Debuger Function Start Annotations", "default" : false, "type" : "boolean"}')
+			Settings().register_setting(key, '{"description" : "Enables automatic additional annotations to be added to the start of functions that will persist after the debugger has moved away. Must break or step across the start of a function to trigger. Currently uses comments but will be migrated to ephemeral comments when that system is finished.", "title" : "Debugger Function Start Annotations", "default" : false, "type" : "boolean"}')
 
 	def widget(self, name):
 		return widget.get_dockwidget(self.state.bv, name)
