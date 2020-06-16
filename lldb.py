@@ -4,6 +4,7 @@ import os
 import re
 import struct
 import shutil
+import shlex
 import socket
 import subprocess
 
@@ -64,9 +65,8 @@ class DebugAdapterLLDB(gdblike.DebugAdapterGdbLike):
 				dbg_args.extend(['--stdio-path', '/dev/stdin'])
 				dbg_args.extend(['--stdout-path', '/dev/stdout'])
 				dbg_args.extend(['--stderr-path', '/dev/stderr'])
-				dbg_args.extend(['localhost:%d'%port, path, '--'])
-				dbg_args.extend(args)
-				# TODO: test for, escape problematic target arguments requested by user
+				dbg_args.extend(['localhost:%d'%port, shlex.quote(path), '--'])
+				dbg_args.extend([shlex.quote(arg) for arg in args])
 				DebugAdapter.new_terminal(' '.join(dbg_args))
 			else:
 				dbg_args = [path_debugserver, 'localhost:%d'%port, path, '--']

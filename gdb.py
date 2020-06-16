@@ -3,6 +3,7 @@
 import os
 import re
 import shutil
+import shlex
 import socket
 import subprocess
 from struct import pack, unpack
@@ -39,13 +40,14 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 			raise Exception('no available ports')
 
 		# invoke gdbserver
-		dbg_args = [path_gdbserver, '--once', '--no-startup-with-shell', 'localhost:%d'%port, path]
-		dbg_args.extend(args)
-		print(' '.join(dbg_args))
 		try:
 			if kwargs.get('terminal', False):
+				dbg_args = [path_gdbserver, '--once', '--no-startup-with-shell', 'localhost:%d'%port, shlex.quote(path)]
+				dbg_args.extend([shlex.quote(arg) for arg in args])
 				DebugAdapter.new_terminal(' '.join(dbg_args))
 			else:
+				dbg_args = [path_gdbserver, '--once', '--no-startup-with-shell', 'localhost:%d'%port, path]
+				dbg_args.extend(args)
 				subprocess.Popen(dbg_args, stdin=None, stdout=None, stderr=None, preexec_fn=gdblike.preexec)
 		except Exception:
 			raise Exception('invoking gdbserver (used path: %s)' % path_gdbserver)

@@ -4,6 +4,7 @@ import os
 import re
 import time
 import socket
+import shlex
 import threading
 from struct import pack, unpack
 from ctypes import *
@@ -181,9 +182,9 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		if '/' in fpath:
 			fpath = fpath.replace('/', '\\')
 
-		cmdline = fpath
+		cmdline = shlex.quote(fpath)
 		if args:
-			cmdline += ' ' + ' '.join(args)
+			cmdline += ' ' + ' '.join([shlex.quote(arg) for arg in args])
 
 		# ask dll to create process
 		cmdline_ = c_char_p(cmdline.encode('utf-8'))
