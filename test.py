@@ -324,7 +324,6 @@ if __name__ == '__main__':
 	if arg == 'oneoff':
 		fpath = testbin_to_fpath('helloworld_thread')
 		adapter = DebugAdapter.get_adapter_for_current_system()
-		adapter.setup()
 		adapter.exec(fpath)
 		print(adapter.mem_modules())
 		print(type(adapter) == dbgeng.DebugAdapterDbgeng)
@@ -353,7 +352,6 @@ if __name__ == '__main__':
 		def thread_task():
 			adapter = DebugAdapter.get_adapter_for_current_system()
 
-			adapter.setup()
 			adapter.exec(fpath, ['segfault'])
 			# set initial breakpoint
 			entry = confirm_initial_module(adapter)
@@ -374,7 +372,6 @@ if __name__ == '__main__':
 			assert_equality(reason, DebugAdapter.STOP_REASON.PROCESS_EXITED)
 
 			adapter.quit()
-			adapter.teardown()
 			adapter = None
 
 		for i in range(10):
@@ -393,7 +390,6 @@ if __name__ == '__main__':
 		testvals = [('-11',[245,4294967285]), ('-1',[4294967295,255]), ('-3',[4294967293,253]), ('0',[0]), ('3',[3]), ('7',[7]), ('123',[123])]
 		for (arg, expected) in testvals:
 			adapter = DebugAdapter.get_adapter_for_current_system()
-			adapter.setup()
 
 			utils.green('testing %s %s' % (tb, arg))
 			adapter.exec(fpath, [arg])
@@ -413,21 +409,18 @@ if __name__ == '__main__':
 		fpath = testbin_to_fpath()
 
 		# segfault
-		adapter.setup()
 		adapter.exec(fpath, ['segfault'])
 		(reason, extra) = go_initial(adapter)
 		assert_equality(reason, DebugAdapter.STOP_REASON.ACCESS_VIOLATION)
 		adapter.quit()
 
 		# illegal instruction
-		adapter.setup()
 		adapter.exec(fpath, ['illegalinstr'])
 		(reason, extra) = go_initial(adapter)
 		expect_bad_instruction(reason)
 		adapter.quit()
 
 		# breakpoint, single step, exited
-		adapter.setup()
 		adapter.exec(fpath, ['fakearg'])
 		entry = confirm_initial_module(adapter)
 		adapter.breakpoint_set(entry)
@@ -448,7 +441,6 @@ if __name__ == '__main__':
 		adapter.quit()
 
 		# divzero
-		adapter.setup()
 		adapter.exec(fpath, ['divzero'])
 		(reason, extra) = go_initial(adapter)
 		assert_equality(reason, DebugAdapter.STOP_REASON.CALCULATION)
@@ -467,7 +459,6 @@ if __name__ == '__main__':
 
 		# tester and testee run on same machine
 		adapter = DebugAdapter.get_adapter_for_current_system()
-		adapter.setup()
 		adapter.exec(fpath, '')
 
 		xip = 'eip' if 'x86' in tb else 'rip'
@@ -525,7 +516,6 @@ if __name__ == '__main__':
 
 		# tester and testee run on same machine
 		adapter = DebugAdapter.get_adapter_for_current_system()
-		adapter.setup()
 		fpath = testbin_to_fpath()
 		adapter.exec(fpath, '')
 		entry = confirm_initial_module(adapter)
@@ -631,7 +621,6 @@ if __name__ == '__main__':
 
 		# for x64 machine, tester and testee run on same machine
 		adapter = DebugAdapter.get_adapter_for_current_system()
-		adapter.setup()
 		fpath = testbin_to_fpath()
 		adapter.exec(fpath, '')
 		entry = confirm_initial_module(adapter)

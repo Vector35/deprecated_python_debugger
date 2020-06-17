@@ -194,14 +194,22 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		self.dll.process_detach()
 
 	def quit(self):
-		self.dll.break_into()
+		status = self.get_exec_status()
 
-		# target in I/O have measurable time before interrupt request moves them to BREAK state
-		for i in range(20):
-			if self.get_exec_status() == DEBUG_STATUS.BREAK:
-				self.dll.quit()
-				return
-			time.sleep(.1)
+		if status == DEBUG_STATUS.NO_DEBUGGEE:
+			pass
+		elif status == DEBUG_STATUS.BREAK:
+			self.dll.quit()
+		else:
+			# targets waiting on I/O have considerable time before interrupt
+			# request moves them to BREAK state
+			for i in range(20):
+				self.dll.break_into()
+				time.sleep(.1)
+				if self.get_exec_status() == DEBUG_STATUS.BREAK:
+					break
+			else:
+				raise Exception('unable to quit, target won\'t break')
 
 	# target info
 	def target_arch(self):
