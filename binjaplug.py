@@ -631,7 +631,6 @@ class DebuggerState:
 		if DebugAdapter.ADAPTER_TYPE.use_exec(self.adapter_type):
 			try:
 				self.adapter = QueuedAdapter.QueuedAdapter(self.adapter)
-				self.adapter.setup()
 				self.adapter.exec(fpath, self.command_line_args, terminal=self.request_terminal_emulator)
 				self.connecting = False
 			except Exception as e:
@@ -676,7 +675,6 @@ class DebuggerState:
 			if DebugAdapter.ADAPTER_TYPE.use_connect(self.adapter_type):
 				try:
 					self.adapter = QueuedAdapter.QueuedAdapter(self.adapter)
-					self.adapter.setup()
 					self.adapter.connect(self.remote_host, self.remote_port)
 					self.connecting = False
 				except Exception as e:

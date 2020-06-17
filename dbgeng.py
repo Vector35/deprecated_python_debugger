@@ -78,8 +78,6 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 		if not self.dll:
 			raise DebugAdapter.GeneralError("loading %s" % fpath)
-		if self.dll.setup() != 0:
-			raise DebugAdapter.GeneralError("initializing %s" % fpath)
 
 	def __del__(self):
 		#print('dbgeng.__del__() by thread %d %s' % (threading.current_thread().ident, threading.current_thread().name))

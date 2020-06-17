@@ -76,6 +76,8 @@ ULONG g_process_exit_code;
 
 /* forward declarations */
 void status_to_str(ULONG status, char *str);
+int client_setup(void);
+int client_teardown(void);
 
 #define printf_debug(fmt, ...) { \
 	char asd123[1024]; \
@@ -688,20 +690,37 @@ int process_start(char *cmdline)
 
 	printf_debug("executing command line: %s\n", cmdline);
 
-	if(!g_Client) {
-		printf_debug("ERROR: interfaces not initialized\n");
-		rc = ERROR_NO_DBGENG_INTERFACES;
+	/* end any current sessions */
+	if(g_Client) {
+		printf_debug("WARNING: client/session already active, attempting shutdown\n");
+		client_teardown();
+	}
+
+	if(g_Client) {
+		printf_debug("ERROR: unable to end current client/session\n");
+		rc = ERROR_UNSPECIFIED;
 		goto cleanup;
 	}
 
-	if(g_Control->SetEngineOptions(DEBUG_ENGOPT_INITIAL_BREAK) != S_OK) {
-		printf_debug("ERROR: SetEngineOptions()\n");
+	/* start new session */
+	rc = client_setup();
+	if(rc) {
+		printf_debug("ERROR: client_setup() initializing client/session\n");
+		rc = ERROR_UNSPECIFIED;
+		goto cleanup;
+	}
+
+	/* set engine, create process */
+	hResult = g_Control->SetEngineOptions(DEBUG_ENGOPT_INITIAL_BREAK);
+	if(hResult != S_OK) {
+		printf_debug("ERROR: SetEngineOptions() returned 0x%08X\n", hResult);
 		rc = ERROR_DBGENG_API;
 		goto cleanup;
 	}
 
-	if(g_Client->CreateProcess(0, cmdline, DEBUG_ONLY_THIS_PROCESS) != S_OK) {
-		printf_debug("ERROR: creating debug process\n");
+	hResult = g_Client->CreateProcess(0, cmdline, DEBUG_ONLY_THIS_PROCESS);
+	if(hResult != S_OK) {
+		printf_debug("ERROR: CreateProcess() returned 0x%08X\n", hResult);
 		rc = ERROR_DBGENG_API;
 		goto cleanup;
 	}
@@ -776,6 +795,8 @@ int process_detach(void)
 	if(g_Client->DetachProcesses())
 		return ERROR_DBGENG_API;
 
+	client_teardown();
+
 	return 0;
 }
 
@@ -783,6 +804,10 @@ EASY_CTYPES_SPEC
 int quit(void)
 {
 	int rc = ERROR_UNSPECIFIED;
+
+	if(!g_Client)
+		return ERROR_NO_DBGENG_INTERFACES;
+
 	if(g_Client->TerminateProcesses() != S_OK) {
 		printf_debug("ERROR: TerminateCurrentProcess() failed\n");
 		goto cleanup;
@@ -790,6 +815,9 @@ int quit(void)
 	else {
 		printf_debug("TerminateCurrentProcess() succeeded!\n");
 	}
+
+	client_teardown();
+
 	rc = 0;
 	cleanup:
 	return rc;
@@ -1235,8 +1263,7 @@ int get_last_breakpoint_address(uint64_t *addr)
 /* INITIALIZATION, ENTRYPOINT */
 /*****************************************************************************/
 
-EASY_CTYPES_SPEC
-int setup(void)
+int client_setup(void)
 {
 	int rc = ERROR_UNSPECIFIED;
 	HRESULT hResult;
@@ -1271,8 +1298,7 @@ int setup(void)
 	return rc;
 }
 
-EASY_CTYPES_SPEC
-int teardown(void)
+int client_teardown(void)
 {
 	printf_debug("teardown()\n");
 
@@ -1315,12 +1341,12 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 	switch(fdwReason) {
 		case DLL_PROCESS_DETACH:
 			printf_debug("DLL_PROCESS_DETACH\n");
-			teardown();
+			client_teardown();
 			break;
 
 		case DLL_PROCESS_ATTACH:
 			printf_debug("DLL_PROCESS_ATTACH\n");
-			/* do NOT initialize here, user should call setup() */
+			/* do NOT initialize here */
 			/* SEE: https://docs.microsoft.com/en-us/windows/win32/dlls/dllmain */
 			break;
 
