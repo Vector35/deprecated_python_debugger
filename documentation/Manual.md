@@ -227,15 +227,6 @@ You can programmatically debug targets by using `DebugAdapter` methods.
 
 ## DebugAdapter Methods
 
-### Initialization Methods
-
-Some **backends** need to perform some initialization before acquiring a target. For example, **dbgeng** needs to acquire COM interfaces.
-
-```
-	def setup()
-	def teardown()
-```
-
 ### Session Start/Stop Methods
 
 These functions start and end a session. A session can be started by executing a target,, attaching to a target, or connecting to a listening **backend**. Detaching, when possible, means disconnecting the debugger and allowing the target to resume execution. Quitting means to end the session entirely.

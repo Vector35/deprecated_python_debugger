@@ -325,10 +325,6 @@ See <code>BNDP_ROOT/cli.py</code>  for an interactive console debugger.</p>
 <a id="user-content-debugadapter-methods" class="anchor" href="#debugadapter-methods" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>DebugAdapter Methods</h2>
 <h3>
 <a id="user-content-initialization-methods" class="anchor" href="#initialization-methods" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Initialization Methods</h3>
-<p>Some <strong>backends</strong> need to perform some initialization before acquiring a target. For example, <strong>dbgeng</strong> needs to acquire COM interfaces.</p>
-<pre><code>	def setup()
-	def teardown()
-</code></pre>
 <h3>
 <a id="user-content-session-startstop-methods" class="anchor" href="#session-startstop-methods" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Session Start/Stop Methods</h3>
 <p>These functions start and end a session. A session can be started by executing a target,, attaching to a target, or connecting to a listening <strong>backend</strong>. Detaching, when possible, means disconnecting the debugger and allowing the target to resume execution. Quitting means to end the session entirely.</p>
