@@ -81,7 +81,6 @@ def connect_sense(address, port):
 			# TODO: can we "see" this if we're positioned above?
 			adapt = gdblike.DebugAdapterGdbLike
 
-		adapt.setup()
 		adapt.connect_continued(sock, rsp_conn)
 		ok = True
 		return adapt
@@ -118,11 +117,6 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 
 		# rsp connection
 		self.rspConn = None
-
-	def setup(self):
-		pass
-	def teardown(self):
-		pass
 
 	#--------------------------------------------------------------------------
 	# API

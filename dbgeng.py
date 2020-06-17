@@ -71,16 +71,6 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		self.stop_reason_fallback = DebugAdapter.STOP_REASON.UNKNOWN
 
 		#
-		self.dll = None
-
-	def __del__(self):
-		#print('dbgeng.__del__() by thread %d %s' % (threading.current_thread().ident, threading.current_thread().name))
-		pass
-
-	# NOTE: thread that initializes dbgeng session must be same that calls WaitForEvent()
-	def setup(self):
-		#print('dbgeng.setup() by thread %d %s' % (threading.current_thread().ident, threading.current_thread().name))
-
 		fpath = os.path.abspath(__file__)
 		fpath = os.path.dirname(fpath)
 		fpath = os.path.join(fpath, 'dbgengadapt\\dbgengadapt.dll')
@@ -91,9 +81,8 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		if self.dll.setup() != 0:
 			raise DebugAdapter.GeneralError("initializing %s" % fpath)
 
-	def teardown(self):
-		#print('dbgeng.teardown() by thread %d %s' % (threading.current_thread().ident, threading.current_thread().name))
-		self.dll.teardown()
+	def __del__(self):
+		#print('dbgeng.__del__() by thread %d %s' % (threading.current_thread().ident, threading.current_thread().name))
 		del self.dll
 		self.dll = None
 

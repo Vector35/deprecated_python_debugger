@@ -302,7 +302,6 @@ if __name__ == '__main__':
 			raise Exception('file not found: %s' % fpath)
 
 		adapter = DebugAdapter.get_adapter_for_current_system()
-		adapter.setup()
 
 		# remaining debugger args become target args
 		target_args = list(reversed(args))

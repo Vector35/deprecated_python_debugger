@@ -107,10 +107,6 @@ class QueuedAdapter(DebugAdapter.DebugAdapter):
 	# thread-safe as a result
 	# -------------------------------------------------------------------------
 
-	def setup(self):
-		return self.adapter.setup()
-	def teardown(self):
-		return self.adapter.teardown()
 	def exec(self, path, args=[], **kwargs):
 		self.record_stat("exec")
 		return self.submit(lambda: self.adapter.exec(path, args, **kwargs))
