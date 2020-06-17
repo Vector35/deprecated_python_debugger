@@ -272,30 +272,45 @@ if __name__ == '__main__':
 		adjust_ctrl_c()
 
 	adapter = None
-	if not sys.argv[1:]:
-		raise Exception('specify target on command line')
-	arg1 = sys.argv[1]
+
+	args = list(reversed(sys.argv))
+	tok = args.pop()
+	if not args:
+		print('usage:')
+		print('%s [--terminal] <target_path> <target_args>' % tok)
+		print('%s <server>:<port>' % tok)
+		sys.exit(-1)
+
+	tok = args.pop()
 	# does it look like <server>:<port> ?
-	if re.match(r'^.*:\d+$', arg1):
-		(host, port) = arg1.split(':')
+	if re.match(r'^.*:\d+$', tok):
+		(host, port) = tok.split(':')
 		adapter = gdblike.connect_sense(host, int(port))
 	# otherwise treat as a path
 	else:
-		if '~' in arg1:
-			arg1 = os.expanduser(arg1)
-		arg1 = os.path.abspath(arg1)
-		if not os.path.exists(arg1):
-			raise Exception('file not found: %s' % arg1)
+		terminal = False
+		if tok=='--terminal':
+			terminal = True
+			tok = args.pop()
+
+		# determine target path
+		fpath = tok
+		if '~' in tok:
+			fpath = os.expanduser(fpath)
+		fpath = os.path.abspath(fpath)
+		if not os.path.exists(fpath):
+			raise Exception('file not found: %s' % fpath)
 
 		adapter = DebugAdapter.get_adapter_for_current_system()
 		adapter.setup()
 
-		target = arg1
-		target_args = ['']
-		if '--terminal' in sys.argv[2:]:
-			adapter.exec(arg1, target_args, terminal=True)
+		# remaining debugger args become target args
+		target_args = list(reversed(args))
+		print(target_args)
+		if terminal:
+			adapter.exec(fpath, target_args, terminal=True)
 		else:
-			adapter.exec(arg1, target_args)
+			adapter.exec(fpath, target_args)
 
 	arch = adapter.target_arch()
 

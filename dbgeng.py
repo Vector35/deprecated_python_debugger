@@ -178,13 +178,16 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 	# session start/stop
 	def exec(self, fpath, args, terminal=False):
+		def enclose(s):
+			return s if s.startswith('"') and s.endswith('"') else '"%s"'%s
+
 		# form command line
 		if '/' in fpath:
 			fpath = fpath.replace('/', '\\')
 
-		cmdline = shlex.quote(fpath)
+		cmdline = enclose(fpath)
 		if args:
-			cmdline += ' ' + ' '.join([shlex.quote(arg) for arg in args])
+			cmdline += ' ' + ' '.join([enclose(arg) for arg in args])
 
 		# ask dll to create process
 		cmdline_ = c_char_p(cmdline.encode('utf-8'))
