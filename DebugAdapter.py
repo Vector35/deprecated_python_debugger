@@ -14,6 +14,8 @@ class NotExecutableError(Exception):
 	pass
 class PermissionDeniedError(Exception):
 	pass
+class ProcessStartError(Exception):
+	pass
 
 @unique
 class ADAPTER_TYPE(Enum):

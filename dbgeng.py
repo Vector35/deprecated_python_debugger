@@ -180,7 +180,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		cmdline_ = c_char_p(cmdline.encode('utf-8'))
 		rc = self.dll.process_start(cmdline_)
 		if rc:
-			raise Exception('unable to launch "%s", dbgeng adapter returned %d' % (cmdline, rc))
+			raise DebugAdapter.ProcessStartError('dbgeng adapter returned %d' % rc)
 
 		self.target_path_ = fpath
 

@@ -698,15 +698,12 @@ int process_start(char *cmdline)
 
 	if(g_Client) {
 		printf_debug("ERROR: unable to end current client/session\n");
-		rc = ERROR_UNSPECIFIED;
 		goto cleanup;
 	}
 
 	/* start new session */
-	rc = client_setup();
-	if(rc) {
+	if(client_setup()) {
 		printf_debug("ERROR: client_setup() initializing client/session\n");
-		rc = ERROR_UNSPECIFIED;
 		goto cleanup;
 	}
 
@@ -756,7 +753,7 @@ int process_start(char *cmdline)
 
 	}
 
-	printf_debug("giving up\n");
+	printf_debug("gave up! returning error %d\n", rc);
 
 	cleanup:
 	return rc;

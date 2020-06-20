@@ -235,6 +235,8 @@ class DebugControlsWidget(QToolBar):
 					execute_on_main_thread_and_wait(perform_run_after)
 				except ConnectionRefusedError:
 					execute_on_main_thread_and_wait(lambda: perform_run_error('ERROR: Connection Refused'))
+				except DebugAdapter.ProcessStartError as e:
+					execute_on_main_thread_and_wait(lambda: perform_run_error(str(e)))
 				except DebugAdapter.NotExecutableError as e:
 					fpath = e.args[0]
 					if platform.system() != 'Windows':
