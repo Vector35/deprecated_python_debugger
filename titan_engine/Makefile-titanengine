@@ -1,0 +1,181 @@
+SWITCHES = /O1 -DWIN32 -D_WINDOWS -D_USRDLL -DSCYLLA_WRAPPER_EXPORTS -DUNICODE -D_UNICODE /EHsc
+
+all: TitanEngine.dll
+
+TitanEngine.dll: Global.Breakpoints.o Global.Debugger.o Global.Engine.Extension.o Global.Engine.GUI.o Global.Engine.Hash.o Global.Engine.Hider.o Global.Engine.Hook.o Global.Engine.Importer.o Global.Engine.Simplification.o Global.Engine.Threading.o Global.Engine.o Global.Garbage.o Global.Handle.o Global.Helper.o Global.Injector.o Global.Librarian.o Global.Mapping.o Global.OEPFinder.o Global.Realigner.o Global.TLS.o Global.Threader.o LzmaDec.o TitanEngine.Breakpoints.o TitanEngine.Debugger.Context.o TitanEngine.Debugger.Control.o TitanEngine.Debugger.Data.o TitanEngine.Debugger.DebugLoop.o TitanEngine.Debugger.Helper.o TitanEngine.Debugger.Memory.o TitanEngine.Debugger.o TitanEngine.Disassembler.o TitanEngine.Dumper.o TitanEngine.Engine.Simplification.o TitanEngine.Engine.o TitanEngine.Exporter.o TitanEngine.Handler.o TitanEngine.Hider.o TitanEngine.Hooks.o TitanEngine.Importer.o TitanEngine.Injector.o TitanEngine.Librarian.o TitanEngine.OEPFinder.o TitanEngine.PE.Convert.o TitanEngine.PE.Data.o TitanEngine.PE.Fixer.o TitanEngine.PE.Overlay.o TitanEngine.PE.Section.o TitanEngine.PE.o TitanEngine.Process.o TitanEngine.Realigner.o TitanEngine.Relocator.o TitanEngine.Resourcer.o TitanEngine.Static.o TitanEngine.TLS.o TitanEngine.Threader.o TitanEngine.Tracer.o TitanEngine.TranslateName.o TitanEngine.o
+	link *.o advapi32.lib psapi.lib shell32.lib ntdll.lib comdlg32.lib kernel32.lib user32.lib distorm_x64.lib ..\scylla_wrapper_dll\scylla_wrapper\scylla_wrapper_x64.lib /DLL /OUT:TitanEngine.dll
+
+Global.Breakpoints.o: Global.Breakpoints.cpp
+	cl /c $(SWITCHES) Global.Breakpoints.cpp /Fo:Global.Breakpoints.o
+
+Global.Debugger.o: Global.Debugger.cpp
+	cl /c $(SWITCHES) Global.Debugger.cpp /Fo:Global.Debugger.o
+
+Global.Engine.Extension.o: Global.Engine.Extension.cpp
+	cl /c $(SWITCHES) Global.Engine.Extension.cpp /Fo:Global.Engine.Extension.o
+
+Global.Engine.GUI.o: Global.Engine.GUI.cpp
+	cl /c $(SWITCHES) Global.Engine.GUI.cpp /Fo:Global.Engine.GUI.o
+
+Global.Engine.Hash.o: Global.Engine.Hash.cpp
+	cl /c $(SWITCHES) Global.Engine.Hash.cpp /Fo:Global.Engine.Hash.o
+
+Global.Engine.Hider.o: Global.Engine.Hider.cpp
+	cl /c $(SWITCHES) Global.Engine.Hider.cpp /Fo:Global.Engine.Hider.o
+
+Global.Engine.Hook.o: Global.Engine.Hook.cpp
+	cl /c $(SWITCHES) Global.Engine.Hook.cpp /Fo:Global.Engine.Hook.o
+
+Global.Engine.Importer.o: Global.Engine.Importer.cpp
+	cl /c $(SWITCHES) Global.Engine.Importer.cpp /Fo:Global.Engine.Importer.o
+
+Global.Engine.Simplification.o: Global.Engine.Simplification.cpp
+	cl /c $(SWITCHES) Global.Engine.Simplification.cpp /Fo:Global.Engine.Simplification.o
+
+Global.Engine.Threading.o: Global.Engine.Threading.cpp
+	cl /c $(SWITCHES) Global.Engine.Threading.cpp /Fo:Global.Engine.Threading.o
+
+Global.Engine.o: Global.Engine.cpp
+	cl /c $(SWITCHES) Global.Engine.cpp /Fo:Global.Engine.o
+
+Global.Garbage.o: Global.Garbage.cpp
+	cl /c $(SWITCHES) Global.Garbage.cpp /Fo:Global.Garbage.o
+
+Global.Handle.o: Global.Handle.cpp
+	cl /c $(SWITCHES) Global.Handle.cpp /Fo:Global.Handle.o
+
+Global.Helper.o: Global.Helper.cpp
+	cl /c $(SWITCHES) Global.Helper.cpp /Fo:Global.Helper.o
+
+Global.Injector.o: Global.Injector.cpp
+	cl /c $(SWITCHES) Global.Injector.cpp /Fo:Global.Injector.o
+
+Global.Librarian.o: Global.Librarian.cpp
+	cl /c $(SWITCHES) Global.Librarian.cpp /Fo:Global.Librarian.o
+
+Global.Mapping.o: Global.Mapping.cpp
+	cl /c $(SWITCHES) Global.Mapping.cpp /Fo:Global.Mapping.o
+
+Global.OEPFinder.o: Global.OEPFinder.cpp
+	cl /c $(SWITCHES) Global.OEPFinder.cpp /Fo:Global.OEPFinder.o
+
+Global.Realigner.o: Global.Realigner.cpp
+	cl /c $(SWITCHES) Global.Realigner.cpp /Fo:Global.Realigner.o
+
+Global.TLS.o: Global.TLS.cpp
+	cl /c $(SWITCHES) Global.TLS.cpp /Fo:Global.TLS.o
+
+Global.Threader.o: Global.Threader.cpp
+	cl /c $(SWITCHES) Global.Threader.cpp /Fo:Global.Threader.o
+
+LzmaDec.o: LzmaDec.cpp
+	cl /c $(SWITCHES) LzmaDec.cpp /Fo:LzmaDec.o
+
+TitanEngine.Breakpoints.o: TitanEngine.Breakpoints.cpp
+	cl /c $(SWITCHES) TitanEngine.Breakpoints.cpp /Fo:TitanEngine.Breakpoints.o
+
+TitanEngine.Debugger.Context.o: TitanEngine.Debugger.Context.cpp
+	cl /c $(SWITCHES) TitanEngine.Debugger.Context.cpp /Fo:TitanEngine.Debugger.Context.o
+
+TitanEngine.Debugger.Control.o: TitanEngine.Debugger.Control.cpp
+	cl /c $(SWITCHES) TitanEngine.Debugger.Control.cpp /Fo:TitanEngine.Debugger.Control.o
+
+TitanEngine.Debugger.Data.o: TitanEngine.Debugger.Data.cpp
+	cl /c $(SWITCHES) TitanEngine.Debugger.Data.cpp /Fo:TitanEngine.Debugger.Data.o
+
+TitanEngine.Debugger.DebugLoop.o: TitanEngine.Debugger.DebugLoop.cpp
+	cl /c $(SWITCHES) TitanEngine.Debugger.DebugLoop.cpp /Fo:TitanEngine.Debugger.DebugLoop.o
+
+TitanEngine.Debugger.Helper.o: TitanEngine.Debugger.Helper.cpp
+	cl /c $(SWITCHES) TitanEngine.Debugger.Helper.cpp /Fo:TitanEngine.Debugger.Helper.o
+
+TitanEngine.Debugger.Memory.o: TitanEngine.Debugger.Memory.cpp
+	cl /c $(SWITCHES) TitanEngine.Debugger.Memory.cpp /Fo:TitanEngine.Debugger.Memory.o
+
+TitanEngine.Debugger.o: TitanEngine.Debugger.cpp
+	cl /c $(SWITCHES) TitanEngine.Debugger.cpp /Fo:TitanEngine.Debugger.o
+
+TitanEngine.Disassembler.o: TitanEngine.Disassembler.cpp
+	cl /c $(SWITCHES) TitanEngine.Disassembler.cpp /Fo:TitanEngine.Disassembler.o
+
+TitanEngine.Dumper.o: TitanEngine.Dumper.cpp
+	cl /c $(SWITCHES) TitanEngine.Dumper.cpp /Fo:TitanEngine.Dumper.o
+
+TitanEngine.Engine.Simplification.o: TitanEngine.Engine.Simplification.cpp
+	cl /c $(SWITCHES) TitanEngine.Engine.Simplification.cpp /Fo:TitanEngine.Engine.Simplification.o
+
+TitanEngine.Engine.o: TitanEngine.Engine.cpp
+	cl /c $(SWITCHES) TitanEngine.Engine.cpp /Fo:TitanEngine.Engine.o
+
+TitanEngine.Exporter.o: TitanEngine.Exporter.cpp
+	cl /c $(SWITCHES) TitanEngine.Exporter.cpp /Fo:TitanEngine.Exporter.o
+
+TitanEngine.Handler.o: TitanEngine.Handler.cpp
+	cl /c $(SWITCHES) TitanEngine.Handler.cpp /Fo:TitanEngine.Handler.o
+
+TitanEngine.Hider.o: TitanEngine.Hider.cpp
+	cl /c $(SWITCHES) TitanEngine.Hider.cpp /Fo:TitanEngine.Hider.o
+
+TitanEngine.Hooks.o: TitanEngine.Hooks.cpp
+	cl /c $(SWITCHES) TitanEngine.Hooks.cpp /Fo:TitanEngine.Hooks.o
+
+TitanEngine.Importer.o: TitanEngine.Importer.cpp
+	cl /c $(SWITCHES) TitanEngine.Importer.cpp /Fo:TitanEngine.Importer.o
+
+TitanEngine.Injector.o: TitanEngine.Injector.cpp
+	cl /c $(SWITCHES) TitanEngine.Injector.cpp /Fo:TitanEngine.Injector.o
+
+TitanEngine.Librarian.o: TitanEngine.Librarian.cpp
+	cl /c $(SWITCHES) TitanEngine.Librarian.cpp /Fo:TitanEngine.Librarian.o
+
+TitanEngine.OEPFinder.o: TitanEngine.OEPFinder.cpp
+	cl /c $(SWITCHES) TitanEngine.OEPFinder.cpp /Fo:TitanEngine.OEPFinder.o
+
+TitanEngine.PE.Convert.o: TitanEngine.PE.Convert.cpp
+	cl /c $(SWITCHES) TitanEngine.PE.Convert.cpp /Fo:TitanEngine.PE.Convert.o
+
+TitanEngine.PE.Data.o: TitanEngine.PE.Data.cpp
+	cl /c $(SWITCHES) TitanEngine.PE.Data.cpp /Fo:TitanEngine.PE.Data.o
+
+TitanEngine.PE.Fixer.o: TitanEngine.PE.Fixer.cpp
+	cl /c $(SWITCHES) TitanEngine.PE.Fixer.cpp /Fo:TitanEngine.PE.Fixer.o
+
+TitanEngine.PE.Overlay.o: TitanEngine.PE.Overlay.cpp
+	cl /c $(SWITCHES) TitanEngine.PE.Overlay.cpp /Fo:TitanEngine.PE.Overlay.o
+
+TitanEngine.PE.Section.o: TitanEngine.PE.Section.cpp
+	cl /c $(SWITCHES) TitanEngine.PE.Section.cpp /Fo:TitanEngine.PE.Section.o
+
+TitanEngine.PE.o: TitanEngine.PE.cpp
+	cl /c $(SWITCHES) TitanEngine.PE.cpp /Fo:TitanEngine.PE.o
+
+TitanEngine.Process.o: TitanEngine.Process.cpp
+	cl /c $(SWITCHES) TitanEngine.Process.cpp /Fo:TitanEngine.Process.o
+
+TitanEngine.Realigner.o: TitanEngine.Realigner.cpp
+	cl /c $(SWITCHES) TitanEngine.Realigner.cpp /Fo:TitanEngine.Realigner.o
+
+TitanEngine.Relocator.o: TitanEngine.Relocator.cpp
+	cl /c $(SWITCHES) TitanEngine.Relocator.cpp /Fo:TitanEngine.Relocator.o
+
+TitanEngine.Resourcer.o: TitanEngine.Resourcer.cpp
+	cl /c $(SWITCHES) TitanEngine.Resourcer.cpp /Fo:TitanEngine.Resourcer.o
+
+TitanEngine.Static.o: TitanEngine.Static.cpp
+	cl /c $(SWITCHES) TitanEngine.Static.cpp /Fo:TitanEngine.Static.o
+
+TitanEngine.TLS.o: TitanEngine.TLS.cpp
+	cl /c $(SWITCHES) TitanEngine.TLS.cpp /Fo:TitanEngine.TLS.o
+
+TitanEngine.Threader.o: TitanEngine.Threader.cpp
+	cl /c $(SWITCHES) TitanEngine.Threader.cpp /Fo:TitanEngine.Threader.o
+
+TitanEngine.Tracer.o: TitanEngine.Tracer.cpp
+	cl /c $(SWITCHES) TitanEngine.Tracer.cpp /Fo:TitanEngine.Tracer.o
+
+TitanEngine.TranslateName.o: TitanEngine.TranslateName.cpp
+	cl /c $(SWITCHES) TitanEngine.TranslateName.cpp /Fo:TitanEngine.TranslateName.o
+
+TitanEngine.o: TitanEngine.cpp
+	cl /c $(SWITCHES) TitanEngine.cpp /Fo:TitanEngine.o
+

@@ -1,0 +1,55 @@
+SWITCHES = /O1 -DWIN32 -D_WINDOWS -D_USRDLL -DSCYLLA_WRAPPER_EXPORTS -DUNICODE -D_UNICODE /EHsc
+
+all: scylla_wrapper_x64.dll
+
+scylla_wrapper_x64.dll: ApiReader.o Architecture.o DeviceNameResolver.o dllmain.o IATReferenceScan.o IATSearch.o ImportRebuilder.o NativeWinApi.o PeParser.o ProcessAccessHelp.o ProcessLister.o scylla_wrapper.o stdafx.o StringConversion.o SystemInformation.o Thunks.o 
+	link *.o advapi32.lib distorm_x64.lib /DLL /OUT:scylla_wrapper_x64.dll
+
+ApiReader.o: ApiReader.cpp
+	cl /c $(SWITCHES) ApiReader.cpp /Fo:ApiReader.o
+
+Architecture.o: Architecture.cpp
+	cl /c $(SWITCHES) Architecture.cpp /Fo:Architecture.o
+
+DeviceNameResolver.o: DeviceNameResolver.cpp
+	cl /c $(SWITCHES) DeviceNameResolver.cpp /Fo:DeviceNameResolver.o
+
+dllmain.o: dllmain.cpp
+	cl /c $(SWITCHES) dllmain.cpp /Fo:dllmain.o
+
+IATReferenceScan.o: IATReferenceScan.cpp
+	cl /c $(SWITCHES) IATReferenceScan.cpp /Fo:IATReferenceScan.o
+
+IATSearch.o: IATSearch.cpp
+	cl /c $(SWITCHES) IATSearch.cpp /Fo:IATSearch.o
+
+ImportRebuilder.o: ImportRebuilder.cpp
+	cl /c $(SWITCHES) ImportRebuilder.cpp /Fo:ImportRebuilder.o
+
+NativeWinApi.o: NativeWinApi.cpp
+	cl /c $(SWITCHES) NativeWinApi.cpp /Fo:NativeWinApi.o
+
+PeParser.o: PeParser.cpp
+	cl /c $(SWITCHES) PeParser.cpp /Fo:PeParser.o
+
+ProcessAccessHelp.o: ProcessAccessHelp.cpp
+	cl /c $(SWITCHES) ProcessAccessHelp.cpp /Fo:ProcessAccessHelp.o
+
+ProcessLister.o: ProcessLister.cpp
+	cl /c $(SWITCHES) ProcessLister.cpp /Fo:ProcessLister.o
+
+scylla_wrapper.o: scylla_wrapper.cpp
+	cl /c $(SWITCHES) scylla_wrapper.cpp /Fo:scylla_wrapper.o
+
+stdafx.o: stdafx.cpp
+	cl /c $(SWITCHES) stdafx.cpp /Fo:stdafx.o
+
+StringConversion.o: StringConversion.cpp
+	cl /c $(SWITCHES) StringConversion.cpp /Fo:StringConversion.o
+
+SystemInformation.o: SystemInformation.cpp
+	cl /c $(SWITCHES) SystemInformation.cpp /Fo:SystemInformation.o
+
+Thunks.o: Thunks.cpp
+	cl /c $(SWITCHES) Thunks.cpp /Fo:Thunks.o
+
