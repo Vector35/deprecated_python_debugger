@@ -1,6 +1,6 @@
 # nmake -f Makefile-win64 from within "x64 Native Tools Command Prompt"
 
-TARGETS_ALL = helloworld_x64-windows.exe exitcode_x64-windows.exe helloworld_loop_x64-windows.exe helloworld_thread_x64-windows.exe helloworld_func_x64-windows.exe helloworld_pie_x64-windows.exe helloworld_loop_pie_x64-windows.exe helloworld_thread_pie_x64-windows.exe helloworld_func_pie_x64-windows.exe asmtest_x64-windows.exe do_exception_pie_x64-windows.exe hello_x64-windows.exe indirect_calls_x64-windows.exe missing_switch_case_x64-windows.exe cat_x64-windows.exe
+TARGETS_ALL = helloworld_x64-windows.exe exitcode_x64-windows.exe helloworld_loop_x64-windows.exe helloworld_thread_x64-windows.exe helloworld_func_x64-windows.exe helloworld_pie_x64-windows.exe helloworld_loop_pie_x64-windows.exe helloworld_thread_pie_x64-windows.exe helloworld_func_pie_x64-windows.exe asmtest_x64-windows.exe hh1.exe do_exception_pie_x64-windows.exe hello_x64-windows.exe indirect_calls_x64-windows.exe missing_switch_case_x64-windows.exe cat_x64-windows.exe
 
 all: $(TARGETS_ALL)
 
@@ -45,6 +45,9 @@ asmtest_x64-windows.exe: asmtest_x64-windows.obj
 
 asmtest_x64-windows.obj: asmtest_x64.asm
 	nasm -f win64 -DOS_IS_WINDOWS asmtest_x64.asm -o asmtest_x64-windows.obj
+
+hh1.exe: hh1.asm
+	nasm -f bin -DOS_IS_WINDOWS hh1.asm -o hh1.exe
 
 hello_x64-windows.exe: hello_x64-windows.obj
 	link hello_x64-windows.obj /ENTRY:WinMain /SUBSYSTEM:CONSOLE /LARGEADDRESSAWARE:NO /DYNAMICBASE:NO /OUT:hello_x64-windows.exe kernel32.lib
