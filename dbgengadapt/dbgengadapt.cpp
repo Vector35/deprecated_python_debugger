@@ -76,7 +76,7 @@ ULONG g_process_exit_code;
 
 /* forward declarations */
 void status_to_str(ULONG status, char *str);
-int client_setup(void);
+int client_setup(char *errmsg);
 int client_teardown(void);
 
 #define printf_debug(fmt, ...) { \
@@ -636,48 +636,10 @@ void status_to_str(ULONG status, char *str)
 /* ADAPTER API (binja/python calls this) */
 /*****************************************************************************/
 
-EASY_CTYPES_SPEC
-int hello(void)
-{
-	int rc = ERROR_UNSPECIFIED;
-	ULONG a, b;
-	HRESULT hr;
-
-	if(g_Objects->GetTotalNumberThreads(&a, &b) != S_OK) {
-		printf_debug("ERROR: GetTotalNumberThreads()\n");
-		goto cleanup;
-	}
-
-	printf_debug("number threads: %d\n", a);
-	printf_debug("total threads: %d\n", b);
-
-	if(g_Objects->GetCurrentThreadId(&a) != S_OK) {
-		printf_debug("ERROR: GetCurrentThread()\n");
-		goto cleanup;
-	}
-
-	printf_debug("current thread: %d\n", a);
-
-	printf_debug("Hello, world!\n");
-	printf_debug("sizeof(ULONG)==%zd\n", sizeof(ULONG));
-	printf_debug("sizeof(S_OK)==%zd S_OK==%ld\n", sizeof(S_OK), S_OK);
-
-	rc = 0;
-	cleanup:
-	return rc;
-}
-
-EASY_CTYPES_SPEC
-int echo(char *input)
-{
-	printf_debug("you said: %s\n", input);
-	return 0;
-}
-
 /* calls related to starting and stopping debug sessions */
 
 EASY_CTYPES_SPEC
-int process_start(char *cmdline)
+int process_start(char *cmdline, char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 	HRESULT hResult;
@@ -698,12 +660,14 @@ int process_start(char *cmdline)
 
 	if(g_Client) {
 		printf_debug("ERROR: unable to end current client/session\n");
+		sprintf(errmsg, "unable to end current client/session\n");
 		goto cleanup;
 	}
 
 	/* start new session */
-	if(client_setup()) {
+	if(client_setup(errmsg)) {
 		printf_debug("ERROR: client_setup() initializing client/session\n");
+		// client_setup() set errmsg
 		goto cleanup;
 	}
 
@@ -711,6 +675,7 @@ int process_start(char *cmdline)
 	hResult = g_Control->SetEngineOptions(DEBUG_ENGOPT_INITIAL_BREAK);
 	if(hResult != S_OK) {
 		printf_debug("ERROR: SetEngineOptions() returned 0x%08X\n", hResult);
+		sprintf(errmsg, "SetEngineOptions() returned 0x%08X\n", hResult);
 		rc = ERROR_DBGENG_API;
 		goto cleanup;
 	}
@@ -718,6 +683,7 @@ int process_start(char *cmdline)
 	hResult = g_Client->CreateProcess(0, cmdline, DEBUG_ONLY_THIS_PROCESS);
 	if(hResult != S_OK) {
 		printf_debug("ERROR: CreateProcess() returned 0x%08X\n", hResult);
+		sprintf(errmsg, "CreateProcess() returned 0x%08X\n", hResult);
 		rc = ERROR_DBGENG_API;
 		goto cleanup;
 	}
@@ -753,22 +719,29 @@ int process_start(char *cmdline)
 
 	}
 
-	printf_debug("gave up! returning error %d\n", rc);
+	printf_debug("ERROR: gave up! returning %d\n", rc);
+	sprintf(errmsg, "session status never went active or CreateProcess event never received");
 
 	cleanup:
 	return rc;
 }
 
 EASY_CTYPES_SPEC
-int process_attach(int pid)
+int process_attach(int pid, char *errmsg)
 {
+	HRESULT hResult;
+
 	printf_debug("attaching to process: %d\n", pid);
 
 	if(!g_Client)
 		return ERROR_NO_DBGENG_INTERFACES;
 
-	if(g_Client->AttachProcess(0, pid, 0) != S_OK)
+	hResult = g_Client->AttachProcess(0, pid, 0);
+	if(hResult != S_OK) {
+		printf_debug("ERROR: g_Client->AttachProcess(0, %d, 0) returned 0x%X\n", pid, hResult);
+		sprintf(errmsg, "g_Client->AttachProcess(0, %d, 0) returned 0x%X", pid, hResult);
 		return ERROR_DBGENG_API;
+	}
 
 	/* wait for active session */
 	for(int i=0; i<10; ++i) {
@@ -780,11 +753,13 @@ int process_attach(int pid)
 		wait(INFINITE);
 	}
 
+	printf_debug("ERROR: timeout waiting for active debug session\n");
+	sprintf(errmsg, "timeout waiting for active debug session");
 	return ERROR_UNSPECIFIED;
 }
 
 EASY_CTYPES_SPEC
-int process_detach(void)
+int process_detach(char *errmsg)
 {
 	if(!g_Client)
 		return ERROR_NO_DBGENG_INTERFACES;
@@ -798,15 +773,17 @@ int process_detach(void)
 }
 
 EASY_CTYPES_SPEC
-int quit(void)
+int quit(char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 
 	if(!g_Client)
 		return ERROR_NO_DBGENG_INTERFACES;
 
-	if(g_Client->TerminateProcesses() != S_OK) {
-		printf_debug("ERROR: TerminateCurrentProcess() failed\n");
+	HRESULT hr = g_Client->TerminateProcesses();
+	if(hr != S_OK) {
+		printf_debug("ERROR: TerminateCurrentProcess() returned 0x%08X\n", hr);
+		sprintf(errmsg, "TerminateCurrentProcess() returned 0x%08X\n", hr);
 		goto cleanup;
 	}
 	else {
@@ -823,11 +800,13 @@ int quit(void)
 /* calls related to execution control */
 
 EASY_CTYPES_SPEC
-int break_into(void)
+int break_into(char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
-	if(g_Control->SetInterrupt(DEBUG_INTERRUPT_ACTIVE) != S_OK) {
-		printf_debug("ERROR: SetInterrupt() failed\n");
+	HRESULT hr = g_Control->SetInterrupt(DEBUG_INTERRUPT_ACTIVE);
+	if(hr != S_OK) {
+		printf_debug("ERROR: SetInterrupt() returned 0x%08X\n", hr);
+		sprintf(errmsg, "SetInterrupt() returned 0x%08X", hr);
 		goto cleanup;
 	}
 	rc = 0;
@@ -836,11 +815,12 @@ int break_into(void)
 }
 
 EASY_CTYPES_SPEC
-int go(void)
+int go(char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 	if(g_Control->SetExecutionStatus(DEBUG_STATUS_GO) != S_OK) {
 		printf_debug("ERROR: SetExecutionStatus(GO) failed\n");
+		sprintf(errmsg, "SetExecutionStatus(GO) failed\n");
 		goto cleanup;
 	}
 	wait(INFINITE);
@@ -850,11 +830,12 @@ int go(void)
 }
 
 EASY_CTYPES_SPEC
-int step_into(void)
+int step_into(char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 	if(g_Control->SetExecutionStatus(DEBUG_STATUS_STEP_INTO) != S_OK) {
 		printf_debug("ERROR: SetExecutionStatus(STEP_INTO) failed\n");
+		sprintf(errmsg, "SetExecutionStatus(STEP_INTO) failed\n");
 		goto cleanup;
 	}
 	wait(INFINITE);
@@ -864,11 +845,12 @@ int step_into(void)
 }
 
 EASY_CTYPES_SPEC
-int step_over(void)
+int step_over(char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 	if(g_Control->SetExecutionStatus(DEBUG_STATUS_STEP_OVER) != S_OK) {
 		printf_debug("ERROR: SetExecutionStatus(STEP_OVER) failed\n");
+		sprintf(errmsg, "SetExecutionStatus(STEP_OVER) failed\n");
 		goto cleanup;
 	}
 	wait(INFINITE);
@@ -880,7 +862,7 @@ int step_over(void)
 /* calls related to breakpoints */
 
 EASY_CTYPES_SPEC
-int breakpoint_set(uint64_t addr, ULONG *id)
+int breakpoint_set(uint64_t addr, ULONG *id, char *errmsg)
 {
 	IDebugBreakpoint *pidb = NULL;
 
@@ -891,16 +873,19 @@ int breakpoint_set(uint64_t addr, ULONG *id)
 	ULONG bytes_read;
 	if(g_Data->ReadVirtual(addr, data, 1, &bytes_read) != S_OK) {
 		printf_debug("ERROR: ReadVirtual(0x%I64X) during breakpoint precheck\n", addr);
+		sprintf(errmsg, "ReadVirtual(0x%I64X) during breakpoint precheck\n", addr);
 		return ERROR_UNSPECIFIED;
 	}
 
 	if(g_Data->WriteVirtual(addr, data, 1, NULL) != S_OK) {
 		printf_debug("ERROR: WriteVirtual(0x%I64X) during breakpoint precheck\n", addr);
+		sprintf(errmsg, "WriteVirtual(0x%I64X) during breakpoint precheck\n", addr);
 		return ERROR_UNSPECIFIED;
 	}
 
 	if(g_Control->AddBreakpoint(DEBUG_BREAKPOINT_CODE, DEBUG_ANY_ID, &pidb) != S_OK) {
 		printf_debug("ERROR: AddBreakpoint failed\n");
+		sprintf(errmsg, "AddBreakpoint failed\n");
 		return ERROR_DBGENG_API;
 	}
 
@@ -913,7 +898,7 @@ int breakpoint_set(uint64_t addr, ULONG *id)
 }
 
 EASY_CTYPES_SPEC
-int breakpoint_clear(ULONG id)
+int breakpoint_clear(ULONG id, char *errmsg)
 {
 	IDebugBreakpoint *pidb = NULL;
 
@@ -929,15 +914,15 @@ int breakpoint_clear(ULONG id)
 /* calls related to state */
 
 EASY_CTYPES_SPEC
-int mem_read(uint64_t addr, uint32_t length, uint8_t *result)
+int mem_read(uint64_t addr, uint32_t length, uint8_t *result, char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 	ULONG bytes_read;
 
 	HRESULT hr = g_Data->ReadVirtual(addr, result, length, &bytes_read);
 	if(hr != S_OK) {
-		printf_debug("ERROR: ReadVirtual(0x%I64X, 0x%x) returned 0x%X\n",
-			addr, length, hr);
+		printf_debug("ERROR: ReadVirtual(0x%I64X, 0x%x) returned 0x%X\n", addr, length, hr);
+		sprintf(errmsg, "ERROR: ReadVirtual(0x%I64X, 0x%x) returned 0x%X\n", addr, length, hr);
 		goto cleanup;
 	}
 
@@ -947,12 +932,13 @@ int mem_read(uint64_t addr, uint32_t length, uint8_t *result)
 }
 
 EASY_CTYPES_SPEC
-int mem_write(uint64_t addr, uint8_t *data, uint32_t len)
+int mem_write(uint64_t addr, uint8_t *data, uint32_t len, char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 
 	if(g_Data->WriteVirtual(addr, data, len, NULL) != S_OK) {
 		printf_debug("ERROR: WriteVirtual()\n");
+		sprintf(errmsg, "WriteVirtual()\n");
 		goto cleanup;
 	}
 
@@ -962,14 +948,14 @@ int mem_write(uint64_t addr, uint8_t *data, uint32_t len)
 }
 
 EASY_CTYPES_SPEC
-int module_num(int *num)
+int module_num(int *num, char *errmsg)
 {
 	ULONG n_loaded, n_unloaded;
-	HRESULT hr;
 
-	hr = g_Symbols->GetNumberModules(&n_loaded, &n_unloaded);
+	HRESULT hr = g_Symbols->GetNumberModules(&n_loaded, &n_unloaded);
 	if(hr != S_OK) {
 		printf_debug("ERROR: GetNumberModules() returned 0x%X\n", hr);
+		sprintf(errmsg, "GetNumberModules() returned 0x%X\n", hr);
 		return ERROR_UNSPECIFIED;
 	}
 
@@ -978,20 +964,25 @@ int module_num(int *num)
 }
 
 EASY_CTYPES_SPEC
-int module_get(int index, char *image, uint64_t *addr)
+int module_get(int index, char *image, uint64_t *addr, char *errmsg)
 {
 	int n_loaded;
-	if(module_num(&n_loaded) != S_OK)
-		return ERROR_UNSPECIFIED;
+	int ir = module_num(&n_loaded, errmsg);
+	if(ir) {
+		// module_num() has set errmsg
+		return ir;
+	}
 
 	if(index < 0 || index >= n_loaded) {
 		printf_debug("ERROR: module_get(), index %d is negative or >= %d\n", index, n_loaded);
+		sprintf(errmsg, "module_get(), index %d is negative or >= %d\n", index, n_loaded);
 		return ERROR_UNSPECIFIED;
 	}
 
 	ULONG64 base;
 	if(g_Symbols->GetModuleByIndex(index, &base) != S_OK) {
 		printf_debug("ERROR: GetModuleByIndex()\n");
+		sprintf(errmsg, "GetModuleByIndex()\n");
 		return ERROR_UNSPECIFIED;
 	}
 	printf_debug("index: %d of %d\n", index, n_loaded);
@@ -1005,6 +996,7 @@ int module_get(int index, char *image, uint64_t *addr)
 		module_name, 1024, NULL,
 		loaded_image_name, 1024, NULL) != S_OK) {
 			printf_debug("ERROR: GetModuleNames()\n");
+		sprintf(errmsg, "GetModuleNames()\n");
 			return ERROR_UNSPECIFIED;
 		}
 	printf_debug("image_name: %s\n", image_name);
@@ -1019,7 +1011,7 @@ int module_get(int index, char *image, uint64_t *addr)
 }
 
 EASY_CTYPES_SPEC
-int reg_read(char *name, uint64_t *result)
+int reg_read(char *name, uint64_t *result, char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 
@@ -1028,11 +1020,13 @@ int reg_read(char *name, uint64_t *result)
 
 	if(g_Registers->GetIndexByName(name, &reg_index) != S_OK) {
 		printf_debug("ERROR: GetIndexByName(\"%s\")\n", name);
+		sprintf(errmsg, "GetIndexByName(\"%s\")\n", name);
 		goto cleanup;
 	}
 
 	if(g_Registers->GetValue(reg_index, &dv) != S_OK) {
 		printf_debug("ERROR: GetValue()\n");
+		sprintf(errmsg, "GetValue()\n");
 		goto cleanup;
 	}
 
@@ -1044,7 +1038,7 @@ int reg_read(char *name, uint64_t *result)
 }
 
 EASY_CTYPES_SPEC
-int reg_write(char *name, uint64_t value)
+int reg_write(char *name, uint64_t value, char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 
@@ -1053,6 +1047,7 @@ int reg_write(char *name, uint64_t value)
 
 	if(g_Registers->GetIndexByName(name, &reg_index) != S_OK) {
 		printf_debug("ERROR: GetIndexByName(\"%s\")\n", name);
+		sprintf(errmsg, "GetIndexByName(\"%s\")\n", name);
 		goto cleanup;
 	}
 	printf_debug("The value of register %s is %d\n", name, reg_index);
@@ -1062,6 +1057,7 @@ int reg_write(char *name, uint64_t value)
 	HRESULT hr = g_Registers->SetValue(reg_index, &dv);
 	if(hr != S_OK) {
 		printf_debug("ERROR: SetValue() returned %08X\n", hr);
+		sprintf(errmsg, "SetValue() returned %08X\n", hr);
 		goto cleanup;
 	}
 
@@ -1071,11 +1067,12 @@ int reg_write(char *name, uint64_t value)
 }
 
 EASY_CTYPES_SPEC
-int reg_count(int *count)
+int reg_count(int *count, char *errmsg)
 {
 	ULONG ulcount;
 	if(g_Registers->GetNumberRegisters(&ulcount) != S_OK) {
 		printf_debug("ERROR: GetNumberRegisters()\n");
+		sprintf(errmsg, "GetNumberRegisters()\n");
 		return ERROR_UNSPECIFIED;
 	}
 	*count = ulcount;
@@ -1083,7 +1080,7 @@ int reg_count(int *count)
 }
 
 EASY_CTYPES_SPEC
-int reg_name(int idx, char *name)
+int reg_name(int idx, char *name, char *errmsg)
 {
 	HRESULT rc;
 
@@ -1093,6 +1090,7 @@ int reg_name(int idx, char *name)
 	rc = g_Registers->GetDescription(idx, name, 256, &len, &descr);
 	if(rc != S_OK) {
 		printf_debug("ERROR: GetDescription() returned %08X\n", rc);
+		sprintf(errmsg, "GetDescription() returned %08X\n", rc);
 		return ERROR_UNSPECIFIED;
 	}
 
@@ -1100,11 +1098,12 @@ int reg_name(int idx, char *name)
 }
 
 EASY_CTYPES_SPEC
-int reg_width(char *name, int *width)
+int reg_width(char *name, int *width, char *errmsg)
 {
 	ULONG regidx;
 	if(g_Registers->GetIndexByName(name, &regidx) != S_OK) {
 		printf_debug("ERROR: GetIndexByName()\n");
+		sprintf(errmsg, "GetIndexByName()\n");
 		return ERROR_UNSPECIFIED;
 	}
 
@@ -1114,6 +1113,7 @@ int reg_width(char *name, int *width)
 	int rc = g_Registers->GetDescription(regidx, tmp, 256, &len, &descr);
 	if(rc != S_OK) {
 		printf_debug("ERROR: GetDescription() returned %08X\n", rc);
+		sprintf(errmsg, "GetDescription() returned %08X\n", rc);
 		return ERROR_UNSPECIFIED;
 	}
 
@@ -1134,11 +1134,12 @@ int reg_width(char *name, int *width)
 }
 
 EASY_CTYPES_SPEC
-int get_exec_status(unsigned long *status)
+int get_exec_status(unsigned long *status, char *errmsg)
 {
 	*status = ERROR_UNSPECIFIED;
 	if(g_Control->GetExecutionStatus(status) != S_OK) {
 		printf_debug("ERROR: GetExecutionStatus() failed\n");
+		sprintf(errmsg, "GetExecutionStatus() failed\n");
 		return ERROR_UNSPECIFIED;
 	}
 
@@ -1149,10 +1150,11 @@ int get_exec_status(unsigned long *status)
 }
 
 EASY_CTYPES_SPEC
-int get_exit_code(unsigned long *code)
+int get_exit_code(unsigned long *code, char *errmsg)
 {
 	if(!b_PROCESS_EXITED) {
 		printf_debug("ERROR: attempt to retrieve exit code of a non-exited process\n");
+		sprintf(errmsg, "attempt to retrieve exit code of a non-exited process\n");
 		return ERROR_UNSPECIFIED;
 	}
 
@@ -1163,12 +1165,13 @@ int get_exit_code(unsigned long *code)
 /* calls related to threads */
 
 EASY_CTYPES_SPEC
-int set_current_thread(ULONG id)
+int set_current_thread(ULONG id, char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 
 	if(g_Objects->SetCurrentThreadId(id) != S_OK) {
 		printf_debug("ERROR: SetCurrentThreadId()\n");
+		sprintf(errmsg, "SetCurrentThreadId()\n");
 		goto cleanup;
 	}
 
@@ -1178,22 +1181,24 @@ int set_current_thread(ULONG id)
 }
 
 EASY_CTYPES_SPEC
-int get_current_thread(void)
+int get_current_thread(char *errmsg)
 {
 	ULONG tid;
 	if(g_Objects->GetCurrentThreadId(&tid) != S_OK) {
 		printf_debug("ERROR: GetCurrentThread()\n");
+		sprintf(errmsg, "GetCurrentThread()\n");
 		return ERROR_UNSPECIFIED;
 	}
 	return tid;
 }
 
 EASY_CTYPES_SPEC
-int get_number_threads(void)
+int get_number_threads(char *errmsg)
 {
 	ULONG Total, LargestProcess;
 	if(g_Objects->GetTotalNumberThreads(&Total, &LargestProcess) != S_OK) {
 		printf_debug("ERROR: GetTotalNumberThreads()\n");
+		sprintf(errmsg, "GetTotalNumberThreads()\n");
 		return ERROR_UNSPECIFIED;
 	}
 	return Total;
@@ -1201,7 +1206,7 @@ int get_number_threads(void)
 
 /* misc */
 EASY_CTYPES_SPEC
-int get_pid(ULONG *pid)
+int get_pid(ULONG *pid, char *errmsg)
 {
 	if(g_Objects->GetCurrentProcessSystemId(pid) != S_OK)
 		return ERROR_UNSPECIFIED;
@@ -1210,7 +1215,7 @@ int get_pid(ULONG *pid)
 
 /* current processor type (may switch between 64 and 32 in WoW64) */
 EASY_CTYPES_SPEC
-int get_executing_processor_type(ULONG *proc_type)
+int get_executing_processor_type(ULONG *proc_type, char *errmsg)
 {
 	if(g_Control->GetExecutingProcessorType(proc_type) != S_OK)
 		return ERROR_UNSPECIFIED;
@@ -1219,7 +1224,7 @@ int get_executing_processor_type(ULONG *proc_type)
 
 /* processor the target image uses */
 EASY_CTYPES_SPEC
-int get_effective_processor_type(ULONG *proc_type)
+int get_effective_processor_type(ULONG *proc_type, char *errmsg)
 {
 	if(g_Control->GetEffectiveProcessorType(proc_type) != S_OK)
 		return ERROR_UNSPECIFIED;
@@ -1228,7 +1233,7 @@ int get_effective_processor_type(ULONG *proc_type)
 
 /* physical processor on the machine running the target */
 EASY_CTYPES_SPEC
-int get_actual_processor_type(ULONG *proc_type)
+int get_actual_processor_type(ULONG *proc_type, char *errmsg)
 {
 	if(g_Control->GetEffectiveProcessorType(proc_type) != S_OK)
 		return ERROR_UNSPECIFIED;
@@ -1236,21 +1241,21 @@ int get_actual_processor_type(ULONG *proc_type)
 }
 
 EASY_CTYPES_SPEC
-int get_image_base(ULONGLONG *base)
+int get_image_base(ULONGLONG *base, char *errmsg)
 {
 	*base = g_image_base;
 	return 0;
 }
 
 EASY_CTYPES_SPEC
-int get_exception_record64(EXCEPTION_RECORD64 *result)
+int get_exception_record64(EXCEPTION_RECORD64 *result, char *errmsg)
 {
 	*result = g_last_exception64;
 	return 0;
 }
 
 EASY_CTYPES_SPEC
-int get_last_breakpoint_address(uint64_t *addr)
+int get_last_breakpoint_address(uint64_t *addr, char *errmsg)
 {
 	*addr = g_last_breakpoint;
 	return 0;
@@ -1260,7 +1265,7 @@ int get_last_breakpoint_address(uint64_t *addr)
 /* INITIALIZATION, ENTRYPOINT */
 /*****************************************************************************/
 
-int client_setup(void)
+int client_setup(char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 	HRESULT hResult;
@@ -1271,6 +1276,7 @@ int client_setup(void)
 	if(hResult != S_OK)
 	{
 		printf_debug("ERROR: getting IDebugClient5\n");
+		sprintf(errmsg, "getting IDebugClient5");
 		goto cleanup;
 	}
 
@@ -1281,12 +1287,14 @@ int client_setup(void)
 		(hResult = g_Client->QueryInterface(__uuidof(IDebugSystemObjects), (void**)&g_Objects)) != S_OK)
 	{
 		printf_debug("ERROR: getting client debugging interface\n");
+		sprintf(errmsg, "getting client debugging interface");
 		goto cleanup;
 	}
 
 	if ((hResult = g_Client->SetEventCallbacks(&g_EventCb)) != S_OK)
 	{
-		printf_debug("ERROR: registering event callbacks\n");
+		printf_debug("ERROR: SetEventCallbacks() returned 0x%08X\n", hResult);
+		sprintf(errmsg, "ERROR: SetEventCallbacks() returned 0x%08X\n", hResult);
 		goto cleanup;
 	}
 
