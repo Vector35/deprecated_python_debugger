@@ -86,7 +86,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 	def get_last_breakpoint_address(self):
 		addr = c_ulonglong()
-		if self.dll.get_last_breakpoint_address(byref(addr)) != 0:
+		if self.dll.get_last_breakpoint_address(byref(addr), None) != 0:
 			raise DebugAdapter.GeneralError("retrieving last breakpoint address")
 		return addr.value
 
@@ -102,7 +102,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		#    DWORD64 ExceptionInformation[EXCEPTION_MAXIMUM_PARAMETERS];
 		#} EXCEPTION_RECORD64, *PEXCEPTION_RECORD64;
 		record = create_string_buffer(4+4+8+8+4+4+8*15)
-		self.dll.get_exception_record64(record)
+		self.dll.get_exception_record64(record, None)
 		(ExceptionCode, ExceptionFlags, ExceptionRecord, ExceptionAddress, NumberParameters) = \
 			unpack('<IIQQI', record[0:28])
 
@@ -115,7 +115,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 	def get_exec_status(self):
 		status = c_ulong()
-		if self.dll.get_exec_status(byref(status)) != 0:
+		if self.dll.get_exec_status(byref(status), None) != 0:
 			raise DebugAdapter.GeneralError("retrieving execution status")
 		return DEBUG_STATUS(status.value)
 
@@ -152,7 +152,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 		if status == DEBUG_STATUS.NO_DEBUGGEE:
 			code = c_ulong()
-			if self.dll.get_exit_code(byref(code)) != 0:
+			if self.dll.get_exit_code(byref(code), None) != 0:
 				raise DebugAdapter.GeneralError("retrieving exit code")
 			return (DebugAdapter.STOP_REASON.PROCESS_EXITED, code.value)
 
@@ -165,6 +165,8 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 	# session start/stop
 	def exec(self, fpath, args, terminal=False):
+		errmsg = create_string_buffer(4096)
+
 		def enclose(s):
 			return s if s.startswith('"') and s.endswith('"') else '"%s"'%s
 
@@ -178,18 +180,18 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 		# ask dll to create process
 		cmdline_ = c_char_p(cmdline.encode('utf-8'))
-		rc = self.dll.process_start(cmdline_)
+		rc = self.dll.process_start(cmdline_, byref(errmsg))
 		if rc:
-			raise DebugAdapter.ProcessStartError('dbgeng adapter returned %d' % rc)
+			raise DebugAdapter.ProcessStartError(errmsg.value.decode('utf-8'))
 
 		self.target_path_ = fpath
 
 	def attach(self, pid):
-		if self.dll.process_attach(target):
+		if self.dll.process_attach(target, None):
 			raise Exception('unable to attach to pid %d' % pid)
 
 	def detach(self):
-		self.dll.process_detach()
+		self.dll.process_detach(None)
 
 	def quit(self):
 		status = self.get_exec_status()
@@ -197,12 +199,12 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		if status == DEBUG_STATUS.NO_DEBUGGEE:
 			pass
 		elif status == DEBUG_STATUS.BREAK:
-			self.dll.quit()
+			self.dll.quit(None)
 		else:
 			# targets waiting on I/O have considerable time before interrupt
 			# request moves them to BREAK state
 			for i in range(20):
-				self.dll.break_into()
+				self.dll.break_into(None)
 				time.sleep(.1)
 				if self.get_exec_status() == DEBUG_STATUS.BREAK:
 					break
@@ -212,7 +214,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	# target info
 	def target_arch(self):
 		proc_type = c_ulong()
-		if self.dll.get_executing_processor_type(byref(proc_type)) != 0:
+		if self.dll.get_executing_processor_type(byref(proc_type), None) != 0:
 			raise Exception('unable to get executing processor type')
 		proc_type = proc_type.value
 
@@ -232,31 +234,31 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 	def target_pid(self):
 		pid = c_ulong();
-		if self.dll.get_pid(byref(pid)) != 0:
+		if self.dll.get_pid(byref(pid), None) != 0:
 			raise DebugAdapter.GeneralError("retrieving process id")
 		return pid.value
 
 	def target_base(self):
 		base = c_ulonglong();
-		if self.dll.get_image_base(byref(base)) != 0:
+		if self.dll.get_image_base(byref(base), None) != 0:
 			raise DebugAdapter.GeneralError("retrieving image base")
 		return base.value
 
 	# threads
 	def thread_list(self):
-		threads_n = self.dll.get_number_threads()
+		threads_n = self.dll.get_number_threads(None)
 		if threads_n < 0:
 			raise DebugAdapter.GeneralError("retrieving thread list")
 		return list(range(threads_n))
 
 	def thread_selected(self):
-		tid = self.dll.get_current_thread()
+		tid = self.dll.get_current_thread(None)
 		if tid < 0:
 			raise DebugAdapter.GeneralError("retrieving selected thread")
 		return tid
 
 	def thread_select(self, tid):
-		rc = self.dll.set_current_thread(tid)
+		rc = self.dll.set_current_thread(tid, None)
 		if rc < 0:
 			raise DebugAdapter.GeneralError("selecting thread")
 
@@ -264,9 +266,9 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	def breakpoint_set(self, addr):
 		pfunc = self.dll.breakpoint_set
 		pfunc.restype = c_int
-		pfunc.argtypes = [c_ulonglong, POINTER(c_ulong)]
+		pfunc.argtypes = [c_ulonglong, POINTER(c_ulong), c_char_p]
 		bpid = c_ulong();
-		rc = pfunc(addr, byref(bpid))
+		rc = pfunc(addr, byref(bpid), None)
 		if rc != 0:
 			raise DebugAdapter.BreakpointSetError('bp at 0x%X, dll returned %d' % (addr, rc))
 		self.bp_addr_to_id[addr] = bpid.value
@@ -275,7 +277,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		if not addr in self.bp_addr_to_id:
 			raise DebugAdapter.BreakpointClearError('bp at addr not 0x%X found' % addr)
 		bpid = self.bp_addr_to_id[addr]
-		self.dll.breakpoint_clear(bpid)
+		self.dll.breakpoint_clear(bpid, None)
 		del self.bp_addr_to_id[addr]
 
 	def breakpoint_list(self):
@@ -286,25 +288,25 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		if name == 'rflags' or name == 'eflags':
 			name='efl'
 		val = c_ulonglong()
-		if self.dll.reg_read(c_char_p(name.encode('utf-8')), byref(val)) != 0:
+		if self.dll.reg_read(c_char_p(name.encode('utf-8')), byref(val), None) != 0:
 			raise DebugAdapter.GeneralError("reading register %s" % name)
 		return val.value
 
 	def reg_write(self, name, value):
 		value = c_ulonglong(value)
-		if self.dll.reg_write(c_char_p(name.encode('utf-8')), value) != 0:
+		if self.dll.reg_write(c_char_p(name.encode('utf-8')), value, None) != 0:
 			raise DebugAdapter.GeneralError("writing register %s" % name)
 
 	def reg_list(self):
 		regcount = c_int()
-		if self.dll.reg_count(byref(regcount)):
+		if self.dll.reg_count(byref(regcount), None):
 			raise DebugAdapter.GeneralError("retrieving register count")
 		regcount = regcount.value
 		regname = create_string_buffer(512);
 
 		result = []
 		for regidx in range(regcount):
-			if self.dll.reg_name(regidx, regname) != 0:
+			if self.dll.reg_name(regidx, regname, None) != 0:
 				raise DebugAdapter.GeneralError("translating register index to name")
 			result.append(regname.value.decode('utf-8'))
 
@@ -313,11 +315,11 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 	def reg_bits(self, name):
 		name = c_char_p(name.encode('utf-8'))
 		val = c_int()
-		if self.dll.reg_read(name, byref(val)) != 0:
+		if self.dll.reg_read(name, byref(val), None) != 0:
 			raise DebugAdapter.GeneralError("reading register")
 
 		result = c_int()
-		if self.dll.reg_width(name, byref(result)) != 0:
+		if self.dll.reg_width(name, byref(result), None) != 0:
 			raise DebugAdapter.GeneralError("retrieving register width")
 		return result.value
 
@@ -327,9 +329,9 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 		pfunc = self.dll.mem_read
 		pfunc.restype = c_int
-		pfunc.argtypes = [c_ulonglong, c_ulong, POINTER(c_uint8)]
+		pfunc.argtypes = [c_ulonglong, c_ulong, POINTER(c_uint8), c_char_p]
 
-		rc = pfunc(address, length, result)
+		rc = pfunc(address, length, result, None)
 		if rc != 0:
 			raise DebugAdapter.GeneralError("reading from address 0x%X" % address)
 
@@ -342,8 +344,8 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 		pfunc = self.dll.mem_write
 		pfunc.restype = c_int
-		pfunc.argtypes = [c_ulonglong, POINTER(c_uint8), c_ulong]
-		rc = pfunc(address, u8_arr, len(data))
+		pfunc.argtypes = [c_ulonglong, POINTER(c_uint8), c_ulong, c_char_p]
+		rc = pfunc(address, u8_arr, len(data), None)
 		if rc != 0:
 			raise DebugAdapter.GeneralError("writing to address 0x%X" % address)
 
@@ -353,14 +355,14 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		module2addr = {}
 
 		modules_n = c_int()
-		if self.dll.module_num(byref(modules_n)) != 0:
+		if self.dll.module_num(byref(modules_n), None) != 0:
 			raise DebugAdapter.GeneralError("retrieving module list size")
 		modules_n = modules_n.value
 
 		image_path = create_string_buffer(4096) # or MAX_PATH, whatever
 		image_addr = c_ulonglong()
 		for idx in range(modules_n):
-			if self.dll.module_get(idx, byref(image_path), byref(image_addr)) != 0:
+			if self.dll.module_get(idx, byref(image_path), byref(image_addr), None) != 0:
 				raise DebugAdapter.GeneralError("retrieving module name")
 			module2addr[image_path.value.decode('utf-8')] = image_addr.value
 
@@ -368,23 +370,23 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 
 	# break
 	def break_into(self):
-		self.dll.break_into()
+		self.dll.break_into(None)
 
 	# execution control, all return:
 	# returns (STOP_REASON.XXX, <extra_info>)
 	def go(self):
 		# TODO: Handle output
-		self.dll.go()
+		self.dll.go(None)
 		return self.thunk_stop_reason()
 
 	def step_into(self):
 		self.stop_reason_fallback = DebugAdapter.STOP_REASON.SINGLE_STEP
-		self.dll.step_into()
+		self.dll.step_into(None)
 		return self.thunk_stop_reason()
 
 	def step_over(self):
 		self.stop_reason_fallback = DebugAdapter.STOP_REASON.SINGLE_STEP
-		self.dll.step_over()
+		self.dll.step_over(None)
 		return self.thunk_stop_reason()
 
 	# testing

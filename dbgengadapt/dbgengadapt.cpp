@@ -79,14 +79,32 @@ void status_to_str(ULONG status, char *str);
 int client_setup(char *errmsg);
 int client_teardown(void);
 
-#define printf_debug(fmt, ...) { \
-	char asd123[1024]; \
-	sprintf(asd123, fmt, __VA_ARGS__); \
-	OutputDebugString(asd123); \
-	printf(asd123); \
-}
+/*****************************************************************************/
+/* DEBUG REPORTING */
+/*****************************************************************************/
 
-#define printf_debug(x, ...) while(0);
+void report(char *buf_remote, const char *fmt...)
+{
+	va_list args;
+	va_start(args, fmt);
+
+	bool output = false;
+	//output = true;
+
+	if(buf_remote==NULL && output==false)
+		return;
+
+	char buf_local[4096];
+	char *buf = (buf_remote == NULL) ? buf_local : buf_remote;
+	vsprintf(buf, fmt, args);
+
+	if(output) {
+		OutputDebugString(buf);
+		printf(buf);
+	}
+
+	va_end(args);
+}
 
 /*****************************************************************************/
 /* EVENT CALLBACKS */
@@ -100,19 +118,19 @@ class EventCallbacks : public DebugBaseEventCallbacks
 
 STDMETHOD_(ULONG,AddRef)(THIS)
 {
-	printf_debug("EventCallbacks::AddRef()\n");
+	report(NULL, "EventCallbacks::AddRef()\n");
 	return 1;
 }
 
 STDMETHOD_(ULONG,Release)(THIS)
 {
-	printf_debug("EventCallbacks::Release()\n");
+	report(NULL, "EventCallbacks::Release()\n");
 	return 0;
 }
 
 STDMETHOD(GetInterestMask(THIS_ OUT PULONG Mask))
 {
-	printf_debug("EventCallbacks::GetInterestMask()\n");
+	report(NULL, "EventCallbacks::GetInterestMask()\n");
 
 	/* we want it all! */
 	*Mask = 0;
@@ -137,15 +155,15 @@ STDMETHOD(Breakpoint)(
 	THIS_ IN PDEBUG_BREAKPOINT Bp
 )
 {
-	printf_debug("EventCallbacks::Breakpoint()\n");
+	report(NULL, "EventCallbacks::Breakpoint()\n");
 
 	ULONG64 addr;
 	if(Bp->GetOffset(&addr) == S_OK) {
-		printf_debug("\taddress: 0x%016I64x\n", addr);
+		report(NULL, "\taddress: 0x%016I64x\n", addr);
 		g_last_breakpoint = addr;
 	}
 	else
-		printf_debug("\t(failed to get address)\n");
+		report(NULL, "\t(failed to get address)\n");
 
 	return DEBUG_STATUS_NO_CHANGE;
 }
@@ -156,74 +174,74 @@ STDMETHOD(Exception)(
 )
 {
 	// remember, at this point, the debugger status is at DEBUG_STATUS_BREAK
-	printf_debug("EventCallbacks::Exception()\n");
+	report(NULL, "EventCallbacks::Exception()\n");
 	g_last_exception64 = *Exception;
 
-	printf_debug("\tFirstChance: 0x%08I32x\n", Exception->NumberParameters);
-	printf_debug("\tEXCEPTION_RECORD64:\n"
+	report(NULL, "\tFirstChance: 0x%08I32x\n", Exception->NumberParameters);
+	report(NULL, "\tEXCEPTION_RECORD64:\n"
 			"\tExceptionCode: 0x%I32x (",
 			Exception->ExceptionCode);
 
 	switch(Exception->ExceptionCode) {
 		case EXCEPTION_ACCESS_VIOLATION:
-			printf_debug("EXCEPTION_ACCESS_VIOLATION"); break;
+			report(NULL, "EXCEPTION_ACCESS_VIOLATION"); break;
 		case EXCEPTION_DATATYPE_MISALIGNMENT:
-			printf_debug("EXCEPTION_DATATYPE_MISALIGNMENT"); break;
+			report(NULL, "EXCEPTION_DATATYPE_MISALIGNMENT"); break;
 		case EXCEPTION_BREAKPOINT:
-			printf_debug("EXCEPTION_BREAKPOINT");
+			report(NULL, "EXCEPTION_BREAKPOINT");
 			b_AT_LEAST_ONE_BREAKPOINT = true;
 			break;
 		case EXCEPTION_SINGLE_STEP:
-			printf_debug("EXCEPTION_SINGLE_STEP"); break;
+			report(NULL, "EXCEPTION_SINGLE_STEP"); break;
 		case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:
-			printf_debug("EXCEPTION_ARRAY_BOUNDS_EXCEEDED"); break;
+			report(NULL, "EXCEPTION_ARRAY_BOUNDS_EXCEEDED"); break;
 		case EXCEPTION_FLT_DENORMAL_OPERAND:
-			printf_debug("EXCEPTION_FLT_DENORMAL_OPERAND"); break;
+			report(NULL, "EXCEPTION_FLT_DENORMAL_OPERAND"); break;
 		case EXCEPTION_FLT_DIVIDE_BY_ZERO:
-			printf_debug("EXCEPTION_FLT_DIVIDE_BY_ZERO"); break;
+			report(NULL, "EXCEPTION_FLT_DIVIDE_BY_ZERO"); break;
 		case EXCEPTION_FLT_INEXACT_RESULT:
-			printf_debug("EXCEPTION_FLT_INEXACT_RESULT"); break;
+			report(NULL, "EXCEPTION_FLT_INEXACT_RESULT"); break;
 		case EXCEPTION_FLT_INVALID_OPERATION:
-			printf_debug("EXCEPTION_FLT_INVALID_OPERATION"); break;
+			report(NULL, "EXCEPTION_FLT_INVALID_OPERATION"); break;
 		case EXCEPTION_FLT_OVERFLOW:
-			printf_debug("EXCEPTION_FLT_OVERFLOW"); break;
+			report(NULL, "EXCEPTION_FLT_OVERFLOW"); break;
 		case EXCEPTION_FLT_STACK_CHECK:
-			printf_debug("EXCEPTION_FLT_STACK_CHECK"); break;
+			report(NULL, "EXCEPTION_FLT_STACK_CHECK"); break;
 		case EXCEPTION_FLT_UNDERFLOW:
-			printf_debug("EXCEPTION_FLT_UNDERFLOW"); break;
+			report(NULL, "EXCEPTION_FLT_UNDERFLOW"); break;
 		case EXCEPTION_INT_DIVIDE_BY_ZERO:
-			printf_debug("EXCEPTION_INT_DIVIDE_BY_ZERO"); break;
+			report(NULL, "EXCEPTION_INT_DIVIDE_BY_ZERO"); break;
 		case EXCEPTION_INT_OVERFLOW:
-			printf_debug("EXCEPTION_INT_OVERFLOW"); break;
+			report(NULL, "EXCEPTION_INT_OVERFLOW"); break;
 		case EXCEPTION_PRIV_INSTRUCTION:
-			printf_debug("EXCEPTION_PRIV_INSTRUCTION"); break;
+			report(NULL, "EXCEPTION_PRIV_INSTRUCTION"); break;
 		case EXCEPTION_IN_PAGE_ERROR:
-			printf_debug("EXCEPTION_IN_PAGE_ERROR"); break;
+			report(NULL, "EXCEPTION_IN_PAGE_ERROR"); break;
 		case EXCEPTION_ILLEGAL_INSTRUCTION:
-			printf_debug("EXCEPTION_ILLEGAL_INSTRUCTION"); break;
+			report(NULL, "EXCEPTION_ILLEGAL_INSTRUCTION"); break;
 		case EXCEPTION_NONCONTINUABLE_EXCEPTION:
-			printf_debug("EXCEPTION_NONCONTINUABLE_EXCEPTION"); break;
+			report(NULL, "EXCEPTION_NONCONTINUABLE_EXCEPTION"); break;
 		case EXCEPTION_STACK_OVERFLOW:
-			printf_debug("EXCEPTION_STACK_OVERFLOW"); break;
+			report(NULL, "EXCEPTION_STACK_OVERFLOW"); break;
 		case EXCEPTION_INVALID_DISPOSITION:
-			printf_debug("EXCEPTION_INVALID_DISPOSITION"); break;
+			report(NULL, "EXCEPTION_INVALID_DISPOSITION"); break;
 		case EXCEPTION_GUARD_PAGE:
-			printf_debug("EXCEPTION_GUARD_PAGE"); break;
+			report(NULL, "EXCEPTION_GUARD_PAGE"); break;
 		case EXCEPTION_INVALID_HANDLE:
-			printf_debug("EXCEPTION_INVALID_HANDLE"); break;
+			report(NULL, "EXCEPTION_INVALID_HANDLE"); break;
 		case 0xe06d7363:
-			printf_debug("C++ Exception"); break;
+			report(NULL, "C++ Exception"); break;
 		//case EXCEPTION_POSSIBLE_DEADLOCK:
-		//	printf_debug("EXCEPTION_POSSIBLE_DEADLOCK"); break;
+		//	report(NULL, "EXCEPTION_POSSIBLE_DEADLOCK"); break;
 		default:
-			printf_debug("EXCEPTION_WTF");
+			report(NULL, "EXCEPTION_WTF");
 	}
 
-	printf_debug(")\n")
-	printf_debug("\tExceptionFlags: 0x%08I32x\n", Exception->ExceptionFlags);
-	printf_debug("\tExceptionRecord: 0x%016I64x\n", Exception->ExceptionRecord);
-	printf_debug("\tExceptionAddress: 0x%016I64x\n", Exception->ExceptionAddress);
-	printf_debug("\tNumberParameters: 0x%08I32x\n", Exception->NumberParameters);
+	report(NULL, ")\n");
+	report(NULL, "\tExceptionFlags: 0x%08I32x\n", Exception->ExceptionFlags);
+	report(NULL, "\tExceptionRecord: 0x%016I64x\n", Exception->ExceptionRecord);
+	report(NULL, "\tExceptionAddress: 0x%016I64x\n", Exception->ExceptionAddress);
+	report(NULL, "\tNumberParameters: 0x%08I32x\n", Exception->NumberParameters);
 
 	/* stay default, should be DEBUG_STATUS_BREAK */
 	return DEBUG_STATUS_NO_CHANGE;
@@ -236,7 +254,7 @@ STDMETHOD(CreateThread)(
         _In_ ULONG64 StartOffset
         )
 {
-	printf_debug("EventCallbacks::CreateThread(Handle=%016I64x DataOffset=%016I64X StartOffset=%016I64X)\n",
+	report(NULL, "EventCallbacks::CreateThread(Handle=%016I64x DataOffset=%016I64X StartOffset=%016I64X)\n",
 		Handle, DataOffset, StartOffset);
 	return DEBUG_STATUS_NO_CHANGE;
 }
@@ -246,7 +264,7 @@ STDMETHOD(ExitThread)(
         _In_ ULONG ExitCode
         )
 {
-	printf_debug("EventCallbacks::ExitThread(ExitCode:%d)\n", ExitCode);
+	report(NULL, "EventCallbacks::ExitThread(ExitCode:%d)\n", ExitCode);
 	return DEBUG_STATUS_NO_CHANGE;
 }
 
@@ -265,12 +283,12 @@ STDMETHOD(CreateProcess)(
 		IN ULONG64 StartOffset
 		)
 {
-	printf_debug("EventCallbacks::CreateProcess()\n");
-	printf_debug("  ImageFileHandle=0x%016I64X\n", ImageFileHandle);
-	printf_debug("           Handle=0x%016I64X\n", Handle);
-	printf_debug("       BaseOffset=0x%016I64X\n", BaseOffset);
-	printf_debug("       ModuleName=\"%s\"\n", ModuleName);
-	printf_debug("        ImageName=\"%s\"\n", ImageName);
+	report(NULL, "EventCallbacks::CreateProcess()\n");
+	report(NULL, "  ImageFileHandle=0x%016I64X\n", ImageFileHandle);
+	report(NULL, "           Handle=0x%016I64X\n", Handle);
+	report(NULL, "       BaseOffset=0x%016I64X\n", BaseOffset);
+	report(NULL, "       ModuleName=\"%s\"\n", ModuleName);
+	report(NULL, "        ImageName=\"%s\"\n", ImageName);
 
 	g_image_base = BaseOffset;
 	b_PROCESS_CREATED = true;
@@ -296,7 +314,7 @@ STDMETHOD(ExitProcess)(
 	IN ULONG ExitCode
 )
 {
-	printf_debug("EventCallbacks::ExitProcess(ExitCode=%d)\n", ExitCode);
+	report(NULL, "EventCallbacks::ExitProcess(ExitCode=%d)\n", ExitCode);
 
 	b_PROCESS_EXITED = true;
 	g_process_exit_code = ExitCode;
@@ -323,8 +341,8 @@ STDMETHOD(LoadModule)(
 
 	HRESULT hRes;
 
-	printf_debug("EventCallbacks::LoadModule()\n");
-	printf_debug("\tloaded module:%s (image:%s) to address %I64x\n", ModuleName, ImageName, BaseOffset);
+	report(NULL, "EventCallbacks::LoadModule()\n");
+	report(NULL, "\tloaded module:%s (image:%s) to address %I64x\n", ModuleName, ImageName, BaseOffset);
 
 	return DEBUG_STATUS_NO_CHANGE;
 }
@@ -335,10 +353,8 @@ STDMETHOD(UnloadModule)(
         _In_ ULONG64 BaseOffset
         )
 {
-	vector<string> kill_list;
-
-	printf_debug("EventCallbacks::UnloadModule()\n");
-	printf_debug("\nloaded image:%s to address %I64x\n", ImageBaseName, BaseOffset);
+	report(NULL, "EventCallbacks::UnloadModule()\n");
+	report(NULL, "\nloaded image:%s to address %I64x\n", ImageBaseName, BaseOffset);
 
 	return DEBUG_STATUS_NO_CHANGE;
 }
@@ -349,7 +365,7 @@ STDMETHOD(SystemError)(
         _In_ ULONG Level
         )
 {
-	printf_debug("EventCallbacks::SystemError()\n");
+	report(NULL, "EventCallbacks::SystemError()\n");
 	return DEBUG_STATUS_NO_CHANGE;
 }
 
@@ -358,7 +374,7 @@ STDMETHOD(SessionStatus)(
 		IN ULONG SessionStatus
 		)
 {
-	printf_debug("EventCallbacks::SessionStatus()\n");
+	report(NULL, "EventCallbacks::SessionStatus()\n");
 	// https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/dbgeng/nf-dbgeng-idebugeventcallbacks-sessionstatus
 
 	lastSessionStatus = SessionStatus;
@@ -366,7 +382,7 @@ STDMETHOD(SessionStatus)(
 	switch(SessionStatus)
 	{
 		case DEBUG_SESSION_END:
-			printf_debug("\tDEBUG_SESSION_END\n");
+			report(NULL, "\tDEBUG_SESSION_END\n");
 
 			HRESULT hResult;
 
@@ -375,16 +391,16 @@ STDMETHOD(SessionStatus)(
 
 			if(hResult == S_FALSE)
 			{
-				printf_debug("error getting return code, dude still running!\n");
+				report(NULL, "error getting return code, dude still running!\n");
 			}
 			else if(hResult == S_OK)
 			{
 				if(exit_code == STILL_ACTIVE)
 				{
-					printf_debug("STILL ACTIVE, WTF!\n");
+					report(NULL, "STILL ACTIVE, WTF!\n");
 				}
 
-				printf_debug("passing back exit code %08I32x\n", exit_code);
+				report(NULL, "passing back exit code %08I32x\n", exit_code);
 				return exit_code;
 			}
 			else if(hResult == E_UNEXPECTED)
@@ -396,32 +412,32 @@ STDMETHOD(SessionStatus)(
 			}
 			else
 			{
-				printf_debug("wtf's up with GetExitCode()? it returned %X\n", hResult);
+				report(NULL, "wtf's up with GetExitCode()? it returned %X\n", hResult);
 			}
 			break;
 		case DEBUG_SESSION_ACTIVE:
-			printf_debug("\tDEBUG_SESSION_ACTIVE\n");
+			report(NULL, "\tDEBUG_SESSION_ACTIVE\n");
 			break;
 		case DEBUG_SESSION_END_SESSION_ACTIVE_TERMINATE:
-			printf_debug("\tDEBUG_SESSION_END_SESSION_ACTIVE_TERMINATE\n");
+			report(NULL, "\tDEBUG_SESSION_END_SESSION_ACTIVE_TERMINATE\n");
 			break;
 		case DEBUG_SESSION_END_SESSION_ACTIVE_DETACH:
-			printf_debug("\tDEBUG_SESSION_END_SESSION_ACTIVE_DETACH\n");
+			report(NULL, "\tDEBUG_SESSION_END_SESSION_ACTIVE_DETACH\n");
 			break;
 		case DEBUG_SESSION_END_SESSION_PASSIVE:
-			printf_debug("\tDEBUG_SESSION_END_SESSION_PASSIVE\n");
+			report(NULL, "\tDEBUG_SESSION_END_SESSION_PASSIVE\n");
 			break;
 		case DEBUG_SESSION_REBOOT:
-			printf_debug("\tDEBUG_SESSION_REBOOT\n");
+			report(NULL, "\tDEBUG_SESSION_REBOOT\n");
 			break;
 		case DEBUG_SESSION_HIBERNATE:
-			printf_debug("\tDEBUG_SESSION_HIBERNATE\n");
+			report(NULL, "\tDEBUG_SESSION_HIBERNATE\n");
 			break;
 		case DEBUG_SESSION_FAILURE:
-			printf_debug("\tDEBUG_SESSION_FAILURE\n");
+			report(NULL, "\tDEBUG_SESSION_FAILURE\n");
 			break;
 		default:
-			printf_debug("\tDEBUG_SESSION_WTF: %d\n", SessionStatus);
+			report(NULL, "\tDEBUG_SESSION_WTF: %d\n", SessionStatus);
 	}
 
 	return S_OK;
@@ -433,13 +449,13 @@ STDMETHOD(ChangeDebuggeeState)(
         _In_ ULONG64 Argument
         )
 {
-	printf_debug("EventCallbacks::ChangeDebuggeeState()\n");
+	report(NULL, "EventCallbacks::ChangeDebuggeeState()\n");
 	if(Flags & DEBUG_CDS_REGISTERS)
-		printf_debug("\tDEBUG_CDS_REGISTERS\n");
+		report(NULL, "\tDEBUG_CDS_REGISTERS\n");
 	if(Flags & DEBUG_CDS_DATA)
-		printf_debug("\tDEBUG_CDS_DATA\n");
+		report(NULL, "\tDEBUG_CDS_DATA\n");
 	if(Flags & DEBUG_CDS_REFRESH)
-		printf_debug("\tDEBUG_CDS_REFRESH\n");
+		report(NULL, "\tDEBUG_CDS_REFRESH\n");
 
 	return DEBUG_STATUS_NO_CHANGE;
 }
@@ -452,45 +468,45 @@ STDMETHOD(ChangeEngineState)(
         )
 {
 	char buf[64];
-	printf_debug("EventCallbacks::ChangeEngineState(0x%08X)\n", Flags);
+	report(NULL, "EventCallbacks::ChangeEngineState(0x%08X)\n", Flags);
 
 	if(Flags & DEBUG_CES_CURRENT_THREAD) {
 		if(Argument == DEBUG_ANY_ID)
 			strcpy(buf, "TID:DEBUG_ANY_ID");
 		else
 			sprintf(buf, "TID:%lld", Argument);
-		printf_debug("\tDEBUG_CES_CURRENT_THREAD (%s)\n", buf);
+		report(NULL, "\tDEBUG_CES_CURRENT_THREAD (%s)\n", buf);
 	}
 	if(Flags & DEBUG_CES_EFFECTIVE_PROCESSOR)
-		printf_debug("\tDEBUG_CES_EFFECTIVE_PROCESSOR\n");
+		report(NULL, "\tDEBUG_CES_EFFECTIVE_PROCESSOR\n");
 	if(Flags & DEBUG_CES_BREAKPOINTS)
-		printf_debug("\tDEBUG_CES_BREAKPOINTS \"One or more breakpoints have changed.\"\n");
+		report(NULL, "\tDEBUG_CES_BREAKPOINTS \"One or more breakpoints have changed.\"\n");
 	if(Flags & DEBUG_CES_CODE_LEVEL)
-		printf_debug("\tDEBUG_CES_CODE_LEVEL\n");
+		report(NULL, "\tDEBUG_CES_CODE_LEVEL\n");
 	if(Flags & DEBUG_CES_EXECUTION_STATUS) {
 		status_to_str(Argument, buf);
-		printf_debug("\tDEBUG_CES_EXECUTION_STATUS (%s)\n", buf);
+		report(NULL, "\tDEBUG_CES_EXECUTION_STATUS (%s)\n", buf);
 	}
 	if(Flags & DEBUG_CES_SYSTEMS)
-		printf_debug("\tDEBUG_CES_SYSTEMS\n");
+		report(NULL, "\tDEBUG_CES_SYSTEMS\n");
 	if(Flags & DEBUG_CES_ENGINE_OPTIONS)
-		printf_debug("\tDEBUG_CES_ENGINE_OPTIONS\n");
+		report(NULL, "\tDEBUG_CES_ENGINE_OPTIONS\n");
 	if(Flags & DEBUG_CES_LOG_FILE)
-		printf_debug("\tDEBUG_CES_LOG_FILE\n");
+		report(NULL, "\tDEBUG_CES_LOG_FILE\n");
 	if(Flags & DEBUG_CES_RADIX)
-		printf_debug("\tDEBUG_CES_RADIX\n");
+		report(NULL, "\tDEBUG_CES_RADIX\n");
 	if(Flags & DEBUG_CES_EVENT_FILTERS)
-		printf_debug("\tDEBUG_CES_EVENT_FILTERS\n");
+		report(NULL, "\tDEBUG_CES_EVENT_FILTERS\n");
 	if(Flags & DEBUG_CES_PROCESS_OPTIONS)
-		printf_debug("\tDEBUG_CES_PROCESS_OPTIONS\n");
+		report(NULL, "\tDEBUG_CES_PROCESS_OPTIONS\n");
 	if(Flags & DEBUG_CES_EXTENSIONS)
-		printf_debug("\tDEBUG_CES_EXTENSIONS\n");
+		report(NULL, "\tDEBUG_CES_EXTENSIONS\n");
 	if(Flags & DEBUG_CES_ASSEMBLY_OPTIONS)
-		printf_debug("\tDEBUG_CES_ASSEMBLY_OPTIONS\n");
+		report(NULL, "\tDEBUG_CES_ASSEMBLY_OPTIONS\n");
 	if(Flags & DEBUG_CES_EXPRESSION_SYNTAX)
-		printf_debug("\tDEBUG_CES_EXPRESSION_SYNTAX\n");
+		report(NULL, "\tDEBUG_CES_EXPRESSION_SYNTAX\n");
 	if(Flags & DEBUG_CES_TEXT_REPLACEMENTS)
-		printf_debug("\tDEBUG_CES_TEXT_REPLACEMENTS\n");
+		report(NULL, "\tDEBUG_CES_TEXT_REPLACEMENTS\n");
 
 	// The return value is ignored by the engine unless it indicates a remote procedure call error;
 	// in this case the client, with which this IDebugEventCallbacks object is registered, is disabled.
@@ -504,22 +520,22 @@ STDMETHOD(ChangeSymbolState)(
         _In_ ULONG64 Argument
 		)
 {
-	printf_debug("EventCallbacks::ChangeSymbolState()\n");
+	report(NULL, "EventCallbacks::ChangeSymbolState()\n");
 
 	if(Flags & DEBUG_CSS_LOADS)
-		printf_debug("\tDEBUG_CSS_LOADS\n");
+		report(NULL, "\tDEBUG_CSS_LOADS\n");
 	if(Flags & DEBUG_CSS_UNLOADS)
-		printf_debug("\tDEBUG_CSS_UNLOADS\n");
+		report(NULL, "\tDEBUG_CSS_UNLOADS\n");
 	if(Flags & DEBUG_CSS_SCOPE)
-		printf_debug("\tDEBUG_CSS_SCOPE\n");
+		report(NULL, "\tDEBUG_CSS_SCOPE\n");
 	if(Flags & DEBUG_CSS_PATHS)
-		printf_debug("\tDEBUG_CSS_PATHS\n");
+		report(NULL, "\tDEBUG_CSS_PATHS\n");
 	if(Flags & DEBUG_CSS_SYMBOL_OPTIONS)
-		printf_debug("\tDEBUG_CSS_SYMBOL_OPTIONS\n");
+		report(NULL, "\tDEBUG_CSS_SYMBOL_OPTIONS\n");
 	if(Flags & DEBUG_CSS_TYPE_OPTIONS)
-		printf_debug("\tDEBUG_CSS_TYPE_OPTIONS\n");
+		report(NULL, "\tDEBUG_CSS_TYPE_OPTIONS\n");
 	if(Flags & DEBUG_CSS_COLLAPSE_CHILDREN)
-		printf_debug("\tDEBUG_CSS_COLLAPSE_CHILDREN\n");
+		report(NULL, "\tDEBUG_CSS_COLLAPSE_CHILDREN\n");
 
 	return DEBUG_STATUS_NO_CHANGE;
 }
@@ -539,43 +555,43 @@ int wait(int timeout)
 	memset(&g_last_exception64, '\0', sizeof(g_last_exception64));
 
 	// block
-	printf_debug("WaitForEvent(timeout=%d)\n", timeout);
+	report(NULL, "WaitForEvent(timeout=%d)\n", timeout);
 	HRESULT hResult = g_Control->WaitForEvent(
 		0, /* flags */
 		timeout /* timeout (ms) (INFINITE == eat events until "break" event); */
 	);
-	printf_debug("WaitForEvent() returned %08I32x ", hResult);
+	report(NULL, "WaitForEvent() returned %08I32x ", hResult);
 
 	if(hResult == S_OK) {
-		printf_debug("S_OK (successful)\n");
+		report(NULL, "S_OK (successful)\n");
 		return 0;
 	}
 
 	if(hResult == S_FALSE) {
-		printf_debug("S_FALSE (timeout expired)\n");
+		report(NULL, "S_FALSE (timeout expired)\n");
 		return ERROR_UNSPECIFIED;
 	}
 
 	if(hResult == E_PENDING) {
-		printf_debug("E_PENDING (exit interrupt issued, target unavailable)\n");
+		report(NULL, "E_PENDING (exit interrupt issued, target unavailable)\n");
 		return ERROR_UNSPECIFIED;
 	}
 
 	if(hResult == E_UNEXPECTED) { /* 8000FFFF */
-		printf_debug("E_UNEXPECTED (outstanding input request, or no targets generate events)\n");
+		report(NULL, "E_UNEXPECTED (outstanding input request, or no targets generate events)\n");
 		if(lastSessionStatus == DEBUG_SESSION_END) {
-			printf_debug("but ok since last session status update was DEBUG_SESSION_END\n");
+			report(NULL, "but ok since last session status update was DEBUG_SESSION_END\n");
 			return 0;
 		}
 		return ERROR_UNSPECIFIED;
 	}
 
 	if(hResult == E_FAIL) {
-		printf_debug("E_FAIL (engine already waiting for event)\n");
+		report(NULL, "E_FAIL (engine already waiting for event)\n");
 		return ERROR_UNSPECIFIED;
 	}
 
-	printf_debug("(unknown)\n");
+	report(NULL, "(unknown)\n");
 
 	return ERROR_UNSPECIFIED;
 }
@@ -650,23 +666,22 @@ int process_start(char *cmdline, char *errmsg)
 
 	lastSessionStatus = DEBUG_SESSION_FAILURE;
 
-	printf_debug("executing command line: %s\n", cmdline);
+	report(NULL, "executing command line: %s\n", cmdline);
 
 	/* end any current sessions */
 	if(g_Client) {
-		printf_debug("WARNING: client/session already active, attempting shutdown\n");
+		report(NULL, "WARNING: client/session already active, attempting shutdown\n");
 		client_teardown();
 	}
 
 	if(g_Client) {
-		printf_debug("ERROR: unable to end current client/session\n");
-		sprintf(errmsg, "unable to end current client/session\n");
+		report(errmsg, "ERROR: unable to end current client/session\n");
 		goto cleanup;
 	}
 
 	/* start new session */
 	if(client_setup(errmsg)) {
-		printf_debug("ERROR: client_setup() initializing client/session\n");
+		report(errmsg, "ERROR: client_setup() initializing client/session\n");
 		// client_setup() set errmsg
 		goto cleanup;
 	}
@@ -674,16 +689,14 @@ int process_start(char *cmdline, char *errmsg)
 	/* set engine, create process */
 	hResult = g_Control->SetEngineOptions(DEBUG_ENGOPT_INITIAL_BREAK);
 	if(hResult != S_OK) {
-		printf_debug("ERROR: SetEngineOptions() returned 0x%08X\n", hResult);
-		sprintf(errmsg, "SetEngineOptions() returned 0x%08X\n", hResult);
+		report(errmsg, "ERROR: SetEngineOptions() returned 0x%08X\n", hResult);
 		rc = ERROR_DBGENG_API;
 		goto cleanup;
 	}
 
 	hResult = g_Client->CreateProcess(0, cmdline, DEBUG_ONLY_THIS_PROCESS);
 	if(hResult != S_OK) {
-		printf_debug("ERROR: CreateProcess() returned 0x%08X\n", hResult);
-		sprintf(errmsg, "CreateProcess() returned 0x%08X\n", hResult);
+		report(errmsg, "ERROR: CreateProcess() returned 0x%08X, cmdline: %s\n", hResult, cmdline);
 		rc = ERROR_DBGENG_API;
 		goto cleanup;
 	}
@@ -694,33 +707,32 @@ int process_start(char *cmdline, char *errmsg)
 	*/
 
 	/* wait for active session */
-	printf_debug("waiting for active session\n");
+	report(NULL, "waiting for active session\n");
 	for(int i=0; i<10; ++i) {
-		printf_debug("wait(100)\n");
+		report(NULL, "wait(100)\n");
 		if(wait(100) == 0) {
-			printf_debug("wait succeeded\n");
+			report(NULL, "wait succeeded\n");
 
 			//if(lastSessionStatus != DEBUG_SESSION_ACTIVE) {
 			if(0) {
-				printf_debug("but lastSessionStatus isn't active\n");
+				report(NULL, "but lastSessionStatus isn't active\n");
 			} else if(!b_PROCESS_CREATED) {
-				printf_debug("but process creation callback hasn't yet happened\n");
+				report(NULL, "but process creation callback hasn't yet happened\n");
 			} else if(!b_AT_LEAST_ONE_BREAKPOINT) {
-				printf_debug("but initial breakpoint hasn't yet happened\n");
+				report(NULL, "but initial breakpoint hasn't yet happened\n");
 			} else {
-				printf_debug("all's well!\n");
+				report(NULL, "all's well!\n");
 				rc = 0;
 				goto cleanup;
 			}
 		}
 		else {
-			printf_debug("wait failed, going again...\n");
+			report(NULL, "wait failed, going again...\n");
 		}
 
 	}
 
-	printf_debug("ERROR: gave up! returning %d\n", rc);
-	sprintf(errmsg, "session status never went active or CreateProcess event never received");
+	report(errmsg, "ERROR: gave up! returning %d\n", rc);
 
 	cleanup:
 	return rc;
@@ -731,30 +743,28 @@ int process_attach(int pid, char *errmsg)
 {
 	HRESULT hResult;
 
-	printf_debug("attaching to process: %d\n", pid);
+	report(NULL, "attaching to process: %d\n", pid);
 
 	if(!g_Client)
 		return ERROR_NO_DBGENG_INTERFACES;
 
 	hResult = g_Client->AttachProcess(0, pid, 0);
 	if(hResult != S_OK) {
-		printf_debug("ERROR: g_Client->AttachProcess(0, %d, 0) returned 0x%X\n", pid, hResult);
-		sprintf(errmsg, "g_Client->AttachProcess(0, %d, 0) returned 0x%X", pid, hResult);
+		report(errmsg, "ERROR: g_Client->AttachProcess(0, %d, 0) returned 0x%X\n", pid, hResult);
 		return ERROR_DBGENG_API;
 	}
 
 	/* wait for active session */
 	for(int i=0; i<10; ++i) {
 		if(lastSessionStatus == DEBUG_SESSION_ACTIVE && b_PROCESS_CREATED) {
-			printf_debug("process created!\n");
+			report(NULL, "process created!\n");
 			return 0;
 		}
 
 		wait(INFINITE);
 	}
 
-	printf_debug("ERROR: timeout waiting for active debug session\n");
-	sprintf(errmsg, "timeout waiting for active debug session");
+	report(errmsg, "ERROR: timeout waiting for active debug session\n");
 	return ERROR_UNSPECIFIED;
 }
 
@@ -782,12 +792,11 @@ int quit(char *errmsg)
 
 	HRESULT hr = g_Client->TerminateProcesses();
 	if(hr != S_OK) {
-		printf_debug("ERROR: TerminateCurrentProcess() returned 0x%08X\n", hr);
-		sprintf(errmsg, "TerminateCurrentProcess() returned 0x%08X\n", hr);
+		report(errmsg, "ERROR: TerminateCurrentProcess() returned 0x%08X\n", hr);
 		goto cleanup;
 	}
 	else {
-		printf_debug("TerminateCurrentProcess() succeeded!\n");
+		report(NULL, "TerminateCurrentProcess() succeeded!\n");
 	}
 
 	client_teardown();
@@ -805,8 +814,7 @@ int break_into(char *errmsg)
 	int rc = ERROR_UNSPECIFIED;
 	HRESULT hr = g_Control->SetInterrupt(DEBUG_INTERRUPT_ACTIVE);
 	if(hr != S_OK) {
-		printf_debug("ERROR: SetInterrupt() returned 0x%08X\n", hr);
-		sprintf(errmsg, "SetInterrupt() returned 0x%08X", hr);
+		report(errmsg, "ERROR: SetInterrupt() returned 0x%08X\n", hr);
 		goto cleanup;
 	}
 	rc = 0;
@@ -819,8 +827,7 @@ int go(char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 	if(g_Control->SetExecutionStatus(DEBUG_STATUS_GO) != S_OK) {
-		printf_debug("ERROR: SetExecutionStatus(GO) failed\n");
-		sprintf(errmsg, "SetExecutionStatus(GO) failed\n");
+		report(errmsg, "ERROR: SetExecutionStatus(GO) failed\n");
 		goto cleanup;
 	}
 	wait(INFINITE);
@@ -834,8 +841,7 @@ int step_into(char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 	if(g_Control->SetExecutionStatus(DEBUG_STATUS_STEP_INTO) != S_OK) {
-		printf_debug("ERROR: SetExecutionStatus(STEP_INTO) failed\n");
-		sprintf(errmsg, "SetExecutionStatus(STEP_INTO) failed\n");
+		report(errmsg, "ERROR: SetExecutionStatus(STEP_INTO) failed\n");
 		goto cleanup;
 	}
 	wait(INFINITE);
@@ -849,8 +855,7 @@ int step_over(char *errmsg)
 {
 	int rc = ERROR_UNSPECIFIED;
 	if(g_Control->SetExecutionStatus(DEBUG_STATUS_STEP_OVER) != S_OK) {
-		printf_debug("ERROR: SetExecutionStatus(STEP_OVER) failed\n");
-		sprintf(errmsg, "SetExecutionStatus(STEP_OVER) failed\n");
+		report(errmsg, "ERROR: SetExecutionStatus(STEP_OVER) failed\n");
 		goto cleanup;
 	}
 	wait(INFINITE);
@@ -871,21 +876,21 @@ int breakpoint_set(uint64_t addr, ULONG *id, char *errmsg)
 
 	uint8_t data[1];
 	ULONG bytes_read;
-	if(g_Data->ReadVirtual(addr, data, 1, &bytes_read) != S_OK) {
-		printf_debug("ERROR: ReadVirtual(0x%I64X) during breakpoint precheck\n", addr);
-		sprintf(errmsg, "ReadVirtual(0x%I64X) during breakpoint precheck\n", addr);
+	HRESULT hr = g_Data->ReadVirtual(addr, data, 1, &bytes_read);
+	if(hr != S_OK) {
+		report(errmsg, "ERROR: ReadVirtual(0x%I64X) returned 0x%08X during breakpoint precheck\n", addr, hr);
 		return ERROR_UNSPECIFIED;
 	}
 
-	if(g_Data->WriteVirtual(addr, data, 1, NULL) != S_OK) {
-		printf_debug("ERROR: WriteVirtual(0x%I64X) during breakpoint precheck\n", addr);
-		sprintf(errmsg, "WriteVirtual(0x%I64X) during breakpoint precheck\n", addr);
+	hr = g_Data->WriteVirtual(addr, data, 1, NULL);
+	if(hr != S_OK) {
+		report(errmsg, "ERROR: WriteVirtual(0x%I64X) returned 0x%08X during breakpoint precheck\n", addr, hr);
 		return ERROR_UNSPECIFIED;
 	}
 
-	if(g_Control->AddBreakpoint(DEBUG_BREAKPOINT_CODE, DEBUG_ANY_ID, &pidb) != S_OK) {
-		printf_debug("ERROR: AddBreakpoint failed\n");
-		sprintf(errmsg, "AddBreakpoint failed\n");
+	hr = g_Control->AddBreakpoint(DEBUG_BREAKPOINT_CODE, DEBUG_ANY_ID, &pidb);
+	if(hr != S_OK) {
+		report(errmsg, "ERROR: AddBreakpoint() returned 0x%08X\n", hr);
 		return ERROR_DBGENG_API;
 	}
 
@@ -921,8 +926,7 @@ int mem_read(uint64_t addr, uint32_t length, uint8_t *result, char *errmsg)
 
 	HRESULT hr = g_Data->ReadVirtual(addr, result, length, &bytes_read);
 	if(hr != S_OK) {
-		printf_debug("ERROR: ReadVirtual(0x%I64X, 0x%x) returned 0x%X\n", addr, length, hr);
-		sprintf(errmsg, "ERROR: ReadVirtual(0x%I64X, 0x%x) returned 0x%X\n", addr, length, hr);
+		report(errmsg, "ERROR: ReadVirtual(0x%I64X, 0x%x) returned 0x%X\n", addr, length, hr);
 		goto cleanup;
 	}
 
@@ -937,8 +941,7 @@ int mem_write(uint64_t addr, uint8_t *data, uint32_t len, char *errmsg)
 	int rc = ERROR_UNSPECIFIED;
 
 	if(g_Data->WriteVirtual(addr, data, len, NULL) != S_OK) {
-		printf_debug("ERROR: WriteVirtual()\n");
-		sprintf(errmsg, "WriteVirtual()\n");
+		report(errmsg, "ERROR: WriteVirtual()\n");
 		goto cleanup;
 	}
 
@@ -954,8 +957,7 @@ int module_num(int *num, char *errmsg)
 
 	HRESULT hr = g_Symbols->GetNumberModules(&n_loaded, &n_unloaded);
 	if(hr != S_OK) {
-		printf_debug("ERROR: GetNumberModules() returned 0x%X\n", hr);
-		sprintf(errmsg, "GetNumberModules() returned 0x%X\n", hr);
+		report(errmsg, "ERROR: GetNumberModules() returned 0x%X\n", hr);
 		return ERROR_UNSPECIFIED;
 	}
 
@@ -974,19 +976,17 @@ int module_get(int index, char *image, uint64_t *addr, char *errmsg)
 	}
 
 	if(index < 0 || index >= n_loaded) {
-		printf_debug("ERROR: module_get(), index %d is negative or >= %d\n", index, n_loaded);
-		sprintf(errmsg, "module_get(), index %d is negative or >= %d\n", index, n_loaded);
+		report(errmsg, "ERROR: module_get(), index %d is negative or >= %d\n", index, n_loaded);
 		return ERROR_UNSPECIFIED;
 	}
 
 	ULONG64 base;
 	if(g_Symbols->GetModuleByIndex(index, &base) != S_OK) {
-		printf_debug("ERROR: GetModuleByIndex()\n");
-		sprintf(errmsg, "GetModuleByIndex()\n");
+		report(errmsg, "ERROR: GetModuleByIndex()\n");
 		return ERROR_UNSPECIFIED;
 	}
-	printf_debug("index: %d of %d\n", index, n_loaded);
-	printf_debug("base: 0x%016I64X\n", base);
+	report(NULL, "index: %d of %d\n", index, n_loaded);
+	report(NULL, "base: 0x%016I64X\n", base);
 
 	char image_name[1024]; // full path, when available, like "C:\WINDOWS\System32\KERNEL32.DLL"
 	char module_name[1024]; // path and extension stripped, like "KERNEL32"
@@ -995,13 +995,12 @@ int module_get(int index, char *image, uint64_t *addr, char *errmsg)
 		image_name, 1024, NULL,
 		module_name, 1024, NULL,
 		loaded_image_name, 1024, NULL) != S_OK) {
-			printf_debug("ERROR: GetModuleNames()\n");
-		sprintf(errmsg, "GetModuleNames()\n");
+			report(errmsg, "ERROR: GetModuleNames()\n");
 			return ERROR_UNSPECIFIED;
 		}
-	printf_debug("image_name: %s\n", image_name);
-	printf_debug("module_name: %s\n", module_name);
-	printf_debug("loaded_image_name: %s\n", loaded_image_name);
+	report(NULL, "image_name: %s\n", image_name);
+	report(NULL, "module_name: %s\n", module_name);
+	report(NULL, "loaded_image_name: %s\n", loaded_image_name);
 
 	if(image)
 		strcpy(image, image_name);
@@ -1019,14 +1018,12 @@ int reg_read(char *name, uint64_t *result, char *errmsg)
 	DEBUG_VALUE dv;
 
 	if(g_Registers->GetIndexByName(name, &reg_index) != S_OK) {
-		printf_debug("ERROR: GetIndexByName(\"%s\")\n", name);
-		sprintf(errmsg, "GetIndexByName(\"%s\")\n", name);
+		report(errmsg, "ERROR: GetIndexByName(\"%s\")\n", name);
 		goto cleanup;
 	}
 
 	if(g_Registers->GetValue(reg_index, &dv) != S_OK) {
-		printf_debug("ERROR: GetValue()\n");
-		sprintf(errmsg, "GetValue()\n");
+		report(errmsg, "ERROR: GetValue()\n");
 		goto cleanup;
 	}
 
@@ -1046,18 +1043,16 @@ int reg_write(char *name, uint64_t value, char *errmsg)
 	DEBUG_VALUE dv;
 
 	if(g_Registers->GetIndexByName(name, &reg_index) != S_OK) {
-		printf_debug("ERROR: GetIndexByName(\"%s\")\n", name);
-		sprintf(errmsg, "GetIndexByName(\"%s\")\n", name);
+		report(errmsg, "ERROR: GetIndexByName(\"%s\")\n", name);
 		goto cleanup;
 	}
-	printf_debug("The value of register %s is %d\n", name, reg_index);
+	report(NULL, "The value of register %s is %d\n", name, reg_index);
 
 	dv.I64 = value;
 	dv.Type = DEBUG_VALUE_INT64;
 	HRESULT hr = g_Registers->SetValue(reg_index, &dv);
 	if(hr != S_OK) {
-		printf_debug("ERROR: SetValue() returned %08X\n", hr);
-		sprintf(errmsg, "SetValue() returned %08X\n", hr);
+		report(errmsg, "ERROR: SetValue() returned %08X\n", hr);
 		goto cleanup;
 	}
 
@@ -1071,8 +1066,7 @@ int reg_count(int *count, char *errmsg)
 {
 	ULONG ulcount;
 	if(g_Registers->GetNumberRegisters(&ulcount) != S_OK) {
-		printf_debug("ERROR: GetNumberRegisters()\n");
-		sprintf(errmsg, "GetNumberRegisters()\n");
+		report(errmsg, "ERROR: GetNumberRegisters()\n");
 		return ERROR_UNSPECIFIED;
 	}
 	*count = ulcount;
@@ -1089,8 +1083,7 @@ int reg_name(int idx, char *name, char *errmsg)
 
 	rc = g_Registers->GetDescription(idx, name, 256, &len, &descr);
 	if(rc != S_OK) {
-		printf_debug("ERROR: GetDescription() returned %08X\n", rc);
-		sprintf(errmsg, "GetDescription() returned %08X\n", rc);
+		report(errmsg, "ERROR: GetDescription() returned %08X\n", rc);
 		return ERROR_UNSPECIFIED;
 	}
 
@@ -1102,8 +1095,7 @@ int reg_width(char *name, int *width, char *errmsg)
 {
 	ULONG regidx;
 	if(g_Registers->GetIndexByName(name, &regidx) != S_OK) {
-		printf_debug("ERROR: GetIndexByName()\n");
-		sprintf(errmsg, "GetIndexByName()\n");
+		report(errmsg, "ERROR: GetIndexByName()\n");
 		return ERROR_UNSPECIFIED;
 	}
 
@@ -1112,8 +1104,7 @@ int reg_width(char *name, int *width, char *errmsg)
 	DEBUG_REGISTER_DESCRIPTION descr;
 	int rc = g_Registers->GetDescription(regidx, tmp, 256, &len, &descr);
 	if(rc != S_OK) {
-		printf_debug("ERROR: GetDescription() returned %08X\n", rc);
-		sprintf(errmsg, "GetDescription() returned %08X\n", rc);
+		report(errmsg, "ERROR: GetDescription() returned %08X\n", rc);
 		return ERROR_UNSPECIFIED;
 	}
 
@@ -1138,14 +1129,13 @@ int get_exec_status(unsigned long *status, char *errmsg)
 {
 	*status = ERROR_UNSPECIFIED;
 	if(g_Control->GetExecutionStatus(status) != S_OK) {
-		printf_debug("ERROR: GetExecutionStatus() failed\n");
-		sprintf(errmsg, "GetExecutionStatus() failed\n");
+		report(errmsg, "ERROR: GetExecutionStatus() failed\n");
 		return ERROR_UNSPECIFIED;
 	}
 
 	char buf[64];
 	status_to_str(*status, buf);
-	printf_debug("get_exec_status() returning %s\n", buf);
+	report(NULL, "get_exec_status() returning %s\n", buf);
 	return 0;
 }
 
@@ -1153,8 +1143,7 @@ EASY_CTYPES_SPEC
 int get_exit_code(unsigned long *code, char *errmsg)
 {
 	if(!b_PROCESS_EXITED) {
-		printf_debug("ERROR: attempt to retrieve exit code of a non-exited process\n");
-		sprintf(errmsg, "attempt to retrieve exit code of a non-exited process\n");
+		report(errmsg, "ERROR: attempt to retrieve exit code of a non-exited process\n");
 		return ERROR_UNSPECIFIED;
 	}
 
@@ -1170,8 +1159,7 @@ int set_current_thread(ULONG id, char *errmsg)
 	int rc = ERROR_UNSPECIFIED;
 
 	if(g_Objects->SetCurrentThreadId(id) != S_OK) {
-		printf_debug("ERROR: SetCurrentThreadId()\n");
-		sprintf(errmsg, "SetCurrentThreadId()\n");
+		report(errmsg, "ERROR: SetCurrentThreadId()\n");
 		goto cleanup;
 	}
 
@@ -1185,8 +1173,7 @@ int get_current_thread(char *errmsg)
 {
 	ULONG tid;
 	if(g_Objects->GetCurrentThreadId(&tid) != S_OK) {
-		printf_debug("ERROR: GetCurrentThread()\n");
-		sprintf(errmsg, "GetCurrentThread()\n");
+		report(errmsg, "ERROR: GetCurrentThread()\n");
 		return ERROR_UNSPECIFIED;
 	}
 	return tid;
@@ -1197,8 +1184,7 @@ int get_number_threads(char *errmsg)
 {
 	ULONG Total, LargestProcess;
 	if(g_Objects->GetTotalNumberThreads(&Total, &LargestProcess) != S_OK) {
-		printf_debug("ERROR: GetTotalNumberThreads()\n");
-		sprintf(errmsg, "GetTotalNumberThreads()\n");
+		report(errmsg, "ERROR: GetTotalNumberThreads()\n");
 		return ERROR_UNSPECIFIED;
 	}
 	return Total;
@@ -1270,13 +1256,12 @@ int client_setup(char *errmsg)
 	int rc = ERROR_UNSPECIFIED;
 	HRESULT hResult;
 
-	printf_debug("setup()\n");
+	report(NULL, "setup()\n");
 
 	hResult = DebugCreate(__uuidof(IDebugClient5), (void **)&g_Client);
 	if(hResult != S_OK)
 	{
-		printf_debug("ERROR: getting IDebugClient5\n");
-		sprintf(errmsg, "getting IDebugClient5");
+		report(errmsg, "ERROR: getting IDebugClient5\n");
 		goto cleanup;
 	}
 
@@ -1286,15 +1271,13 @@ int client_setup(char *errmsg)
 		(hResult = g_Client->QueryInterface(__uuidof(IDebugSymbols), (void**)&g_Symbols)) != S_OK ||
 		(hResult = g_Client->QueryInterface(__uuidof(IDebugSystemObjects), (void**)&g_Objects)) != S_OK)
 	{
-		printf_debug("ERROR: getting client debugging interface\n");
-		sprintf(errmsg, "getting client debugging interface");
+		report(errmsg, "ERROR: getting client debugging interface\n");
 		goto cleanup;
 	}
 
 	if ((hResult = g_Client->SetEventCallbacks(&g_EventCb)) != S_OK)
 	{
-		printf_debug("ERROR: SetEventCallbacks() returned 0x%08X\n", hResult);
-		sprintf(errmsg, "ERROR: SetEventCallbacks() returned 0x%08X\n", hResult);
+		report(errmsg, "ERROR: SetEventCallbacks() returned 0x%08X\n", hResult);
 		goto cleanup;
 	}
 
@@ -1305,7 +1288,7 @@ int client_setup(char *errmsg)
 
 int client_teardown(void)
 {
-	printf_debug("teardown()\n");
+	report(NULL, "teardown()\n");
 
 	if (g_Control != NULL) {
 		g_Control->Release();
@@ -1345,26 +1328,26 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
 	switch(fdwReason) {
 		case DLL_PROCESS_DETACH:
-			printf_debug("DLL_PROCESS_DETACH\n");
+			report(NULL, "DLL_PROCESS_DETACH\n");
 			client_teardown();
 			break;
 
 		case DLL_PROCESS_ATTACH:
-			printf_debug("DLL_PROCESS_ATTACH\n");
+			report(NULL, "DLL_PROCESS_ATTACH\n");
 			/* do NOT initialize here */
 			/* SEE: https://docs.microsoft.com/en-us/windows/win32/dlls/dllmain */
 			break;
 
 		case DLL_THREAD_ATTACH:
-			printf_debug("DLL_THREAD_ATTACH\n");
+			report(NULL, "DLL_THREAD_ATTACH\n");
 			break;
 
 		case DLL_THREAD_DETACH:
-			printf_debug("DLL_THREAD_DETACH\n");
+			report(NULL, "DLL_THREAD_DETACH\n");
 			break;
 
 		default:
-			printf_debug("unknown fdwReason: %d\n", fdwReason);
+			report(NULL, "unknown fdwReason: %d\n", fdwReason);
 			break;
 	}
 

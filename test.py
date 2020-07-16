@@ -511,7 +511,7 @@ if __name__ == '__main__':
 		if not tb.startswith('helloworld_'): continue
 		if not ('_x64-' in tb or '_x86-' in tb): continue
 		if '_thread' in tb: continue
-		utils.green('testing %s' % tb)
+		utils.green('hellworld x86/x64, no threads, testing %s' % tb)
 		testbin = tb
 
 		# tester and testee run on same machine
@@ -530,12 +530,13 @@ if __name__ == '__main__':
 		print('%s: 0x%X' % (xip, adapter.reg_read(xip)))
 
 		# breakpoint set/clear should fail at 0
-		print('breakpoint failures')
+		print('expect breakpoint clear failure at 0')
 		try:
 			adapter.breakpoint_clear(0)
 		except DebugAdapter.BreakpointClearError:
 			pass
 
+		print('expect breakpoint set failure at 0')
 		try:
 			adapter.breakpoint_set(0)
 		except DebugAdapter.BreakpointSetError:
