@@ -563,8 +563,12 @@ class DebugControlsWidget(QToolBar):
 
 	def state_error(self, msg=None):
 		self.editStatus.setText(msg or 'ERROR')
-		self.set_actions_enabled(Starting=True, Stopping=False, Pause=False, Resume=False, Stepping=False, Threads=False)
-		self.set_default_process_action("Attach" if self.can_connect() else "Run")
+		if self.debug_state.connected:
+			self.set_actions_enabled(Starting=False, Stopping=True, Pause=False, Resume=False, Stepping=False, Threads=False)
+			self.set_default_process_action("Detach" if self.can_connect() else "Quit")
+		else:
+			self.set_actions_enabled(Starting=True, Stopping=False, Pause=False, Resume=False, Stepping=False, Threads=False)
+			self.set_default_process_action("Attach" if self.can_connect() else "Run")
 		self.set_thread_list([])
 		self.set_resume_pause_action("Resume")
 
