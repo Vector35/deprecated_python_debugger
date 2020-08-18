@@ -205,6 +205,9 @@ class DebugView(QWidget, View):
 			address = self.binary_editor.getDisassembly().getCurrentOffset()
 			return DebugView.DebugViewHistoryEntry(memory_addr, address, False)
 
+	def navigateToFunction(self, func, offset):
+		return self.navigate(offset)
+
 	def navigateToHistoryEntry(self, entry):
 		self.is_navigating_history = True
 		if hasattr(entry, 'is_raw'):
