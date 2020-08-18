@@ -6,7 +6,7 @@ import sys
 import traceback
 import tempfile
 
-from binaryninja import Architecture, BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation, core_ui_enabled
+from binaryninja import Architecture, BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation, core_ui_enabled, get_text_line_input, get_choice_input
 
 from . import DebugAdapter, ProcessView, dbgeng, gdblike, QueuedAdapter
 
@@ -514,6 +514,25 @@ class DebuggerState:
 				arch = Architecture['thumb2']
 		return arch
 
+	# Find target base path via adapter or via user input as a fallback
+	def resolve_target_base(self):
+		if self.adapter.target_path() is None:
+			# We cannot resolve our base if we don't know our path
+			try:
+				modules = list(self.adapter.mem_modules(False).keys())
+				choice = get_choice_input("Cannot find binary on target... is it one of these?", "Choose Target Module", modules)
+				return modules[choice]
+			except:
+				# Ignore this and we will just specify manually
+				module = get_text_line_input("Cannot find binary on target... Please enter path to binary on target", "Cannot find binary")
+				# If they still give us nothing we're out of options
+				if module is None:
+					return None
+				return module.decode()
+		else:
+			return self.modules.get_module_for_addr(self.adapter.target_base())
+		return None
+
 	# Mark memory as dirty, will refresh memory view
 	def memory_dirty(self):
 		self.registers.mark_dirty()
@@ -641,7 +660,10 @@ class DebuggerState:
 			self.connecting = False
 			raise Exception("cannot exec adapter of type %s" % self.adapter_type)
 
-		current_module = self.modules.get_module_for_addr(self.adapter.target_base())
+		current_module = self.resolve_target_base()
+		if current_module is None:
+			raise Exception("Cannot find module on target")
+
 		if current_module != self.bv.file.original_filename:
 			print("Detected local process running at different path: {}".format(current_module))
 			self.modules.translations[current_module] = self.bv.file.original_filename
@@ -687,7 +709,10 @@ class DebuggerState:
 
 		self.memory_view.update_base()
 
-		current_module = self.modules.get_module_for_addr(self.adapter.target_base())
+		current_module = self.resolve_target_base()
+		if current_module is None:
+			raise Exception("Cannot find module on target")
+
 		if current_module != self.bv.file.original_filename:
 			print("Detected remote process running at different path: {}".format(current_module))
 			self.modules.translations[current_module] = self.bv.file.original_filename
