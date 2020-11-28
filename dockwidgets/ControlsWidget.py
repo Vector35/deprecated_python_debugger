@@ -377,7 +377,7 @@ class DebugControlsWidget(QToolBar):
 	def perform_step_into_il(self):
 
 		disasm = self.debug_state.ui.debug_view.binary_editor.getDisassembly()
-		graph_type = disasm.getGraphType()
+		graph_type = disasm.getILViewType()
 
 		def perform_step_into_il_thread():
 			(reason, data) = self.debug_state.step_into(graph_type)
@@ -406,7 +406,7 @@ class DebugControlsWidget(QToolBar):
 	def perform_step_over_il(self):
 
 		disasm = self.debug_state.ui.debug_view.binary_editor.getDisassembly()
-		graph_type = disasm.getGraphType()
+		graph_type = disasm.getILViewType()
 
 		def perform_step_over_il_thread():
 			(reason, data) = self.debug_state.step_over(graph_type)
