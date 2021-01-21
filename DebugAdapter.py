@@ -95,7 +95,7 @@ def get_adapter_for_current_system(**kwargs):
 		raise Exception('unsupported system: %s' % system)
 
 def get_new_adapter(adapter_type = ADAPTER_TYPE.DEFAULT, **kwargs):
-	from . import dbgeng, gdb, lldb
+	from . import dbgeng, gdblike, gdb, lldb
 
 	if adapter_type == ADAPTER_TYPE.LOCAL_DBGENG or adapter_type == ADAPTER_TYPE.REMOTE_DBGENG:
 		return dbgeng.DebugAdapterDbgeng(**kwargs)
@@ -104,7 +104,7 @@ def get_new_adapter(adapter_type = ADAPTER_TYPE.DEFAULT, **kwargs):
 	elif adapter_type == ADAPTER_TYPE.LOCAL_LLDB or adapter_type == ADAPTER_TYPE.REMOTE_LLDB:
 		return lldb.DebugAdapterLLDB(**kwargs)
 	elif adapter_type == ADAPTER_TYPE.REMOTE_SENSE:
-		return lldbDebugAdapterGdbLike(**kwargs)
+		return gdblike.DebugAdapterGdbLike(**kwargs)
 	elif adapter_type == ADAPTER_TYPE.DEFAULT:
 		return get_adapter_for_current_system(**kwargs)
 	else:
