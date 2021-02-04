@@ -133,7 +133,7 @@ class DebugThreadsItemDelegate(QItemDelegate):
 		# Draw background highlight in theme style
 		selected = option.state & QStyle.State_Selected != 0
 		if selected:
-			painter.setBrush(binaryninjaui.getThemeColor(binaryninjaui.SelectionColor))
+			painter.setBrush(binaryninjaui.getThemeColor(binaryninjaui.ThemeColor.SelectionColor))
 		else:
 			painter.setBrush(option.backgroundBrush)
 		painter.setPen(Qt.NoPen)
