@@ -742,11 +742,39 @@ EASY_CTYPES_SPEC
 int process_attach(int pid, char *errmsg)
 {
 	HRESULT hResult;
+    int rc = ERROR_UNSPECIFIED;
 
 	report(NULL, "attaching to process: %d\n", pid);
 
-	if(!g_Client)
+    if(g_Client) {
+		report(NULL, "WARNING: client/session already active, attempting shutdown\n");
+		client_teardown();
+	}
+
+	if(g_Client) {
+		report(errmsg, "ERROR: unable to end current client/session\n");
+		goto cleanup;
+	}
+
+	/* start new session */
+	if(client_setup(errmsg)) {
+		report(errmsg, "ERROR: client_setup() initializing client/session\n");
+		// client_setup() set errmsg
+		goto cleanup;
+	}
+
+	if(!g_Client){
+        report(NULL, "ERROR_NO_DBGENG_INTERFACES %i", ERROR_NO_DBGENG_INTERFACES);
 		return ERROR_NO_DBGENG_INTERFACES;
+    }
+
+    /* set engine, attach to process */
+	hResult = g_Control->SetEngineOptions(DEBUG_ENGOPT_INITIAL_BREAK);
+	if(hResult != S_OK) {
+		report(errmsg, "ERROR: SetEngineOptions() returned 0x%08X\n", hResult);
+		rc = ERROR_DBGENG_API;
+		goto cleanup;
+	}
 
 	hResult = g_Client->AttachProcess(0, pid, 0);
 	if(hResult != S_OK) {
@@ -756,16 +784,21 @@ int process_attach(int pid, char *errmsg)
 
 	/* wait for active session */
 	for(int i=0; i<10; ++i) {
-		if(lastSessionStatus == DEBUG_SESSION_ACTIVE && b_PROCESS_CREATED) {
-			report(NULL, "process created!\n");
+		//if(lastSessionStatus == DEBUG_SESSION_ACTIVE && b_PROCESS_CREATED) {
+		if(lastSessionStatus == DEBUG_SESSION_ACTIVE) {
+			report(NULL, "attached to process!\n");
 			return 0;
 		}
 
-		wait(INFINITE);
+		//wait(INFINITE);
+		wait(100);
 	}
 
 	report(errmsg, "ERROR: timeout waiting for active debug session\n");
 	return ERROR_UNSPECIFIED;
+
+	cleanup:
+	return rc;
 }
 
 EASY_CTYPES_SPEC
