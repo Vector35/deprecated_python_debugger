@@ -26,11 +26,11 @@ default rel
 %endif
 
 start:
-	; get pointer past switch constraint
+	; get pointer past switch constraint (which binja static analyzed)
 	lea		rbx, [function_with_switch]
 	mov		edi, 14
 	call	mapper ; returns 7
-	add		rbx, rax
+	add		rbx, rax ; skip over switch constraint
 
 	; call secret cases
 	mov		rcx, 4
@@ -52,8 +52,6 @@ start:
 	mov		rdi, 3
 	call	function_with_switch
 
-; exit
-
 %ifdef OS_IS_LINUX
 	mov		rdi, 0 ; arg0: status
 	mov		rax, 60 ; __NR_exit
@@ -71,6 +69,9 @@ start:
     call    ExitProcess
 %endif
 
+; exit (so Binja knows end-of-function)
+	ret
+
 function_with_switch:
 	; 00000000: 0x48, 0x89, 0xf9
 	mov		rcx, rdi				; arg0: 0,1,2,3
@@ -84,35 +85,35 @@ function_with_switch:
 	jmp		rdx
 
 .case0:
-	add		rax, 0
+	mov		rax, 0
 	jmp		.switch_end
 
 .case1:
-	add		rax, 1
+	mov		rax, 1
 	jmp		.switch_end
 
 .case2:
-	add		rax, 2
+	mov		rax, 2
 	jmp		.switch_end
 
 .case3:
-	add		rax, 3
+	mov		rax, 3
 	jmp		.switch_end
 
 .case4:
-	add		rax, 4
+	mov		rax, 4
 	jmp		.switch_end
 
 .case5:
-	add		rax, 5
+	mov		rax, 5
 	jmp		.switch_end
 
 .case6:
-	add		rax, 6
+	mov		rax, 6
 	jmp		.switch_end
 
 .case7:
-	add		rax, 7
+	mov		rax, 7
 	jmp		.switch_end
 
 .switch_end:
