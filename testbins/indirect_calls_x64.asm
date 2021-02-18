@@ -15,7 +15,7 @@ default rel
 %endif
 
 %ifdef OS_IS_MACOS
-	global start
+	global start, junk, mapper
 	section .text
 	start:
 %endif
@@ -27,7 +27,7 @@ default rel
 	WinMain:
 %endif
 
-	mov		rcx, 4
+	mov		rcx, 4					; <------- LOOP VAR
 
 .next:
 	push	rcx
@@ -85,6 +85,8 @@ default rel
     mov		rcx, 0
     call    ExitProcess
 %endif
+
+	ret
 
 sub_00:
 	ret
