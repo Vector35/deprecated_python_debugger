@@ -5,7 +5,7 @@ from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, Q
 
 import binaryninjaui
 from binaryninja import BinaryView
-from binaryninjaui import DockContextHandler, UIActionHandler
+from binaryninjaui import DockContextHandler, UIActionHandler, ThemeColor
 
 from . import widget
 from .. import binjaplug
@@ -133,7 +133,7 @@ class DebugThreadsItemDelegate(QItemDelegate):
 		# Draw background highlight in theme style
 		selected = option.state & QStyle.State_Selected != 0
 		if selected:
-			painter.setBrush(binaryninjaui.getThemeColor(binaryninjaui.SelectionColor))
+			painter.setBrush(binaryninjaui.getThemeColor(ThemeColor.SelectionColor))
 		else:
 			painter.setBrush(option.backgroundBrush)
 		painter.setPen(Qt.NoPen)
@@ -147,7 +147,7 @@ class DebugThreadsItemDelegate(QItemDelegate):
 		if state == 'updated':
 			painter.setPen(option.palette.color(QPalette.Highlight).rgba())
 		elif state == 'modified':
-			painter.setPen(binaryninjaui.getThemeColor(binaryninjaui.OrangeStandardHighlightColor).rgba())
+			painter.setPen(binaryninjaui.getThemeColor(ThemeColor.OrangeStandardHighlightColor).rgba())
 		else:
 			painter.setPen(option.palette.color(QPalette.WindowText).rgba())
 		painter.drawText(2 + option.rect.left(), self.char_offset + self.baseline + option.rect.top(), str(text))

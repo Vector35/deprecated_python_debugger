@@ -4,7 +4,7 @@ from PySide2.QtGui import QPalette, QFontMetricsF
 from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QTableView, QItemDelegate, QStyle, QHeaderView, QAbstractItemView
 
 import binaryninjaui
-from binaryninjaui import DockContextHandler, UIActionHandler
+from binaryninjaui import DockContextHandler, UIActionHandler, ThemeColor
 from binaryninja import BinaryView
 
 from . import widget
@@ -121,7 +121,7 @@ class DebugBreakpointsItemDelegate(QItemDelegate):
 		# Draw background highlight in theme style
 		selected = option.state & QStyle.State_Selected != 0
 		if selected:
-			painter.setBrush(binaryninjaui.getThemeColor(binaryninjaui.SelectionColor))
+			painter.setBrush(binaryninjaui.getThemeColor(ThemeColor.SelectionColor))
 		else:
 			painter.setBrush(option.backgroundBrush)
 		painter.setPen(Qt.NoPen)
