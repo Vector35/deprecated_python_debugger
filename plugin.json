@@ -24,6 +24,6 @@
       "Windows": "To install this manually, please see the \"Using Plugins\" section of the [Getting Started Guide](https://docs.binary.ninja/getting-started.html#using-plugins). Or use Binary Ninja's built in plugin manager.",
       "Linux": "To install this manually, please see the \"Using Plugins\" section of the [Getting Started Guide](https://docs.binary.ninja/getting-started.html#using-plugins). Or use Binary Ninja's built in plugin manager."
    },
-   "version": "1.3",
+   "version": "1.3.2",
    "minimumbinaryninjaversion": 2085
 }
