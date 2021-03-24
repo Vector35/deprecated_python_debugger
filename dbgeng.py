@@ -187,7 +187,7 @@ class DebugAdapterDbgeng(DebugAdapter.DebugAdapter):
 		self.target_path_ = fpath
 
 	def attach(self, pid):
-		if self.dll.process_attach(target, None):
+		if self.dll.process_attach(pid, None):
 			raise Exception('unable to attach to pid %d' % pid)
 
 	def detach(self):
