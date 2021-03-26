@@ -244,32 +244,31 @@ def handler_sigint(signal, frame):
 	adapter.break_into()
 
 def adjust_ctrl_c():
-	kernel32 = ctypes.windll.kernel32
-	# If the HandlerRoutine parameter is NULL,
-	# a TRUE value causes the calling process to ignore CTRL+C input
-	bRet = kernel32.SetConsoleCtrlHandler(0, True)
-	#print("SetConsoleCtrlHandler(0, 1) returns %d\n", bRet)
+	if platform.system() == 'Windows':
+		kernel32 = ctypes.windll.kernel32
+		# If the HandlerRoutine parameter is NULL,
+		# a TRUE value causes the calling process to ignore CTRL+C input
+		bRet = kernel32.SetConsoleCtrlHandler(0, True)
+		#print("SetConsoleCtrlHandler(0, 1) returns %d\n", bRet)
 
-	#handle = kernel32.GetStdHandle(STD_INPUT_HANDLE)
-	#print("GetStdHandle(STD_INPUT_HANDLE) returns %d\n" % handle)
-	#mode = c_uint()
-	#pfunc = kernel32.GetConsoleMode
-	#pfunc.restype = c_int
-	#pfunc.argtypes = [POINTER(c_ulong)]
-	#bRet = pfunc(byref(mode))
-	#mode = mode.value
-	#print("GetConsoleMode(%d) returns %08X\n" % (handle, mode))
-	#mode |= ENABLE_PROCESSED_INPUT
-	#bRet = kernel32.SetConsoleMode(handle, ENABLE_PROCESSED_INPUT)
-	#print("SetConsoleMode(%d, %08X) returns %d\n" % (handle, mode, bRet))
+		#handle = kernel32.GetStdHandle(STD_INPUT_HANDLE)
+		#print("GetStdHandle(STD_INPUT_HANDLE) returns %d\n" % handle)
+		#mode = c_uint()
+		#pfunc = kernel32.GetConsoleMode
+		#pfunc.restype = c_int
+		#pfunc.argtypes = [POINTER(c_ulong)]
+		#bRet = pfunc(byref(mode))
+		#mode = mode.value
+		#print("GetConsoleMode(%d) returns %08X\n" % (handle, mode))
+		#mode |= ENABLE_PROCESSED_INPUT
+		#bRet = kernel32.SetConsoleMode(handle, ENABLE_PROCESSED_INPUT)
+		#print("SetConsoleMode(%d, %08X) returns %d\n" % (handle, mode, bRet))
 
 if __name__ == '__main__':
 	colorama.init()
 
 	# set up ctrl+c for break-into
 	signal.signal(signal.SIGINT, handler_sigint)
-	if platform.system() == 'Windows':
-		adjust_ctrl_c()
 
 	adapter = None
 
@@ -277,17 +276,25 @@ if __name__ == '__main__':
 	tok = args.pop()
 	if not args:
 		print('usage:')
+		print('%s --attach <pid>' % tok)
 		print('%s [--terminal] <target_path> <target_args>' % tok)
 		print('%s <server>:<port>' % tok)
 		sys.exit(-1)
 
 	tok = args.pop()
+	if tok == '--attach':
+		pid = int(args.pop())
+		adapter = DebugAdapter.get_adapter_for_current_system()
+		adapter.attach(pid)
 	# does it look like <server>:<port> ?
-	if re.match(r'^.*:\d+$', tok):
+	elif re.match(r'^.*:\d+$', tok):
+		adjust_ctrl_c()
 		(host, port) = tok.split(':')
 		adapter = gdblike.connect_sense(host, int(port))
 	# otherwise treat as a path
 	else:
+		adjust_ctrl_c()
+
 		terminal = False
 		if tok=='--terminal':
 			terminal = True
@@ -393,6 +400,7 @@ if __name__ == '__main__':
 
 			# break into, go, step, step into
 			elif text in ['break', 'breakinto']:
+				print('break_into() due to "break" or "breakinto" in cli')
 				break_into()
 
 			elif text in 'gpt':

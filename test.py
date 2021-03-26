@@ -329,6 +329,40 @@ if __name__ == '__main__':
 		print(type(adapter) == dbgeng.DebugAdapterDbgeng)
 		sys.exit(0)
 
+	# attaching test
+	if arg == 'attaching':
+		pid = None
+		if platform.system() == 'Windows':
+			testbin = 'helloworld_loop_x64-windows'
+			fpath = testbin_to_fpath()
+			DETACHED_PROCESS = 0x00000008
+			CREATE_NEW_CONSOLE = 0x00000010
+			cmds = [fpath]
+			print('cmds:', cmds)
+			pid = subprocess.Popen(cmds, creationflags=CREATE_NEW_CONSOLE).pid
+		else:
+			print('attaching test not yet implemented on %s' % platform.system())
+		print('created process with pid: %d\n' % pid)
+		adapter = DebugAdapter.get_adapter_for_current_system()
+		print('attaching')
+		adapter.attach(pid)
+		for i in range(4):
+			print('scheduling break into in 2 seconds')
+			threading.Timer(2, break_into, [adapter]).start()
+			print('some registers:')
+			for (ridx,rname) in enumerate(adapter.reg_list()):
+				width = adapter.reg_bits(rname)
+				print('%d: %s (%d bits): 0x%X' % (ridx, rname, width, adapter.reg_read(rname)))
+				if ridx > 8: break
+			print('pausing a sec')
+			time.sleep(1)
+			print('continuing')
+			(reason, extra) = adapter.go()
+		print('quiting')
+		adapter.quit()
+		adapter = None
+		sys.exit(-1)
+
 	# otherwise test all executables built in the testbins dir
 	testbins = []
 	for fname in os.listdir('testbins'):
