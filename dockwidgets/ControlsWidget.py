@@ -199,7 +199,7 @@ class DebugControlsWidget(QToolBar):
 			remote_os = "Linux"
 		elif adapter_type == DebugAdapter.ADAPTER_TYPE.LOCAL_LLDB or adapter_type == DebugAdapter.ADAPTER_TYPE.REMOTE_LLDB:
 			remote_os = "Darwin"
-		elif adapter_type == DebugAdapter.ADAPTER_TYPE.LOCAL_DBGENG or adapter_type == DebugAdapter.ADAPTER_TYPE.REMOTE_DBGENG:
+		elif adapter_type == DebugAdapter.ADAPTER_TYPE.LOCAL_DBGENG:
 			remote_os = "Windows"
 		else:
 			# Uncertain

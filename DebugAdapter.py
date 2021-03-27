@@ -23,7 +23,6 @@ class ADAPTER_TYPE(Enum):
 	LOCAL_DBGENG = auto()
 	LOCAL_GDB = auto()
 	LOCAL_LLDB = auto()
-	REMOTE_DBGENG = auto()
 	REMOTE_GDB = auto()
 	REMOTE_LLDB = auto()
 	REMOTE_SENSE = auto()
@@ -40,7 +39,6 @@ class ADAPTER_TYPE(Enum):
 	@staticmethod
 	def use_connect(adapter_type):
 		return adapter_type in [
-			ADAPTER_TYPE.REMOTE_DBGENG,
 			ADAPTER_TYPE.REMOTE_GDB,
 			ADAPTER_TYPE.REMOTE_LLDB,
 			ADAPTER_TYPE.REMOTE_SENSE
@@ -54,7 +52,6 @@ class ADAPTER_TYPE(Enum):
 			return adapter_type in [
 				ADAPTER_TYPE.DEFAULT,
 				ADAPTER_TYPE.LOCAL_DBGENG,
-				ADAPTER_TYPE.REMOTE_DBGENG,
 				ADAPTER_TYPE.REMOTE_GDB,
 				ADAPTER_TYPE.REMOTE_LLDB,
 				ADAPTER_TYPE.REMOTE_SENSE
@@ -63,7 +60,6 @@ class ADAPTER_TYPE(Enum):
 			return adapter_type in [
 				ADAPTER_TYPE.DEFAULT,
 				ADAPTER_TYPE.LOCAL_GDB,
-				ADAPTER_TYPE.REMOTE_DBGENG,
 				ADAPTER_TYPE.REMOTE_GDB,
 				ADAPTER_TYPE.REMOTE_LLDB,
 				ADAPTER_TYPE.REMOTE_SENSE
@@ -72,7 +68,6 @@ class ADAPTER_TYPE(Enum):
 			return adapter_type in [
 				ADAPTER_TYPE.DEFAULT,
 				ADAPTER_TYPE.LOCAL_LLDB,
-				ADAPTER_TYPE.REMOTE_DBGENG,
 				ADAPTER_TYPE.REMOTE_GDB,
 				ADAPTER_TYPE.REMOTE_LLDB,
 				ADAPTER_TYPE.REMOTE_SENSE
@@ -97,7 +92,7 @@ def get_adapter_for_current_system(**kwargs):
 def get_new_adapter(adapter_type = ADAPTER_TYPE.DEFAULT, **kwargs):
 	from . import dbgeng, gdblike, gdb, lldb
 
-	if adapter_type == ADAPTER_TYPE.LOCAL_DBGENG or adapter_type == ADAPTER_TYPE.REMOTE_DBGENG:
+	if adapter_type == ADAPTER_TYPE.LOCAL_DBGENG:
 		return dbgeng.DebugAdapterDbgeng(**kwargs)
 	elif adapter_type == ADAPTER_TYPE.LOCAL_GDB or adapter_type == ADAPTER_TYPE.REMOTE_GDB:
 		return gdb.DebugAdapterGdb(**kwargs)
