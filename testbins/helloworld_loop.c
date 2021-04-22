@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-#if defined(_WIN32) or defined(_WIN64)
+#if defined(_WIN32) || defined(_WIN64)
 #include <process.h>
 #define PIDFUNC _getpid
 #else
