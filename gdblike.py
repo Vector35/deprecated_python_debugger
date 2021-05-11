@@ -563,7 +563,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 						general_group_id = attrs['group_id']
 
 				group = attrs.get('group')
-				if group == 'general' and (not attrs['group_id'] == general_group_id):
+				if group == 'general' and ('group_id' in attrs and not attrs['group_id'] == general_group_id):
 					group = 'unknown'
 
 				#print('assigning reg %s num=%d group=%s' % (regname, regnum, group))
