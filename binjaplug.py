@@ -474,7 +474,7 @@ class DebuggerState:
 			return self.registers['rip']
 		elif self.remote_arch.name == 'x86':
 			return self.registers['eip']
-		elif self.remote_arch.name in ['aarch64', 'arm', 'armv7', 'Z80']:
+		elif self.remote_arch.name in ['aarch64', 'arm', 'armv7', 'thumb2', 'Z80']:
 			return self.registers['pc']
 		else:
 			raise NotImplementedError('unimplemented architecture %s' % self.remote_arch.name)
@@ -495,7 +495,7 @@ class DebuggerState:
 			return self.registers['rsp']
 		elif self.remote_arch.name == 'x86':
 			return self.registers['esp']
-		elif self.remote_arch.name in ['aarch64', 'arm', 'armv7', 'Z80']:
+		elif self.remote_arch.name in ['aarch64', 'arm', 'armv7', 'thumb2', 'Z80']:
 			return self.registers['sp']
 		else:
 			raise NotImplementedError('unimplemented architecture %s' % self.remote_arch.name)
