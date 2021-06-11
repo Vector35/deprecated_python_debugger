@@ -1,9 +1,15 @@
-from PySide2 import QtCore
-from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize
-from PySide2.QtGui import QPalette, QFontMetricsF
-from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QTableView, QItemDelegate, QStyle, QHeaderView, QAbstractItemView
-
 import binaryninjaui
+if "qt_major_version" in binaryninjaui.__dict__ and binaryninjaui.qt_major_version == 6:
+	from PySide6 import QtCore
+	from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize
+	from PySide6.QtGui import QPalette, QFontMetricsF
+	from PySide6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QTableView, QItemDelegate, QStyle, QHeaderView, QAbstractItemView
+else:
+	from PySide2 import QtCore
+	from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize
+	from PySide2.QtGui import QPalette, QFontMetricsF
+	from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QTableView, QItemDelegate, QStyle, QHeaderView, QAbstractItemView
+
 from binaryninjaui import DockContextHandler, UIActionHandler, ThemeColor
 from binaryninja import BinaryView
 
@@ -206,9 +212,6 @@ class DebugRegistersWidget(QWidget, DockContextHandler):
 
 		self.table.resizeColumnsToContents()
 		self.table.resizeRowsToContents()
-
-		for i in range(len(self.model.columns)):
-			self.table.setColumnWidth(i, self.item_delegate.sizeHint(self.table.viewOptions(), self.model.index(-1, i, QModelIndex())).width())
 
 		layout = QVBoxLayout()
 		layout.setContentsMargins(0, 0, 0, 0)

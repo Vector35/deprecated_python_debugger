@@ -1,9 +1,15 @@
-from PySide2 import QtCore
-from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize
-from PySide2.QtGui import QPalette, QFontMetricsF
-from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QDialog, QPushButton, QFormLayout, QLineEdit, QLabel, QMenu, QCheckBox
-
 import binaryninjaui
+if "qt_major_version" in binaryninjaui.__dict__ and binaryninjaui.qt_major_version == 6:
+	from PySide6 import QtCore
+	from PySide6.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize
+	from PySide6.QtGui import QPalette, QFontMetricsF
+	from PySide6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QDialog, QPushButton, QFormLayout, QLineEdit, QLabel, QMenu, QCheckBox
+else:
+	from PySide2 import QtCore
+	from PySide2.QtCore import Qt, QAbstractItemModel, QModelIndex, QSize
+	from PySide2.QtGui import QPalette, QFontMetricsF
+	from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QWidget, QDialog, QPushButton, QFormLayout, QLineEdit, QLabel, QMenu, QCheckBox
+
 from binaryninja import BinaryView, Settings, SettingsScope
 from binaryninjaui import DockContextHandler, UIActionHandler, LinearView, ViewFrame, UIContext
 

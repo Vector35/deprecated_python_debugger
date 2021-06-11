@@ -1,4 +1,9 @@
-from PySide2.QtWidgets import QApplication, QWidget
+import binaryninjaui
+if "qt_major_version" in binaryninjaui.__dict__ and binaryninjaui.qt_major_version == 6:
+	from PySide6.QtWidgets import QApplication, QWidget
+else:
+	from PySide2.QtWidgets import QApplication, QWidget
+
 from binaryninjaui import DockHandler
 import sys
 import traceback

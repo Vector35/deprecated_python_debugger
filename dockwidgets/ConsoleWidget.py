@@ -1,7 +1,15 @@
-from PySide2 import QtCore
-from PySide2.QtCore import Qt, QSize
-from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QTextEdit
-from PySide2.QtGui import QTextCursor
+import binaryninjaui
+if "qt_major_version" in binaryninjaui.__dict__ and binaryninjaui.qt_major_version == 6:
+	from PySide6 import QtCore
+	from PySide6.QtCore import Qt, QSize
+	from PySide6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QTextEdit
+	from PySide6.QtGui import QTextCursor
+else:
+	from PySide2 import QtCore
+	from PySide2.QtCore import Qt, QSize
+	from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QTextEdit
+	from PySide2.QtGui import QTextCursor
+
 import binaryninja
 from binaryninjaui import DockHandler, DockContextHandler, UIActionHandler, getMonospaceFont
 
