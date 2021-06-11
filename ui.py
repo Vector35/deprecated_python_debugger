@@ -1,7 +1,15 @@
-from PySide2 import QtCore
-from PySide2.QtCore import Qt
-from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
-from PySide2.QtGui import QDesktopServices
+import binaryninjaui
+if "qt_major_version" in binaryninjaui.__dict__ and binaryninjaui.qt_major_version == 6:
+	from PySide6 import QtCore
+	from PySide6.QtCore import Qt
+	from PySide6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
+	from PySide6.QtGui import QDesktopServices
+else:
+	from PySide2 import QtCore
+	from PySide2.QtCore import Qt
+	from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit
+	from PySide2.QtGui import QDesktopServices
+
 from binaryninja.plugin import PluginCommand
 from binaryninja import Endianness, HighlightStandardColor, execute_on_main_thread, execute_on_main_thread_and_wait, LowLevelILOperation, BinaryReader
 from binaryninja.settings import Settings

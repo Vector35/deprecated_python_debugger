@@ -1,6 +1,14 @@
-from PySide2 import QtCore, QtGui
-from PySide2.QtCore import Qt
-from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QToolBar, QToolButton, QMenu, QAction
+import binaryninjaui
+if "qt_major_version" in binaryninjaui.__dict__ and binaryninjaui.qt_major_version == 6:
+	from PySide6 import QtCore, QtGui
+	from PySide6.QtCore import Qt
+	from PySide6.QtGui import QAction
+	from PySide6.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QToolBar, QToolButton, QMenu
+else:
+	from PySide2 import QtCore, QtGui
+	from PySide2.QtCore import Qt
+	from PySide2.QtWidgets import QApplication, QHBoxLayout, QVBoxLayout, QLabel, QWidget, QPushButton, QLineEdit, QToolBar, QToolButton, QMenu, QAction
+
 from binaryninja import execute_on_main_thread_and_wait, BinaryView
 from binaryninja.interaction import show_message_box, MessageBoxIcon, MessageBoxButtonSet, MessageBoxButtonResult
 from binaryninjaui import ViewFrame
