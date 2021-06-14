@@ -1,4 +1,4 @@
-# Debugger (1.1)
+# Debugger (v1.3.3)
 Author: **Vector35**
 
 _Native debugger support_
@@ -11,6 +11,9 @@ Debug Windows, Linux, and MacOS targets from within Binary Ninja.
 
 ![](https://github.com/Vector35/debugger/blob/master/media/gui.png?raw=true)
 ![](https://github.com/Vector35/debugger/blob/master/media/cli.png?raw=true)
+
+
+
 
 ## Installation Instructions
 
@@ -30,12 +33,12 @@ To install this manually, please see the "Using Plugins" section of the [Getting
 
 This plugin requires the following minimum version of Binary Ninja:
 
-* 1.3.2085
+* 2085
+
 
 ## License
 
 This plugin is released under a MIT license.
-
 ## Metadata Version
 
 2
