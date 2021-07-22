@@ -164,7 +164,7 @@ class DebugMemoryView(BinaryView):
 				return None
 			if block not in self.value_cache:
 				try:
-					batch = adapter.mem_read(block, cache_len)
+					batch = adapter.mem_read(block, 0x100)
 					# Cache storage is block => data for every block
 					self.value_cache[block] = batch
 				except DebugAdapter.GeneralError as e:
