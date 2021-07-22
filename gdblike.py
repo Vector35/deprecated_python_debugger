@@ -488,7 +488,7 @@ class DebugAdapterGdbLike(DebugAdapter.DebugAdapter):
 			offs += len(attachment)
 
 		# close
-		(result, errno, attachment) = self.rspConn.tx_rx('vFile:close:%d'%fd, 'host_io')
+		(result, errno, attachment) = self.rspConn.tx_rx('vFile:close:%X'%fd, 'host_io')
 		if result != 0:
 			raise Exception('host i/o close() failed, result=%d, errno=%d' % (result, errno))
 
