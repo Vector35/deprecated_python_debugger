@@ -148,6 +148,7 @@ class DebugView(QWidget, View):
 				self.debug_state.breakpoints.add_offset(self.debug_state.bv.file.original_filename, local_entry_offset)
 				if self.debug_state.ui is not None:
 					self.debug_state.ui.breakpoint_tag_add(self.debug_state.bv.entry_point)
+					self.debug_state.ui.update_highlights()
 					self.debug_state.ui.update_breakpoints()
 
 	def add_scripting_ref(self):

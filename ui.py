@@ -460,8 +460,8 @@ def cb_bp_toggle(bv, address):
 	else:
 		offset = address - bv.start
 		if debug_state.breakpoints.contains_offset(bv.file.original_filename, offset):
-			debug_state.ui.breakpoint_tag_del([address])
 			debug_state.breakpoints.remove_offset(bv.file.original_filename, offset)
+			debug_state.ui.breakpoint_tag_del([address])
 		else:
 			debug_state.breakpoints.add_offset(bv.file.original_filename, offset)
 			debug_state.ui.breakpoint_tag_add(address)
