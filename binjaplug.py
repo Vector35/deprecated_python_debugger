@@ -772,6 +772,9 @@ class DebuggerState:
 		if not self.connected:
 			raise Exception('missing adapter')
 
+		if platform.system() == 'Windows':
+			return self.adapter.go()
+
 		remote_rip = self.ip
 		bphere = self.breakpoints.contains_absolute(remote_rip)
 
@@ -836,6 +839,9 @@ class DebuggerState:
 	def step_into(self, il=FunctionGraphType.NormalFunctionGraph):
 		if not self.connected:
 			raise Exception('missing adapter')
+
+		if platform.system() == 'Windows':
+			return self.adapter.step_into()
 
 		remote_rip = self.ip
 
