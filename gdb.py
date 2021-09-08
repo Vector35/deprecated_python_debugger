@@ -203,7 +203,7 @@ class DebugAdapterGdb(gdblike.DebugAdapterGdbLike):
 
 			# breakpoint and trap flag exception are both reported as SIGTRAP
 			# use presence of 'swbreak' to differentiate, if possible
-			if linux_signal_to_name[signal] == 'SIGTRAP' and 'swbreak' in tdict:
+			if signal in linux_signal_to_name and linux_signal_to_name[signal] == 'SIGTRAP' and 'swbreak' in tdict:
 				result = (DebugAdapter.STOP_REASON.BREAKPOINT, 0)
 			else:
 				if signal in lookup:
