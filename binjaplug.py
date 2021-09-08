@@ -6,7 +6,12 @@ import sys
 import traceback
 import tempfile
 
-from binaryninja import Architecture, BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation, core_ui_enabled, get_text_line_input, get_choice_input
+try:
+	from binaryninja import Architecture, BinaryView, Symbol, SymbolType, Type, StructureBuilder, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation, core_ui_enabled, get_text_line_input, get_choice_input
+	post3 = True
+except:
+	from binaryninja import Architecture, BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation, core_ui_enabled, get_text_line_input, get_choice_input
+	post3 = False
 
 from . import DebugAdapter, ProcessView, dbgeng, gdblike, QueuedAdapter
 
@@ -574,17 +579,27 @@ class DebuggerState:
 			if width > 0:
 				if width > 0x1000:
 					width = 0x1000
-				struct = Structure()
-				struct.type = StructureType.StructStructureType
-				struct.width = width
-				for i in range(0, width, self.remote_arch.address_size):
-					var_name = "var_{:x}".format(width - i)
-					struct.insert(i, Type.pointer(self.remote_arch, Type.void()), var_name)
-				self.memory_view.define_data_var(self.registers['rsp'], Type.structure_type(struct))
-				self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, self.registers['rsp'], "$stack_frame", raw_name="$stack_frame"))
-
+				if post3:
+					with StructureBuilder.create() as struct:
+						struct.type = Type.structure_type
+						struct.width = width
+						for i in range(0, width, self.remote_arch.address_size):
+								var_name = "var_{:x}".format(width - i)
+								struct.insert(i, Type.pointer(self.remote_arch, Type.void()), var_name)
+						self.memory_view.define_data_var(self.registers['rsp'], Type.structure_type(struct))
+						self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, self.registers['rsp'], "$stack_frame", raw_name="$stack_frame"))
+				else:
+					struct = Structure()
+					struct.type = StructureType.StructStructureType
+					struct.width = width
+					for i in range(0, width, self.remote_arch.address_size):
+						var_name = "var_{:x}".format(width - i)
+						struct.insert(i, Type.pointer(self.remote_arch, Type.void()), var_name)
+					self.memory_view.define_data_var(self.registers['rsp'], Type.structure_type(struct))
+					self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, self.registers['rsp'], "$stack_frame", raw_name="$stack_frame"))
 				self.old_symbols.append(self.memory_view.get_symbol_by_raw_name("$stack_frame"))
 				self.old_dvs.add(self.registers['rsp'])
+
 		else:
 			pass
 			# raise NotImplementedError('only x86_64 so far')
