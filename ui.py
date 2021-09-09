@@ -612,7 +612,7 @@ def valid_control_step_return(bv):
 #------------------------------------------------------------------------------
 
 def helpDocs(context):
-	docPath = os.path.join(os.path.dirname(__file__), "Documentation")
+	docPath = os.path.join(os.path.dirname(__file__), "documentation")
 	URLPath = pathlib.Path(os.path.join(docPath, "Manual.html")).as_uri()
 	QDesktopServices.openUrl(URLPath)
 
