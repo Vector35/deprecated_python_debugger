@@ -7,7 +7,7 @@ import traceback
 import tempfile
 
 try:
-	from binaryninja import Architecture, BinaryView, Symbol, SymbolType, Type, StructureBuilder, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation, core_ui_enabled, get_text_line_input, get_choice_input
+	from binaryninja import Architecture, BinaryView, Symbol, SymbolType, Type, StructureBuilder, StructureVariant, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation, core_ui_enabled, get_text_line_input, get_choice_input
 	post3 = True
 except:
 	from binaryninja import Architecture, BinaryView, Symbol, SymbolType, Type, Structure, StructureType, FunctionGraphType, LowLevelILOperation, MediumLevelILOperation, core_ui_enabled, get_text_line_input, get_choice_input
@@ -16,17 +16,17 @@ except:
 from . import DebugAdapter, ProcessView, dbgeng, gdblike, QueuedAdapter
 
 if core_ui_enabled():
-    try:
-        # create the widgets, debugger, etc.
-        from . import ui
-        ui.initialize_ui()
-        have_ui = True
-    except (ModuleNotFoundError, ImportError, IndexError) as e:
-        have_ui = False
-        print(e)
-        print("Could not initialize UI, using headless mode only")
+	try:
+		# create the widgets, debugger, etc.
+		from . import ui
+		ui.initialize_ui()
+		have_ui = True
+	except (ModuleNotFoundError, ImportError, IndexError) as e:
+		have_ui = False
+		print(e)
+		print("Could not initialize UI, using headless mode only")
 else:
-    have_ui = False
+	have_ui = False
 
 #------------------------------------------------------------------------------
 # Globals
@@ -580,23 +580,17 @@ class DebuggerState:
 				if width > 0x1000:
 					width = 0x1000
 				if post3:
-					with StructureBuilder.create() as struct:
-						struct.type = Type.structure_type
-						struct.width = width
-						for i in range(0, width, self.remote_arch.address_size):
-								var_name = "var_{:x}".format(width - i)
-								struct.insert(i, Type.pointer(self.remote_arch, Type.void()), var_name)
-						self.memory_view.define_data_var(self.registers['rsp'], Type.structure_type(struct))
-						self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, self.registers['rsp'], "$stack_frame", raw_name="$stack_frame"))
+					struct = StructureBuilder.create(type=StructureVariant.StructStructureType, width=width)
 				else:
 					struct = Structure()
 					struct.type = StructureType.StructStructureType
 					struct.width = width
-					for i in range(0, width, self.remote_arch.address_size):
+				for i in range(0, width, self.remote_arch.address_size):
 						var_name = "var_{:x}".format(width - i)
 						struct.insert(i, Type.pointer(self.remote_arch, Type.void()), var_name)
-					self.memory_view.define_data_var(self.registers['rsp'], Type.structure_type(struct))
-					self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, self.registers['rsp'], "$stack_frame", raw_name="$stack_frame"))
+				self.memory_view.define_data_var(self.registers['rsp'], struct if post3 else Type.structure_type(struct))
+
+				self.memory_view.define_auto_symbol(Symbol(SymbolType.ExternalSymbol, self.registers['rsp'], "$stack_frame", raw_name="$stack_frame"))
 				self.old_symbols.append(self.memory_view.get_symbol_by_raw_name("$stack_frame"))
 				self.old_dvs.add(self.registers['rsp'])
 
