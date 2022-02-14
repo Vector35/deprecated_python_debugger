@@ -1,4 +1,4 @@
-# Debugger (v1.3.5)
+# Debugger (v1.3.6)
 Author: **Vector35**
 
 _Native debugger support_
