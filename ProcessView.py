@@ -10,7 +10,7 @@ The debug memory BinaryView layout is in a few pieces:
 """
 
 class DebugProcessView(BinaryView):
-	name = "Debugged Process"
+	name = "Python Debugged Process"
 	def __init__(self, parent):
 		self.memory = DebugMemoryView(parent)
 		self.local_view = parent
@@ -117,7 +117,7 @@ class DebugProcessView(BinaryView):
 		return local_addr > local_base and local_addr < local_base + len(relative_view)
 
 class DebugMemoryView(BinaryView):
-	name = "Debugged Process Memory"
+	name = "Python Debugged Process Memory"
 	def __init__(self, parent):
 		BinaryView.__init__(self, parent_view=parent, file_metadata=parent.file)
 		self.value_cache = {}

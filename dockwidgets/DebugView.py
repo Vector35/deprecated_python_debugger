@@ -156,7 +156,7 @@ class DebugView(QWidget, View):
 		# and assign our state to the interpreter's locals
 		for thread in threading.enumerate():
 			if type(thread) == PythonScriptingInstance.InterpreterThread:
-				thread.locals["dbg"] = self.debug_state
+				thread.locals["pydbg"] = self.debug_state
 
 	def getData(self):
 		return self.bv
@@ -374,7 +374,7 @@ class DebugView(QWidget, View):
 class DebugViewType(ViewType):
 	# executed at plugin load time from from ui.py ViewType.registerViewType()
 	def __init__(self):
-		super(DebugViewType, self).__init__("Debugger", "Debugger")
+		super(DebugViewType, self).__init__("Python Debugger", "Python Debugger")
 
 	def getPriority(self, data, filename):
 		return 1

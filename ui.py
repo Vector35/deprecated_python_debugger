@@ -30,12 +30,12 @@ class DebuggerUI:
 		self.regs = []
 		self.stack = []
 
-		registers_widget = self.widget("Debugger Registers")
-		modules_widget = self.widget("Debugger Modules")
-		threads_widget = self.widget("Debugger Threads")
-		stack_widget = self.widget("Debugger Stack")
-		bp_widget = self.widget("Debugger Breakpoints")
-		#console_widget = self.widget('Debugger Console')
+		registers_widget = self.widget("Python Debugger Registers")
+		modules_widget = self.widget("Python Debugger Modules")
+		threads_widget = self.widget("Python Debugger Threads")
+		stack_widget = self.widget("Python Debugger Stack")
+		bp_widget = self.widget("Python Debugger Breakpoints")
+		#console_widget = self.widget('Python Debugger Console')
 
 		if registers_widget is None or modules_widget is None or threads_widget is None or stack_widget is None or bp_widget is None:
 			# One of the views failed to create, bail
@@ -55,10 +55,10 @@ class DebuggerUI:
 		return widget.get_dockwidget(self.state.bv, name)
 
 	def context_display(self):
-		registers_widget = self.widget("Debugger Registers")
-		modules_widget = self.widget("Debugger Modules")
-		threads_widget = self.widget("Debugger Threads")
-		stack_widget = self.widget("Debugger Stack")
+		registers_widget = self.widget("Python Debugger Registers")
+		modules_widget = self.widget("Python Debugger Modules")
+		threads_widget = self.widget("Python Debugger Threads")
+		stack_widget = self.widget("Python Debugger Stack")
 
 		if not self.state.connected:
 			# Disconnected
@@ -355,7 +355,7 @@ class DebuggerUI:
 				# TODO: Length, segments, etc
 			})
 		mods.sort(key=lambda row: row['address'])
-		modules_widget = self.widget("Debugger Modules")
+		modules_widget = self.widget("Python Debugger Modules")
 		modules_widget.notifyModulesChanged(mods)
 
 	# Mark memory as dirty, will refresh memory view
@@ -391,7 +391,7 @@ class DebuggerUI:
 				'address': address
 			})
 
-		bp_widget = self.widget("Debugger Breakpoints")
+		bp_widget = self.widget("Python Debugger Breakpoints")
 		bp_widget.notifyBreakpointsChanged(bps)
 		# Refresh disassembly to show the new bp
 		if self.debug_view is not None:
@@ -435,7 +435,7 @@ class DebuggerUI:
 
 	def on_stdout(self, output):
 		#def on_stdout_main_thread(output):
-		#	console_widget = self.widget('Debugger Console')
+		#	console_widget = self.widget('Python Debugger Console')
 		#	console_widget.notifyStdout(output)
 		#execute_on_main_thread(lambda: on_stdout_main_thread(output))
 		pass
@@ -617,28 +617,28 @@ def helpDocs(context):
 	QDesktopServices.openUrl(URLPath)
 
 def initialize_ui():
-	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Debugger Breakpoints", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
-	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Debugger Registers", Qt.RightDockWidgetArea, Qt.Vertical, False)
-	widget.register_dockwidget(ThreadsWidget.DebugThreadsWidget, "Debugger Threads", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
-	widget.register_dockwidget(StackWidget.DebugStackWidget, "Debugger Stack", Qt.LeftDockWidgetArea, Qt.Vertical, False)
-	widget.register_dockwidget(ModulesWidget.DebugModulesWidget, "Debugger Modules", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
-	#widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
+	widget.register_dockwidget(BreakpointsWidget.DebugBreakpointsWidget, "Python Debugger Breakpoints", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
+	widget.register_dockwidget(RegistersWidget.DebugRegistersWidget, "Python Debugger Registers", Qt.RightDockWidgetArea, Qt.Vertical, False)
+	widget.register_dockwidget(ThreadsWidget.DebugThreadsWidget, "Python Debugger Threads", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
+	widget.register_dockwidget(StackWidget.DebugStackWidget, "Python Debugger Stack", Qt.LeftDockWidgetArea, Qt.Vertical, False)
+	widget.register_dockwidget(ModulesWidget.DebugModulesWidget, "Python Debugger Modules", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
+	#widget.register_dockwidget(ConsoleWidget.DebugConsoleWidget, "Python Debugger Console", Qt.BottomDockWidgetArea, Qt.Horizontal, False)
 
-	PluginCommand.register_for_address("Debugger\\Toggle Breakpoint", "sets/clears breakpoint at right-clicked address", cb_bp_toggle, is_valid=valid_bp_toggle)
+	PluginCommand.register_for_address("Python Debugger\\Toggle Breakpoint", "sets/clears breakpoint at right-clicked address", cb_bp_toggle, is_valid=valid_bp_toggle)
 
-	PluginCommand.register("Debugger\\Process\\Run", "Start new debugging session", cb_process_run, is_valid=valid_process_run)
-	PluginCommand.register("Debugger\\User Documentation", "Open Debugger Documentation", helpDocs, is_valid=valid_process_run)
-	PluginCommand.register("Debugger\\Process\\Restart", "Restart debugging session", cb_process_restart, is_valid=valid_process_restart)
-	PluginCommand.register("Debugger\\Process\\Quit", "Terminate debugged process and end session", cb_process_quit, is_valid=valid_process_quit)
-	# PluginCommand.register("Debugger\\Process\\Attach", "Attach to running process", cb_process_attach, is_valid=valid_process_attach)
-	PluginCommand.register("Debugger\\Process\\Detach", "Detach from current debugged process", cb_process_detach, is_valid=valid_process_detach)
-	PluginCommand.register("Debugger\\Process\\Settings", "Open adapter settings menu", cb_process_settings, is_valid=valid_process_settings)
-	PluginCommand.register("Debugger\\Control\\Pause", "Pause execution", cb_control_pause, is_valid=valid_control_pause)
-	PluginCommand.register("Debugger\\Control\\Resume", "Resume execution", cb_control_resume, is_valid=valid_control_resume)
-	PluginCommand.register("Debugger\\Control\\Step Into (Assembly)", "Step into assembly", cb_control_step_into_asm, is_valid=valid_control_step_into_asm)
-	PluginCommand.register("Debugger\\Control\\Step Into (IL)", "Step into IL", cb_control_step_into_il, is_valid=valid_control_step_into_il)
-	PluginCommand.register("Debugger\\Control\\Step Over (Assembly)", "Step over function call", cb_control_step_over_asm, is_valid=valid_control_step_over_asm)
-	PluginCommand.register("Debugger\\Control\\Step Over (IL)", "Step over function call", cb_control_step_over_il, is_valid=valid_control_step_over_il)
-	PluginCommand.register("Debugger\\Control\\Step Return", "Step until current function returns", cb_control_step_return, is_valid=valid_control_step_return)
+	PluginCommand.register("Python Debugger\\Process\\Run", "Start new debugging session", cb_process_run, is_valid=valid_process_run)
+	PluginCommand.register("Python Debugger\\User Documentation", "Open Debugger Documentation", helpDocs, is_valid=valid_process_run)
+	PluginCommand.register("Python Debugger\\Process\\Restart", "Restart debugging session", cb_process_restart, is_valid=valid_process_restart)
+	PluginCommand.register("Python Debugger\\Process\\Quit", "Terminate debugged process and end session", cb_process_quit, is_valid=valid_process_quit)
+	# PluginCommand.register("Python Debugger\\Process\\Attach", "Attach to running process", cb_process_attach, is_valid=valid_process_attach)
+	PluginCommand.register("Python Debugger\\Process\\Detach", "Detach from current debugged process", cb_process_detach, is_valid=valid_process_detach)
+	PluginCommand.register("Python Debugger\\Process\\Settings", "Open adapter settings menu", cb_process_settings, is_valid=valid_process_settings)
+	PluginCommand.register("Python Debugger\\Control\\Pause", "Pause execution", cb_control_pause, is_valid=valid_control_pause)
+	PluginCommand.register("Python Debugger\\Control\\Resume", "Resume execution", cb_control_resume, is_valid=valid_control_resume)
+	PluginCommand.register("Python Debugger\\Control\\Step Into (Assembly)", "Step into assembly", cb_control_step_into_asm, is_valid=valid_control_step_into_asm)
+	PluginCommand.register("Python Debugger\\Control\\Step Into (IL)", "Step into IL", cb_control_step_into_il, is_valid=valid_control_step_into_il)
+	PluginCommand.register("Python Debugger\\Control\\Step Over (Assembly)", "Step over function call", cb_control_step_over_asm, is_valid=valid_control_step_over_asm)
+	PluginCommand.register("Python Debugger\\Control\\Step Over (IL)", "Step over function call", cb_control_step_over_il, is_valid=valid_control_step_over_il)
+	PluginCommand.register("Python Debugger\\Control\\Step Return", "Step until current function returns", cb_control_step_return, is_valid=valid_control_step_return)
 
 	ViewType.registerViewType(DebugView.DebugViewType())

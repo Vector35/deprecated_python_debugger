@@ -44,7 +44,7 @@ class DebugConsoleWidget(QWidget, DockContextHandler):
 		self.consoleEntry = QLineEdit(self)
 		inputLayout.addWidget(self.consoleEntry, 1)
 
-		self.entryLabel = QLabel("dbg>>> ", self)
+		self.entryLabel = QLabel("pydbg>>> ", self)
 		self.entryLabel.setFont(getMonospaceFont(self))
 		promptLayout.addWidget(self.entryLabel)
 		promptLayout.addStretch(1)
