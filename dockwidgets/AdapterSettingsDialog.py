@@ -98,7 +98,7 @@ class AdapterSettingsDialog(QDialog):
 		self.accepted.connect(lambda: self.apply())
 
 	def selectAdapter(self, adapter):
-		self.bv.store_metadata('debugger.adapter_type', adapter.value)
+		self.bv.store_metadata('python_debugger.adapter_type', adapter.value)
 		debug_state = binjaplug.get_state(self.bv)
 		debug_state.adapter_type = adapter
 		self.adapterEntry.setText(adapter.name)
@@ -116,7 +116,7 @@ class AdapterSettingsDialog(QDialog):
 		debug_state = binjaplug.get_state(self.bv)
 		arguments = shlex.split(self.argumentsEntry.text())
 		debug_state.command_line_args = arguments
-		self.bv.store_metadata('debugger.command_line_args', arguments)
+		self.bv.store_metadata('python_debugger.command_line_args', arguments)
 
 		address = self.addressEntry.text()
 		port = int(self.portEntry.text())
@@ -124,12 +124,12 @@ class AdapterSettingsDialog(QDialog):
 		debug_state.remote_host = address
 		debug_state.remote_port = port
 
-		self.bv.store_metadata('debugger.remote_host', address)
-		self.bv.store_metadata('debugger.remote_port', port)
+		self.bv.store_metadata('python_debugger.remote_host', address)
+		self.bv.store_metadata('python_debugger.remote_port', port)
 
 		request_terminal_emulator = self.requestTerminalEmulator.isChecked()
 		debug_state.request_terminal_emulator = request_terminal_emulator
-		self.bv.store_metadata('debugger.request_terminal_emulator', request_terminal_emulator)
+		self.bv.store_metadata('python_debugger.request_terminal_emulator', request_terminal_emulator)
 
 	def updateArguments(self):
 		try:

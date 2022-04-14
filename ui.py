@@ -47,7 +47,7 @@ class DebuggerUI:
 		self.update_highlights()
 		self.update_breakpoints()
 		Settings().register_group("debugger", "Debugger")
-		key = 'debugger.extra_annotations'
+		key = 'python_debugger.extra_annotations'
 		if not Settings().contains(key):
 			Settings().register_setting(key, '{"description" : "Enables automatic additional annotations to be added to the start of functions that will persist after the debugger has moved away. Must break or step across the start of a function to trigger. Currently uses comments but will be migrated to ephemeral comments when that system is finished.", "title" : "Debugger Function Start Annotations", "default" : false, "type" : "boolean"}')
 

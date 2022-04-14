@@ -399,7 +399,7 @@ class DebuggerBreakpoints:
 		for pair in self.breakpoints:
 			module = pair['module'].replace('\\', '\\\\')
 			tmp.append({'module':module, 'offset':pair['offset']})
-		self.state.bv.store_metadata('debugger.breakpoints', tmp)
+		self.state.bv.store_metadata('python_debugger.breakpoints', tmp)
 
 	'''
 	Load the breakpoints from binary view metadata.
@@ -408,7 +408,7 @@ class DebuggerBreakpoints:
 	def unserialize_metadata(self):
 		tmp = []
 		try:
-			tmp = self.state.bv.query_metadata('debugger.breakpoints')
+			tmp = self.state.bv.query_metadata('python_debugger.breakpoints')
 			for i in range(len(tmp)):
 				tmp[i]['module'] = tmp[i]['module'].replace('\\\\', '\\')
 		except Exception as e:
@@ -447,12 +447,12 @@ class DebuggerState:
 			except:
 				return default
 
-		self.command_line_args = get_metadata('debugger.command_line_args', [])
+		self.command_line_args = get_metadata('python_debugger.command_line_args', [])
 
-		self.adapter_type = list(DebugAdapter.ADAPTER_TYPE)[get_metadata('debugger.adapter_type', DebugAdapter.ADAPTER_TYPE.DEFAULT.value)]
-		self.remote_host = get_metadata('debugger.remote_host', 'localhost')
-		self.remote_port = get_metadata('debugger.remote_port', 31337)
-		self.request_terminal_emulator = get_metadata('debugger.request_terminal_emulator', False)
+		self.adapter_type = list(DebugAdapter.ADAPTER_TYPE)[get_metadata('python_debugger.adapter_type', DebugAdapter.ADAPTER_TYPE.DEFAULT.value)]
+		self.remote_host = get_metadata('python_debugger.remote_host', 'localhost')
+		self.remote_port = get_metadata('python_debugger.remote_port', 31337)
+		self.request_terminal_emulator = get_metadata('python_debugger.request_terminal_emulator', False)
 
 		# Convenience
 		self.registers = DebuggerRegisters(self)
