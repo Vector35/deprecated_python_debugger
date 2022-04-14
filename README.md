@@ -1,7 +1,12 @@
 # Debugger (v1.3.6)
 Author: **Vector35**
 
-_Native debugger support_
+## Notice of deprecation
+
+This repository is deprecated and no longer actively maintained. We have ported the debugger to C++ and it will be shipped with Binary Ninja.
+The new debugger is open-source at https://github.com/Vector35/debugger. Please feel free to test it and report issues.
+
+The C++ debugger already has all of the Python debugger's functionality (and more). If you have installed the python debugger, you are advised to either remove it or -- in case you still need it -- update it to the latest version to avoid conflict with the C++ debugger.
 
 ## Description:
 
