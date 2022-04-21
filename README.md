@@ -1,4 +1,4 @@
-# Debugger (v1.3.6)
+# Debugger (v1.3.8)
 Author: **Vector35**
 
 ## Notice of deprecation
