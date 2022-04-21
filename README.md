@@ -14,8 +14,8 @@ Debug Windows, Linux, and MacOS targets from within Binary Ninja.
 
 ### Screenshots
 
-![](https://github.com/Vector35/debugger/blob/master/media/gui.png?raw=true)
-![](https://github.com/Vector35/debugger/blob/master/media/cli.png?raw=true)
+![](https://github.com/Vector35/deprecated_python_debugger/blob/master/media/gui.png?raw=true)
+![](https://github.com/Vector35/deprecated_python_debugger/blob/master/media/cli.png?raw=true)
 
 
 
